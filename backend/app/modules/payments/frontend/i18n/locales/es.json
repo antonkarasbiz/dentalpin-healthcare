@@ -196,18 +196,57 @@
     },
     "reports": {
       "title": "Informe de cobros",
+      "subtitle": "Cobros, devoluciones, saldos paciente y tendencias del periodo.",
       "cardDescription": "Cobros, devoluciones, saldos paciente, antigüedad y tendencias.",
       "period": "Periodo",
+      "refresh": "Actualizar",
       "collected": "Cobrado",
       "refunded": "Devuelto",
       "net": "Neto",
       "patientCredit": "Saldo a favor pacientes",
+      "patientCreditHint": "A cuenta o anticipos.",
       "clinicReceivable": "Pendiente de cobro",
       "refundRatio": "Tasa devoluciones",
       "byMethod": "Por método",
       "byProfessional": "Por profesional",
+      "byProfessionalHint": "Tratamiento ejecutado, no cobrado.",
       "aging": "Antigüedad de cobros pendientes",
-      "refunds": "Devoluciones"
+      "agingHint": "Pacientes con saldo pendiente por antigüedad de la deuda.",
+      "refunds": "Devoluciones por motivo",
+      "refundsHint": "Distribución de devoluciones por causa registrada.",
+      "bucket": "{range} días",
+      "unknownProfessional": "Sin profesional",
+      "countShort": "{n} mov.",
+      "countPatients": "{n} pacientes",
+      "granularity": {
+        "day": "Día",
+        "week": "Semana",
+        "month": "Mes"
+      },
+      "hero": {
+        "netCollected": "Cobrado neto",
+        "netCollectedHint": "Cobros menos devoluciones del periodo.",
+        "receivable": "Pendiente de cobro",
+        "receivableHint": "Tratamiento ejecutado aún no cobrado, por antigüedad.",
+        "vsPrevious": "vs. periodo anterior",
+        "transactionsCount": "{n} transacciones en el periodo"
+      },
+      "trend": {
+        "title": "Evolución del cobro",
+        "subtitle": "Neto del periodo. La línea discontinua compara con devoluciones."
+      },
+      "empty": {
+        "noDataTitle": "Sin datos en este rango",
+        "noDataDescription": "Ajusta el periodo o registra un cobro para empezar a ver el informe.",
+        "noTrend": "No hay puntos suficientes para dibujar la tendencia.",
+        "noMethods": "Sin cobros por método en el periodo.",
+        "noProfessionals": "Sin tratamiento ejecutado en el periodo.",
+        "noReceivable": "Sin pacientes con deuda."
+      },
+      "drilldown": {
+        "viewPayments": "Ver cobros del periodo",
+        "viewPatients": "Ver pacientes con deuda"
+      }
     }
   }
 }

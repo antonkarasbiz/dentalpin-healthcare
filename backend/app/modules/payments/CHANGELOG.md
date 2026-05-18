@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- docs(user-manual): reescribir pantalla /payments e index del módulo (ES + EN).
+
+### Changed (reports dashboard redesign, 2026-05-17)
+
+- `/reports/payments` reescrito con calm-design: hero KPIs (cobrado
+  neto + sparkline + delta vs periodo anterior, pendiente con mini
+  bars por bucket de antigüedad), KPIs secundarios con sparkline,
+  tendencia full-width (consume por primera vez
+  `GET /reports/trends`), donut por método, top profesionales,
+  aging detail y devoluciones por motivo. Toda interacción dispara
+  drill-down a `/payments` (o `/patients` para aging) con el rango
+  preservado por query string. Sin dependencias nuevas: viz
+  resuelta con SVG en `frontend/app/components/charts/*`
+  (`Sparkline`, `BarRow`, `DonutChart`, `TrendAreaChart`), genéricos
+  y reusables por cualquier módulo. Mantiene el invariante
+  off-books (sin cruces paid↔invoiced).
+- `FilterDateRange` con presets reemplaza los `UInput type=date`
+  crudos; `useCurrency` reemplaza el `Intl.NumberFormat` inline y
+  el fallback hardcoded a `'EUR'`.
+- i18n del módulo: nuevas keys bajo `payments.reports.*`
+  (granularity, hero, trend, empty, drilldown, bucket, refresh,
+  hints) en ES y EN.
+
 ### Added (lists redesign, 2026-05-14)
 
 - `POST /api/v1/payments/summary/by-budgets` — bulk per-budget

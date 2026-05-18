@@ -196,18 +196,57 @@
     },
     "reports": {
       "title": "Payment reports",
+      "subtitle": "Collections, refunds, patient balances and trends for the period.",
       "cardDescription": "Collected, refunds, patient balances, aging and trends.",
       "period": "Period",
+      "refresh": "Refresh",
       "collected": "Collected",
       "refunded": "Refunded",
       "net": "Net",
       "patientCredit": "Patient credit total",
+      "patientCreditHint": "On-account or advance balances.",
       "clinicReceivable": "Clinic receivable",
       "refundRatio": "Refund ratio",
       "byMethod": "By method",
       "byProfessional": "By professional",
+      "byProfessionalHint": "Treatment performed, not collected.",
       "aging": "Receivables aging",
-      "refunds": "Refunds"
+      "agingHint": "Patients with outstanding balance grouped by debt age.",
+      "refunds": "Refunds by reason",
+      "refundsHint": "Distribution of refunds by recorded reason.",
+      "bucket": "{range} days",
+      "unknownProfessional": "Unassigned",
+      "countShort": "{n} txns",
+      "countPatients": "{n} patients",
+      "granularity": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      },
+      "hero": {
+        "netCollected": "Net collected",
+        "netCollectedHint": "Collections minus refunds in the period.",
+        "receivable": "Outstanding receivable",
+        "receivableHint": "Performed treatment not yet collected, by age.",
+        "vsPrevious": "vs. previous period",
+        "transactionsCount": "{n} transactions in the period"
+      },
+      "trend": {
+        "title": "Collection trend",
+        "subtitle": "Net per bucket. Dashed line overlays refunds."
+      },
+      "empty": {
+        "noDataTitle": "No data in this range",
+        "noDataDescription": "Adjust the period or record a payment to start seeing the report.",
+        "noTrend": "Not enough points to draw the trend.",
+        "noMethods": "No collections by method in the period.",
+        "noProfessionals": "No performed treatment in the period.",
+        "noReceivable": "No patients with outstanding debt."
+      },
+      "drilldown": {
+        "viewPayments": "View payments in the period",
+        "viewPatients": "View patients with debt"
+      }
     }
   }
 }
