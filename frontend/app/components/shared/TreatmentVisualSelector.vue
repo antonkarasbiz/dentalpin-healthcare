@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TreatmentCatalogItem, ApiResponse } from '~/types'
+import type { TreatmentCatalogItem } from '~/types'
 
 const props = defineProps<{
   modelValue?: TreatmentCatalogItem | null
@@ -11,70 +11,31 @@ const emit = defineEmits<{
   'update:modelValue': [item: TreatmentCatalogItem | null]
 }>()
 
-const { t, locale } = useI18n()
-const api = useApi()
-const { searchItems, getItemName, formatPrice } = useCatalog()
+const { t } = useI18n()
+const {
+  popularItems,
+  searchResults,
+  isSearching,
+  isLoadingPopular,
+  loadPopularItems,
+  search,
+  getItemName,
+  formatPrice,
+  getCategoryName,
+} = useTreatmentCatalogSearch()
 
-// State
-const popularItems = ref<TreatmentCatalogItem[]>([])
-const searchResults = ref<TreatmentCatalogItem[]>([])
-const isSearching = ref(false)
-const isLoadingPopular = ref(false)
 const selectedItem = ref<TreatmentCatalogItem | null>(props.modelValue || null)
 
-// Load popular items on mount
-onMounted(async () => {
-  await loadPopularItems()
-})
-
-async function loadPopularItems() {
-  isLoadingPopular.value = true
-  try {
-    const response = await api.get<ApiResponse<TreatmentCatalogItem[]>>(
-      '/api/v1/catalog/items/popular?limit=8'
-    )
-    popularItems.value = response.data
-  } catch {
-    popularItems.value = []
-  } finally {
-    isLoadingPopular.value = false
-  }
-}
-
-async function handleSearch(query: string) {
-  if (!query || query.length < 2) {
-    searchResults.value = []
-    return
-  }
-
-  isSearching.value = true
-  try {
-    const results = await searchItems(query, 12)
-    searchResults.value = results as unknown as TreatmentCatalogItem[]
-  } catch {
-    searchResults.value = []
-  } finally {
-    isSearching.value = false
-  }
-}
+onMounted(loadPopularItems)
 
 function handleSelect(item: TreatmentCatalogItem | null) {
   selectedItem.value = item
   emit('update:modelValue', item)
 }
 
-// Sync with parent
 watch(() => props.modelValue, (newVal) => {
   selectedItem.value = newVal || null
 })
-
-// Get category name from item
-function getCategoryName(item: TreatmentCatalogItem): string {
-  if (item.category && item.category.names) {
-    return item.category.names[locale.value] || item.category.names.es || ''
-  }
-  return ''
-}
 </script>
 
 <template>
@@ -128,7 +89,7 @@ function getCategoryName(item: TreatmentCatalogItem): string {
       :grid-cols="2"
       :in-modal="inModal"
       @update:model-value="handleSelect"
-      @search="handleSearch"
+      @search="search"
     >
       <template #item="{ item }">
         <div class="space-y-1">
