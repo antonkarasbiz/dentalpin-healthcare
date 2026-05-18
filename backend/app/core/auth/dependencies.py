@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.log_context import set_request_context
 from app.database import get_db
 
 from .models import Clinic, ClinicMembership, User
@@ -114,6 +115,12 @@ async def get_clinic_context(
             )
     else:
         membership = memberships[0]
+
+    # Bind clinic_id + user_id onto the per-request logging context so
+    # every log line and event emitted inside this handler carries
+    # them automatically (request_id was set by the middleware). Not
+    # reset — the middleware drops the whole context at request end.
+    set_request_context(clinic_id=membership.clinic.id, user_id=current_user.id)
 
     return ClinicContext(
         user=current_user,

@@ -17,6 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.auth.router import limiter
 from app.core.auth.router import router as auth_router
+from app.core.log_context import (
+    new_request_id,
+    reset_request_context,
+    set_request_context,
+    setup_logging,
+)
 from app.core.plugins.loader import load_modules
 from app.core.plugins.processor import PendingProcessor
 from app.core.plugins.service import ModuleService
@@ -30,6 +36,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown."""
+    # Logging: attach the context filter early so every line emitted
+    # during startup / module install also carries the bound fields
+    # (defaults to ``-`` outside a request).
+    setup_logging()
+
     # Startup
     load_modules(app)
 
@@ -93,6 +104,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Bind ``request_id`` for the lifetime of one HTTP request.
+
+    Accepts an inbound ``X-Request-Id`` so a load balancer / client
+    can correlate traces; otherwise mints a fresh short id. Echoes
+    the value back on the response (success or error) so the caller
+    can grep server logs. ``clinic_id`` / ``user_id`` are bound later
+    by the auth dependency once they are known.
+    """
+    incoming = request.headers.get("x-request-id")
+    rid = incoming if incoming and len(incoming) <= 64 else new_request_id()
+    tokens = set_request_context(request_id=rid)
+    try:
+        response = await call_next(request)
+    finally:
+        reset_request_context(tokens)
+    response.headers["X-Request-Id"] = rid
+    return response
 
 
 def _cors_headers(request: Request) -> dict[str, str]:
