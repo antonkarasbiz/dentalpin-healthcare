@@ -67,7 +67,7 @@ export function useMedicalHistory(patientId: Ref<string | undefined>) {
     try {
       const response = await api.put<ApiResponse<MedicalHistory>>(
         `/api/v1/patients_clinical/patients/${patientId.value}/medical-history`,
-        medicalHistory.value as unknown as Record<string, unknown>
+        medicalHistory.value
       )
       medicalHistory.value = response.data
       toast.add({

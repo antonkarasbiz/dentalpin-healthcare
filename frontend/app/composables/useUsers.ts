@@ -50,7 +50,7 @@ export function useUsers() {
     error.value = null
 
     try {
-      const response = await api.post<ApiResponse<User>>('/api/v1/auth/users', data as unknown as Record<string, unknown>)
+      const response = await api.post<ApiResponse<User>>('/api/v1/auth/users', data)
       toast.add({
         title: t('common.success'),
         description: t('settings.messages.userCreated'),
@@ -95,7 +95,7 @@ export function useUsers() {
     error.value = null
 
     try {
-      const response = await api.put<ApiResponse<ClinicUser>>(`/api/v1/auth/users/${userId}`, data as unknown as Record<string, unknown>)
+      const response = await api.put<ApiResponse<ClinicUser>>(`/api/v1/auth/users/${userId}`, data)
       toast.add({
         title: t('common.success'),
         description: t('settings.messages.userUpdated'),

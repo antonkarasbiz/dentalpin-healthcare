@@ -38,7 +38,7 @@ export function useClinic() {
 
   async function updateClinic(data: ClinicUpdate): Promise<Clinic | null> {
     try {
-      const response = await api.put<ApiResponse<Clinic>>('/api/v1/auth/clinics', data as unknown as Record<string, unknown>)
+      const response = await api.put<ApiResponse<Clinic>>('/api/v1/auth/clinics', data)
       currentClinic.value = response.data
       toast.add({
         title: t('common.success'),
@@ -69,7 +69,7 @@ export function useClinic() {
 
   async function createCabinet(data: CabinetCreate): Promise<Cabinet | null> {
     try {
-      const response = await api.post<ApiResponse<Cabinet>>('/api/v1/agenda/cabinets', data as unknown as Record<string, unknown>)
+      const response = await api.post<ApiResponse<Cabinet>>('/api/v1/agenda/cabinets', data)
       patchCabinets(list => [...list, response.data])
       toast.add({
         title: t('common.success'),
@@ -93,7 +93,7 @@ export function useClinic() {
       list.map(c => c.id === cabinetId ? { ...c, ...data } as Cabinet : c),
     )
     try {
-      const response = await api.put<ApiResponse<Cabinet>>(`/api/v1/agenda/cabinets/${cabinetId}`, data as unknown as Record<string, unknown>)
+      const response = await api.put<ApiResponse<Cabinet>>(`/api/v1/agenda/cabinets/${cabinetId}`, data)
       patchCabinets(list => list.map(c => c.id === cabinetId ? response.data : c))
       toast.add({
         title: t('common.success'),

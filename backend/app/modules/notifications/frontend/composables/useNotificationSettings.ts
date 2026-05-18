@@ -101,7 +101,7 @@ export function useNotificationSettings() {
     try {
       const response = await api.put<ApiResponse<ClinicNotificationSettings>>(
         '/api/v1/notifications/settings',
-        data as unknown as Record<string, unknown>
+        data
       )
       settings.value = response.data
       toast.add({
@@ -166,7 +166,7 @@ export function useNotificationSettings() {
     try {
       const response = await api.post<ApiResponse<ManualSendResponse>>(
         '/api/v1/notifications/send',
-        request as unknown as Record<string, unknown>
+        request
       )
       if (response.data.success) {
         toast.add({
@@ -276,7 +276,7 @@ export function useNotificationSettings() {
     try {
       const response = await api.put<ApiResponse<SmtpSettings>>(
         '/api/v1/notifications/smtp-settings',
-        data as unknown as Record<string, unknown>
+        data
       )
       smtpSettings.value = response.data
       toast.add({
@@ -305,7 +305,7 @@ export function useNotificationSettings() {
     try {
       const response = await api.post<ApiResponse<TestEmailResponse>>(
         '/api/v1/notifications/smtp-settings/test',
-        request as unknown as Record<string, unknown>
+        request
       )
       if (response.data.success) {
         toast.add({

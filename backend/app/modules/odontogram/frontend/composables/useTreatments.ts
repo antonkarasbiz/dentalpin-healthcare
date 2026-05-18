@@ -111,7 +111,7 @@ export function useTreatments() {
       }
       const response = await api.post<ApiResponse<Treatment>>(
         `/api/v1/odontogram/patients/${patientId}/treatments`,
-        body as unknown as Record<string, unknown>
+        body
       )
       const normalized = normalizeTreatment(response.data)
       treatments.value.push(normalized)

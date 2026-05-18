@@ -38,7 +38,7 @@ export function useAppointments() {
   async function createAppointment(data: AppointmentCreate): Promise<Appointment> {
     const response = await api.post<ApiResponse<Appointment>>(
       '/api/v1/agenda/appointments',
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Add to local state
@@ -50,7 +50,7 @@ export function useAppointments() {
   async function updateAppointment(id: string, data: AppointmentUpdate): Promise<Appointment> {
     const response = await api.put<ApiResponse<Appointment>>(
       `/api/v1/agenda/appointments/${id}`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state

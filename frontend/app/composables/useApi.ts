@@ -4,7 +4,10 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 interface UseApiOptions {
   method?: HttpMethod
-  body?: Record<string, unknown> | null
+  // Accept any plain object so callers can pass a typed domain payload
+  // (e.g. ``BudgetCreate``) without an ``as unknown as Record<…>`` cast.
+  // ``$fetch`` serializes via JSON.stringify, which handles any object.
+  body?: object | null
   headers?: Record<string, string>
   skipAuth?: boolean
 }
@@ -115,15 +118,15 @@ export function useApi() {
     return $api<T>(path, { ...options, method: 'GET' })
   }
 
-  async function post<T>(path: string, body?: Record<string, unknown> | null, options: Omit<UseApiOptions, 'method' | 'body'> = {}): Promise<T> {
+  async function post<T>(path: string, body?: object | null, options: Omit<UseApiOptions, 'method' | 'body'> = {}): Promise<T> {
     return $api<T>(path, { ...options, method: 'POST', body })
   }
 
-  async function put<T>(path: string, body?: Record<string, unknown> | null, options: Omit<UseApiOptions, 'method' | 'body'> = {}): Promise<T> {
+  async function put<T>(path: string, body?: object | null, options: Omit<UseApiOptions, 'method' | 'body'> = {}): Promise<T> {
     return $api<T>(path, { ...options, method: 'PUT', body })
   }
 
-  async function patch<T>(path: string, body?: Record<string, unknown> | null, options: Omit<UseApiOptions, 'method' | 'body'> = {}): Promise<T> {
+  async function patch<T>(path: string, body?: object | null, options: Omit<UseApiOptions, 'method' | 'body'> = {}): Promise<T> {
     return $api<T>(path, { ...options, method: 'PATCH', body })
   }
 

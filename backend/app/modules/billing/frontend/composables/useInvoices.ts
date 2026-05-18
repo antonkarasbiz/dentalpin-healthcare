@@ -82,7 +82,7 @@ export function useInvoices() {
   async function createSeries(data: InvoiceSeriesCreate): Promise<InvoiceSeries> {
     const response = await api.post<ApiResponse<InvoiceSeries>>(
       '/api/v1/billing/series',
-      data as unknown as Record<string, unknown>
+      data
     )
     return response.data
   }
@@ -90,7 +90,7 @@ export function useInvoices() {
   async function updateSeries(id: string, data: InvoiceSeriesUpdate): Promise<InvoiceSeries> {
     const response = await api.put<ApiResponse<InvoiceSeries>>(
       `/api/v1/billing/series/${id}`,
-      data as unknown as Record<string, unknown>
+      data
     )
     return response.data
   }
@@ -98,7 +98,7 @@ export function useInvoices() {
   async function resetSeriesCounter(id: string, data: SeriesResetRequest): Promise<InvoiceSeries> {
     const response = await api.post<ApiResponse<InvoiceSeries>>(
       `/api/v1/billing/series/${id}/reset`,
-      data as unknown as Record<string, unknown>
+      data
     )
     return response.data
   }
@@ -186,7 +186,7 @@ export function useInvoices() {
   async function createInvoice(data: InvoiceCreate): Promise<Invoice> {
     const response = await api.post<ApiResponse<Invoice>>(
       '/api/v1/billing/invoices',
-      data as unknown as Record<string, unknown>
+      data
     )
     invoices.value = [toListItem(response.data), ...invoices.value]
     return response.data
@@ -195,7 +195,7 @@ export function useInvoices() {
   async function createFromBudget(budgetId: string, data: InvoiceFromBudgetCreate): Promise<Invoice> {
     const response = await api.post<ApiResponse<Invoice>>(
       `/api/v1/billing/invoices/from-budget/${budgetId}`,
-      data as unknown as Record<string, unknown>
+      data
     )
     invoices.value = [toListItem(response.data), ...invoices.value]
     return response.data
@@ -204,7 +204,7 @@ export function useInvoices() {
   async function updateInvoice(id: string, data: InvoiceUpdate): Promise<Invoice> {
     const response = await api.put<ApiResponse<Invoice>>(
       `/api/v1/billing/invoices/${id}`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
@@ -236,7 +236,7 @@ export function useInvoices() {
   ): Promise<Invoice> {
     const response = await api.patch<ApiResponse<Invoice>>(
       `/api/v1/billing/invoices/${id}/billing-party`,
-      data as unknown as Record<string, unknown>
+      data
     )
     if (currentInvoice.value?.id === id) {
       currentInvoice.value = { ...currentInvoice.value, ...response.data }
@@ -261,7 +261,7 @@ export function useInvoices() {
   async function addItem(invoiceId: string, data: InvoiceItemCreate): Promise<InvoiceItem> {
     const response = await api.post<ApiResponse<InvoiceItem>>(
       `/api/v1/billing/invoices/${invoiceId}/items`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Refetch current invoice to get updated totals
@@ -279,7 +279,7 @@ export function useInvoices() {
   ): Promise<InvoiceItem> {
     const response = await api.put<ApiResponse<InvoiceItem>>(
       `/api/v1/billing/invoices/${invoiceId}/items/${itemId}`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Refetch current invoice to get updated totals
@@ -306,7 +306,7 @@ export function useInvoices() {
   async function issueInvoice(id: string, data: InvoiceIssueRequest = {}): Promise<Invoice> {
     const response = await api.post<ApiResponse<Invoice>>(
       `/api/v1/billing/invoices/${id}/issue`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
@@ -331,7 +331,7 @@ export function useInvoices() {
   async function sendInvoice(id: string, data: InvoiceSendRequest): Promise<Invoice> {
     const response = await api.post<ApiResponse<Invoice>>(
       `/api/v1/billing/invoices/${id}/send-email`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     return response.data
@@ -340,7 +340,7 @@ export function useInvoices() {
   async function createCreditNote(id: string, data: CreditNoteCreate): Promise<Invoice> {
     const response = await api.post<ApiResponse<Invoice>>(
       `/api/v1/billing/invoices/${id}/credit-note`,
-      data as unknown as Record<string, unknown>
+      data
     )
     invoices.value = [toListItem(response.data), ...invoices.value]
     updateInvoiceStatus(id, 'cancelled')
@@ -370,7 +370,7 @@ export function useInvoices() {
   async function recordPayment(invoiceId: string, data: InvoicePaymentApply): Promise<InvoicePayment> {
     const response = await api.post<ApiResponse<InvoicePayment>>(
       `/api/v1/billing/invoices/${invoiceId}/payments`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Refetch invoice to pick up the recomputed totals + status.
@@ -416,7 +416,7 @@ export function useInvoices() {
   async function updateSettings(data: BillingSettingsUpdate): Promise<BillingSettings> {
     const response = await api.put<ApiResponse<BillingSettings>>(
       '/api/v1/billing/settings',
-      data as unknown as Record<string, unknown>
+      data
     )
     return response.data
   }

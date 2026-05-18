@@ -143,7 +143,7 @@ export function useBudgets() {
   async function createBudget(data: BudgetCreate): Promise<BudgetDetail> {
     const response = await api.post<ApiResponse<BudgetDetail>>(
       '/api/v1/budget/budgets',
-      data as unknown as Record<string, unknown>
+      data
     )
     budgets.value = [toListItem(response.data), ...budgets.value]
     currentBudget.value = response.data
@@ -153,7 +153,7 @@ export function useBudgets() {
   async function updateBudget(id: string, data: BudgetUpdate): Promise<BudgetDetail> {
     const response = await api.put<ApiResponse<BudgetDetail>>(
       `/api/v1/budget/budgets/${id}`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
@@ -191,7 +191,7 @@ export function useBudgets() {
   async function addItem(budgetId: string, data: BudgetItemCreate): Promise<BudgetItem> {
     const response = await api.post<ApiResponse<BudgetItem>>(
       `/api/v1/budget/budgets/${budgetId}/items`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Refetch current budget to get updated totals
@@ -209,7 +209,7 @@ export function useBudgets() {
   ): Promise<BudgetItem> {
     const response = await api.put<ApiResponse<BudgetItem>>(
       `/api/v1/budget/budgets/${budgetId}/items/${itemId}`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Refetch current budget to get updated totals
@@ -236,7 +236,7 @@ export function useBudgets() {
   async function sendBudget(id: string, data: BudgetSendRequest = {}): Promise<Budget> {
     const response = await api.post<ApiResponse<Budget>>(
       `/api/v1/budget/budgets/${id}/send`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
@@ -248,7 +248,7 @@ export function useBudgets() {
   async function acceptBudget(id: string, data: BudgetAcceptRequest): Promise<Budget> {
     const response = await api.post<ApiResponse<Budget>>(
       `/api/v1/budget/budgets/${id}/accept`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
@@ -260,7 +260,7 @@ export function useBudgets() {
   async function rejectBudget(id: string, data: BudgetRejectRequest = {}): Promise<Budget> {
     const response = await api.post<ApiResponse<Budget>>(
       `/api/v1/budget/budgets/${id}/reject`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
@@ -272,7 +272,7 @@ export function useBudgets() {
   async function cancelBudget(id: string, data: BudgetCancelRequest = {}): Promise<Budget> {
     const response = await api.post<ApiResponse<Budget>>(
       `/api/v1/budget/budgets/${id}/cancel`,
-      data as unknown as Record<string, unknown>
+      data
     )
 
     // Update local state
