@@ -57,27 +57,26 @@ class DocumentService:
         page = max(page, 1)
         offset = (page - 1) * page_size
 
-        query = select(Document).where(
+        conditions = [
             Document.clinic_id == clinic_id,
             Document.patient_id == patient_id,
             Document.status == "active",
-        )
-
+        ]
         if document_type:
-            query = query.where(Document.document_type == document_type)
+            conditions.append(Document.document_type == document_type)
         if media_kind:
-            query = query.where(Document.media_kind == media_kind)
+            conditions.append(Document.media_kind == media_kind)
 
-        count_query = select(func.count()).select_from(query.subquery())
-        total = (await db.execute(count_query)).scalar() or 0
+        total = (await db.execute(select(func.count(Document.id)).where(*conditions))).scalar() or 0
 
-        query = (
-            query.options(selectinload(Document.uploader))
+        result = await db.execute(
+            select(Document)
+            .where(*conditions)
+            .options(selectinload(Document.uploader))
             .order_by(Document.created_at.desc())
             .offset(offset)
             .limit(page_size)
         )
-        result = await db.execute(query)
         return list(result.scalars().all()), total
 
     @staticmethod
@@ -308,14 +307,13 @@ class PhotoService:
         elif pair_status == "unpaired":
             conditions.append(Document.paired_document_id.is_(None))
 
-        query = select(Document).where(*conditions)
-
-        count_query = select(func.count()).select_from(query.subquery())
-        total = (await db.execute(count_query)).scalar() or 0
+        total = (await db.execute(select(func.count(Document.id)).where(*conditions))).scalar() or 0
 
         # Newest first; treat captured_at as a soft override on created_at.
-        query = (
-            query.options(selectinload(Document.uploader))
+        result = await db.execute(
+            select(Document)
+            .where(*conditions)
+            .options(selectinload(Document.uploader))
             .order_by(
                 func.coalesce(Document.captured_at, Document.created_at).desc(),
                 Document.created_at.desc(),
@@ -323,7 +321,6 @@ class PhotoService:
             .offset(offset)
             .limit(page_size)
         )
-        result = await db.execute(query)
         return list(result.scalars().all()), total
 
     @staticmethod

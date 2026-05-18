@@ -293,42 +293,32 @@ class CatalogService:
         page_size = min(max(page_size, 1), 100)
         offset = (page - 1) * page_size
 
-        # Base query with eager loading
-        query = (
-            select(TreatmentCatalogItem)
-            .where(
-                TreatmentCatalogItem.clinic_id == clinic_id,
-                TreatmentCatalogItem.deleted_at.is_(None),
-            )
-            .options(
-                joinedload(TreatmentCatalogItem.category),
-                joinedload(TreatmentCatalogItem.odontogram_mapping),
-                joinedload(TreatmentCatalogItem.vat_type_rel),
-            )
-        )
+        conditions = [
+            TreatmentCatalogItem.clinic_id == clinic_id,
+            TreatmentCatalogItem.deleted_at.is_(None),
+        ]
 
-        # Apply filters
         if is_active is not None:
-            query = query.where(TreatmentCatalogItem.is_active == is_active)
+            conditions.append(TreatmentCatalogItem.is_active == is_active)
 
         if category_id:
-            query = query.where(TreatmentCatalogItem.category_id == category_id)
+            conditions.append(TreatmentCatalogItem.category_id == category_id)
 
         if treatment_scope:
-            query = query.where(TreatmentCatalogItem.treatment_scope == treatment_scope)
+            conditions.append(TreatmentCatalogItem.treatment_scope == treatment_scope)
 
         if has_odontogram_mapping is not None:
             if has_odontogram_mapping:
-                query = query.where(TreatmentCatalogItem.odontogram_mapping.has())
+                conditions.append(TreatmentCatalogItem.odontogram_mapping.has())
             else:
-                query = query.where(~TreatmentCatalogItem.odontogram_mapping.has())
+                conditions.append(~TreatmentCatalogItem.odontogram_mapping.has())
 
         if search_query:
             # Search in internal_code and names (JSONB)
             from sqlalchemy.dialects.postgresql import TEXT
 
             search_pattern = f"%{search_query}%"
-            query = query.where(
+            conditions.append(
                 or_(
                     TreatmentCatalogItem.internal_code.ilike(search_pattern),
                     # Cast JSONB to text for searching
@@ -336,13 +326,19 @@ class CatalogService:
                 )
             )
 
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
-        total = (await db.execute(count_query)).scalar() or 0
+        total = (
+            await db.execute(select(func.count(TreatmentCatalogItem.id)).where(*conditions))
+        ).scalar() or 0
 
-        # Apply pagination and ordering
         query = (
-            query.order_by(
+            select(TreatmentCatalogItem)
+            .where(*conditions)
+            .options(
+                joinedload(TreatmentCatalogItem.category),
+                joinedload(TreatmentCatalogItem.odontogram_mapping),
+                joinedload(TreatmentCatalogItem.vat_type_rel),
+            )
+            .order_by(
                 TreatmentCatalogItem.category_id,
                 TreatmentCatalogItem.internal_code,
             )

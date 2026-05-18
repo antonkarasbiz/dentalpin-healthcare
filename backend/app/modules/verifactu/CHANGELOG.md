@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- perf(records-list): ``/verifactu/records`` counts directly via
+  ``COUNT(VerifactuRecord.id)`` instead of materialising the filter
+  query as a subquery.
 - **AEAT badge en lista y ficha de factura.** Pill `AEAT` con icono +
   color (verde/azul/ámbar/rojo) inyectado vía nuevos slots de billing
   (`invoice.list.row.meta`, `invoice.detail.header.meta`). Tooltip

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- perf(list): drop the ``select_from(query.subquery())`` count
+  anti-pattern in ``TimelineService.get_timeline``; count now runs
+  directly over the indexed ``(clinic_id, patient_id)`` filter.
 - fix(isolation): ``PatientTimeline.patient`` no longer uses
   ``back_populates="timeline_entries"`` — that attribute was removed
   from the foundational ``patients`` module so it would stop pointing

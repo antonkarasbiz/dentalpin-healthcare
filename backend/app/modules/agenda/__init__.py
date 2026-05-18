@@ -24,7 +24,7 @@ class AgendaModule(BaseModule):
         "author": "DentalPin Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": ["patients", "catalog"],
+        "depends": ["patients", "catalog", "odontogram"],
         "installable": True,
         "auto_install": True,
         "removable": False,

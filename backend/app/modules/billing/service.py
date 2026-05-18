@@ -632,40 +632,32 @@ class InvoiceService:
         sort: str | None = None,
     ) -> tuple[list[Invoice], int]:
         """List invoices with filtering and pagination."""
-        query = (
-            select(Invoice)
-            .where(
-                Invoice.clinic_id == clinic_id,
-                Invoice.deleted_at.is_(None),
-            )
-            .options(
-                joinedload(Invoice.patient),
-                joinedload(Invoice.creator),
-            )
-        )
+        conditions = [
+            Invoice.clinic_id == clinic_id,
+            Invoice.deleted_at.is_(None),
+        ]
 
-        # Apply filters
         if patient_id:
-            query = query.where(Invoice.patient_id == patient_id)
+            conditions.append(Invoice.patient_id == patient_id)
 
         if status:
-            query = query.where(Invoice.status.in_(status))
+            conditions.append(Invoice.status.in_(status))
 
         if date_from:
-            query = query.where(Invoice.issue_date >= date_from)
+            conditions.append(Invoice.issue_date >= date_from)
 
         if date_to:
-            query = query.where(Invoice.issue_date <= date_to)
+            conditions.append(Invoice.issue_date <= date_to)
 
         if due_from:
-            query = query.where(Invoice.due_date >= due_from)
+            conditions.append(Invoice.due_date >= due_from)
 
         if due_to:
-            query = query.where(Invoice.due_date <= due_to)
+            conditions.append(Invoice.due_date <= due_to)
 
         if overdue:
             today = date.today()
-            query = query.where(
+            conditions.append(
                 and_(
                     Invoice.due_date < today,
                     Invoice.status.in_(["issued", "partial"]),
@@ -673,13 +665,13 @@ class InvoiceService:
             )
 
         if budget_id:
-            query = query.where(Invoice.budget_id == budget_id)
+            conditions.append(Invoice.budget_id == budget_id)
 
         if is_credit_note is not None:
             if is_credit_note:
-                query = query.where(Invoice.credit_note_for_id.isnot(None))
+                conditions.append(Invoice.credit_note_for_id.isnot(None))
             else:
-                query = query.where(Invoice.credit_note_for_id.is_(None))
+                conditions.append(Invoice.credit_note_for_id.is_(None))
 
         if compliance_severity:
             # Country-agnostic: matches any country key in the JSONB
@@ -697,33 +689,52 @@ class InvoiceService:
             assert all(s.isalpha() and s.islower() for s in compliance_severity)
             # CAST a jsonpath: asyncpg envía el bindparam como VARCHAR
             # y PostgreSQL no acepta VARCHAR para el segundo argumento.
-            query = query.where(
+            conditions.append(
                 text(
                     "jsonb_path_exists(invoices.compliance_data, CAST(:jp AS jsonpath))"
                 ).bindparams(bindparam("jp", value=jsonpath))
             )
 
+        # The search filter joins ``patients`` to match by patient name —
+        # so both the count and the data query share the same join when
+        # active. Without search we count the indexed invoices table
+        # directly, no join overhead.
+        search_join_needed = False
         if search:
             from app.modules.patients.models import Patient
 
-            # Search in invoice number or patient name
             search_term = f"%{search}%"
-            query = query.outerjoin(Patient).where(
+            conditions.append(
                 or_(
                     Invoice.invoice_number.ilike(search_term),
                     Patient.first_name.ilike(search_term),
                     Patient.last_name.ilike(search_term),
                 )
             )
+            search_join_needed = True
 
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await db.execute(count_query)
-        total = total_result.scalar() or 0
+        count_stmt = select(func.count(Invoice.id))
+        if search_join_needed:
+            from app.modules.patients.models import Patient
 
-        # Apply pagination + sort
-        query = query.order_by(parse_sort(sort, _INVOICE_SORT_ALLOW, _INVOICE_SORT_DEFAULT))
-        query = query.offset((page - 1) * page_size).limit(page_size)
+            count_stmt = count_stmt.select_from(Invoice).outerjoin(Patient)
+        total = (await db.execute(count_stmt.where(*conditions))).scalar() or 0
+
+        query = (
+            select(Invoice)
+            .where(*conditions)
+            .options(
+                joinedload(Invoice.patient),
+                joinedload(Invoice.creator),
+            )
+            .order_by(parse_sort(sort, _INVOICE_SORT_ALLOW, _INVOICE_SORT_DEFAULT))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        if search_join_needed:
+            from app.modules.patients.models import Patient
+
+            query = query.outerjoin(Patient)
 
         result = await db.execute(query)
         invoices = list(result.scalars().unique().all())

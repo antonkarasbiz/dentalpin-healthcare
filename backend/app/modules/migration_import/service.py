@@ -104,10 +104,17 @@ class ImportJobService:
         page_size = min(max(page_size, 1), 100)
         page = max(page, 1)
         offset = (page - 1) * page_size
-        base = select(ImportJob).where(ImportJob.clinic_id == clinic_id)
-        total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+        total = (
+            await db.execute(
+                select(func.count(ImportJob.id)).where(ImportJob.clinic_id == clinic_id)
+            )
+        ).scalar() or 0
         rows = await db.execute(
-            base.order_by(ImportJob.created_at.desc()).offset(offset).limit(page_size)
+            select(ImportJob)
+            .where(ImportJob.clinic_id == clinic_id)
+            .order_by(ImportJob.created_at.desc())
+            .offset(offset)
+            .limit(page_size)
         )
         return list(rows.scalars().all()), total
 
@@ -302,9 +309,7 @@ class ImportJobService:
                 await session.commit()
                 warnings_count = (
                     await session.execute(
-                        select(func.count()).select_from(
-                            select(ImportWarning).where(ImportWarning.job_id == job.id).subquery()
-                        )
+                        select(func.count(ImportWarning.id)).where(ImportWarning.job_id == job.id)
                     )
                 ).scalar() or 0
                 await publish_job_completed(
@@ -514,14 +519,20 @@ class ImportJobService:
         page_size = min(max(page_size, 1), 200)
         page = max(page, 1)
         offset = (page - 1) * page_size
-        base = select(ImportWarning).where(ImportWarning.job_id == job_id)
+        conditions = [ImportWarning.job_id == job_id]
         if severity:
-            base = base.where(ImportWarning.severity == severity)
+            conditions.append(ImportWarning.severity == severity)
         if entity_type:
-            base = base.where(ImportWarning.entity_type == entity_type)
-        total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+            conditions.append(ImportWarning.entity_type == entity_type)
+        total = (
+            await db.execute(select(func.count(ImportWarning.id)).where(*conditions))
+        ).scalar() or 0
         rows = await db.execute(
-            base.order_by(ImportWarning.created_at.asc()).offset(offset).limit(page_size)
+            select(ImportWarning)
+            .where(*conditions)
+            .order_by(ImportWarning.created_at.asc())
+            .offset(offset)
+            .limit(page_size)
         )
         return list(rows.scalars().all()), total
 

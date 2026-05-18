@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- perf(invoices-list): drop the ``select_from(query.subquery())``
+  count anti-pattern. ``COUNT(Invoice.id)`` runs directly over the
+  filter set, and the search-by-patient-name join is added only to
+  the count when ``search`` is active (no overhead otherwise).
 - perf(pdf): ``InvoicePDFService.generate_pdf`` is now ``async`` and
   offloads the WeasyPrint render to ``asyncio.to_thread`` so a slow
   PDF (compliance QR, long invoices) no longer stalls the event

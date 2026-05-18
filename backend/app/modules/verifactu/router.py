@@ -409,19 +409,24 @@ async def list_records(
     tipo_factura: str | None = None,
     invoice_id: UUID | None = None,
 ) -> PaginatedApiResponse[VerifactuRecordResponse]:
-    base = select(VerifactuRecord).where(VerifactuRecord.clinic_id == ctx.clinic_id)
+    conditions = [VerifactuRecord.clinic_id == ctx.clinic_id]
     if state:
-        base = base.where(VerifactuRecord.state == state)
+        conditions.append(VerifactuRecord.state == state)
     if tipo_factura:
-        base = base.where(VerifactuRecord.tipo_factura == tipo_factura)
+        conditions.append(VerifactuRecord.tipo_factura == tipo_factura)
     if invoice_id:
-        base = base.where(VerifactuRecord.invoice_id == invoice_id)
-    base = base.order_by(VerifactuRecord.created_at.desc())
+        conditions.append(VerifactuRecord.invoice_id == invoice_id)
 
-    total_q = await db.execute(select(func.count()).select_from(base.subquery()))
+    total_q = await db.execute(select(func.count(VerifactuRecord.id)).where(*conditions))
     total = total_q.scalar_one()
 
-    rows = await db.execute(base.offset((page - 1) * page_size).limit(page_size))
+    rows = await db.execute(
+        select(VerifactuRecord)
+        .where(*conditions)
+        .order_by(VerifactuRecord.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     return PaginatedApiResponse(
         data=[VerifactuRecordResponse.model_validate(r) for r in rows.scalars()],
         total=total,

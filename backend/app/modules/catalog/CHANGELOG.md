@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- perf(list): ``CatalogService.list_items`` now counts directly via
+  ``COUNT(TreatmentCatalogItem.id)`` instead of materialising the
+  joined data query as a subquery.
 - fix(isolation): drop the cross-module imports of
   ``billing.InvoiceItem`` and ``budget.BudgetItem`` from
   ``CatalogService.get_popular_items``. Catalog is foundational

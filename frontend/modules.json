@@ -2,8 +2,8 @@
   "layers": [
     "/module_layers/patients/frontend",
     "/module_layers/catalog/frontend",
-    "/module_layers/agenda/frontend",
     "/module_layers/odontogram/frontend",
+    "/module_layers/agenda/frontend",
     "/module_layers/budget/frontend",
     "/module_layers/payments/frontend",
     "/module_layers/billing/frontend",
@@ -27,12 +27,12 @@
       "path": "/module_layers/catalog/frontend"
     },
     {
-      "name": "agenda",
-      "path": "/module_layers/agenda/frontend"
-    },
-    {
       "name": "odontogram",
       "path": "/module_layers/odontogram/frontend"
+    },
+    {
+      "name": "agenda",
+      "path": "/module_layers/agenda/frontend"
     },
     {
       "name": "budget",

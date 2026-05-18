@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- perf(lists): drop the ``select_from(query.subquery())`` count
+  anti-pattern in ``DocumentService.list_documents`` and
+  ``PhotoService.list_photos``; both lists now count via a direct
+  ``COUNT(Document.id)`` over the same filter set.
 - Added per-module `CLAUDE.md` for AI-agent context (2026-04-27).
 - **0.2.0 (issue #55)** — Photo gallery + generalized polymorphic
   attachments (2026-05-02):

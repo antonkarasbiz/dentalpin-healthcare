@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- fix(isolation): declare ``catalog`` in ``manifest.depends`` — the
+  email-template handlers and the preview endpoint already imported
+  catalog models to render line items. The dependency was real,
+  just undeclared. ``KNOWN_VIOLATIONS`` allowlist trimmed
+  accordingly.
 - chore(events): subscribe via ``EventType.X`` constants instead of
   string literals — the events were already registered in the enum,
   the handler dict was the last drift site.

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- fix(isolation): declare ``odontogram`` in ``manifest.depends``. The
+  service already imported ``Treatment`` to render appointment
+  treatments — the dependency was real, just undeclared.
+  ``KNOWN_VIOLATIONS`` allowlist trimmed accordingly.
+  (``treatment_plan`` stays as a legit known violation because
+  treatment_plan depends on agenda — declaring would cycle.)
 - fix(isolation): ``Appointment.patient`` no longer uses
   ``back_populates="appointments"`` — the matching attribute was
   removed from the foundational ``patients`` module. The

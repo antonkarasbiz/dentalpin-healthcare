@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- fix(isolation): declare ``agenda`` in ``manifest.depends`` — the
+  service already imported ``Appointment`` / ``AppointmentTreatment``
+  to surface visit-level notes. The dependency was real, just
+  undeclared. ``KNOWN_VIOLATIONS`` allowlist trimmed accordingly.
+
 ### Changed
 
 - **0.2.0 (issue #55)** — Polymorphic attachments delegated to `media`:

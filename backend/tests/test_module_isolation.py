@@ -104,13 +104,9 @@ def _list_modules() -> list[str]:
 # fails until the allowlist is updated (forcing the cleanup to be
 # explicit). The goal is to drain this set over time, not grow it.
 KNOWN_VIOLATIONS: set[tuple[str, str, str]] = {
-    ("agenda", "service.py", "odontogram"),
     ("agenda", "service.py", "treatment_plan"),
     ("agenda", "kanban_service.py", "schedules"),
     ("billing", "router.py", "reports"),
-    ("clinical_notes", "service.py", "agenda"),
-    ("notifications", "handlers.py", "catalog"),
-    ("notifications", "router.py", "catalog"),
     ("patient_timeline", "seed.py", "agenda"),
     ("patient_timeline", "seed.py", "billing"),
     ("patient_timeline", "seed.py", "budget"),

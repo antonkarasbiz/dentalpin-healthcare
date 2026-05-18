@@ -29,19 +29,24 @@ class TimelineService:
         page = max(page, 1)
         offset = (page - 1) * page_size
 
-        query = select(PatientTimeline).where(
+        conditions = [
             PatientTimeline.clinic_id == clinic_id,
             PatientTimeline.patient_id == patient_id,
-        )
-
+        ]
         if category:
-            query = query.where(PatientTimeline.event_category == category)
+            conditions.append(PatientTimeline.event_category == category)
 
-        total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+        total = (
+            await db.execute(select(func.count(PatientTimeline.id)).where(*conditions))
+        ).scalar() or 0
 
-        query = query.order_by(PatientTimeline.occurred_at.desc())
-        query = query.offset(offset).limit(page_size)
-        result = await db.execute(query)
+        result = await db.execute(
+            select(PatientTimeline)
+            .where(*conditions)
+            .order_by(PatientTimeline.occurred_at.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
         entries = result.scalars().all()
 
         return [TimelineEntry.model_validate(e) for e in entries], total

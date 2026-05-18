@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- perf(lists): drop the ``select_from(query.subquery())`` count
+  anti-pattern in ``ImportJobService.list_jobs``,
+  ``list_warnings`` and the warnings-count after each execute. All
+  counts now run directly over the indexed filter set.
 - chore(events): publisher helpers (``publish_job_started``,
   ``publish_job_completed``, ``publish_job_failed``,
   ``publish_binary_resolved``, ``publish_entity_persisted``) are now
