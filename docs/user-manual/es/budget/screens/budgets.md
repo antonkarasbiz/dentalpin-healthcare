@@ -36,24 +36,77 @@ related_permissions:
   - budget.accept_in_clinic
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/index.vue
-last_verified_commit: 0000000
+  - backend/app/modules/budget/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /budgets
+# Listado de presupuestos
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Cola operativa de presupuestos de la clínica. Desde aquí buscas
+presupuestos por paciente o número, filtras por estado del flujo,
+estado de cobro, validez y profesional asignado, ordenas y abres el
+detalle para trabajar sobre cada uno.
 
-_Pantalla `/budgets` del módulo `budget`._
+## De un vistazo
+
+- **Filtros con dos orígenes.** Estado, profesional, validez y rango
+  de fechas se mandan al endpoint nativo `GET /budgets`. El filtro
+  *Cobro* (impagado / parcial / cobrado) lo aporta el módulo de
+  pagos: la página llama a `/payments/filters/budgets-by-status` y
+  cruza los IDs.
+- **Columna *Cobrado / Pendiente*** — la rellena `payments` por el
+  slot `budget.list.row.payments`. Si desinstalas cobros la columna
+  desaparece sin romper nada.
+- **Validez** — *Vigentes*, *A punto de expirar* (próximos 7 días),
+  *Expirados*. Si elijes *A punto de expirar* se setean
+  `valid_until_after=hoy` y `valid_until_before=hoy+7`.
+- **Buscar** — caja `?search=` aplica al número de presupuesto y al
+  paciente. Los filtros viven en la URL: enlace compartido =
+  filtros compartidos.
+- **Versionado.** Cada renegociación crea una versión nueva sin
+  borrar la anterior. El listado por defecto solo enseña la versión
+  vigente.
+
+## Buscar un presupuesto
+
+1. Escribe número o paciente en la barra de búsqueda.
+2. Combina con los filtros de estado o cobro para acotar.
+3. Pulsa la fila para abrir el [detalle](./budgets_id.md).
+
+## Crear un presupuesto
+
+> Requiere `budget.write`.
+
+1. Pulsa **Nuevo presupuesto**. Te lleva a `/budgets/new`.
+2. Selecciona paciente y añade ítems del catálogo, descuentos e IVA.
+   Ver [Nuevo presupuesto](./budgets_new.md).
+
+## Acciones por fila
+
+> Algunas acciones requieren permisos extra. Mira la columna de
+> permisos abajo.
+
+- **Descargar PDF** — del presupuesto en su estado actual.
+- **Duplicar** — crea un nuevo borrador con los mismos ítems.
+- **Cancelar / Borrar** — admin only.
 
 ## Permisos
 
-- `budget.read`
-- `budget.write`
-- `budget.admin`
-- `budget.renegotiate`
-- `budget.accept_in_clinic`
+| Lo que ves / puedes hacer | Permiso |
+|---------------------------|---------|
+| Navegar y buscar, descargar PDF | `budget.read` |
+| Crear, editar, enviar, duplicar | `budget.write` |
+| Borrar | `budget.admin` |
+| Renegociar (nueva versión) | `budget.renegotiate` |
+| Aceptar en clínica (tablet con firma) | `budget.accept_in_clinic` |
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
+- **El filtro *Cobro* no aparece.** El módulo `payments` no está
+  instalado; el slot no se rellena.
+- **Veo el aviso "resultados truncados".** El filtro *Cobro* cruza
+  contra una respuesta limitada de cobros; afina por fechas o
+  profesional para reducir el universo.
+- **Un presupuesto recién renegociado no sale.** El listado muestra
+  la versión vigente: la nueva versión está visible, la anterior
+  queda en el historial accesible desde el detalle.

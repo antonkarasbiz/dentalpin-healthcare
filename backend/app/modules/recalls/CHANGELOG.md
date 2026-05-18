@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(user-manual): reescribir pantallas con guía operativa (ES + EN).
 - Initial release. Patient call-back workflow (issue #62).
 - Tables: `recalls`, `recall_contact_attempts`, `recall_settings`
   on the `recalls` Alembic branch (`rec_0001`).

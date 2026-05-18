@@ -36,36 +36,98 @@ related_permissions:
   - budget.accept_in_clinic
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/[id].vue
-last_verified_commit: 0ba0a4a
+  - backend/app/modules/budget/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /budgets/[id]
+# Budget detail
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+Full view of one budget: header with patient info, a main column
+with the line items and totals, and a sidebar with actions, metadata,
+and the payments card contributed by the payments module. This is
+where the budget moves through `draft → sent → accepted` and gets
+signed, invoiced, or renegotiated.
 
-_Screen `/budgets/[id]` of the `budget` module._
+## At a glance
+
+- **Two-column layout.** Left: budget line items with catalog item,
+  tooth, surfaces, quantity, discount, and VAT. Right (top to
+  bottom): **payments** card (slot `budget.detail.sidebar`, filled
+  by `payments`), **totals** (subtotal, discount, VAT, total),
+  **info** (number, version, validity, creator, linked plan).
+- **Status chip** in the header. Available actions depend on it.
+- **Versioning.** Each renegotiation creates a new version linked
+  via `parent_budget_id`; history is shown under *Version history*.
+- **Signature and PDFs.** An accepted budget stores a
+  `BudgetSignature` plus a signed PDF whose SHA-256 is kept as a
+  tamper-evident hash. Two downloads exist: unsigned PDF and
+  signed PDF.
+- **Create invoice.** When the budget is *accepted* and still has
+  uninvoiced items, a *Create invoice* button appears and takes you
+  to `/invoices/from-budget/{id}`.
+
+## Edit lines
+
+> Requires `budget.write` and `draft` status.
+
+1. Click **Edit** on a line or **Add item** below the table.
+2. Change catalog item, tooth, surfaces, quantity, discount, or
+   VAT. Totals recompute on save.
+3. The backend rewrites the totals invariant on save (no `update`
+   event yet).
+
+## Send to the patient
+
+> Requires `budget.write`.
+
+1. Click **Send to patient**. The budget transitions to `sent`, a
+   public code is generated, and the email goes out.
+2. `budget.sent` is published so messaging modules can complement
+   the email.
+3. The sidebar then shows the [public link](./p_budget_token.md)
+   card with the verification code.
+
+## Accept or reject
+
+> Requires `budget.write` for online acceptance,
+> `budget.accept_in_clinic` for in-clinic signed acceptance.
+
+1. **Accept (online)** — used when the patient accepts via the
+   public link. Creates a `BudgetSignature` and a signed PDF.
+   Publishes `budget.accepted`.
+2. **Accept in clinic** — button only visible with the matching
+   permission. Opens the tablet signature modal (drawn signature).
+   Same result as the online acceptance.
+3. **Reject** — records a reason and publishes `budget.rejected`.
+
+## Renegotiate
+
+> Requires `budget.renegotiate`.
+
+1. Click **Renegotiate**. Creates a new version linked to the
+   current one; the previous becomes historical.
+2. Edit items and save. Publishes `budget.renegotiated`.
 
 ## Permissions
 
-- `budget.read`
-- `budget.write`
-- `budget.admin`
-- `budget.renegotiate`
-- `budget.accept_in_clinic`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| View detail, lines, version history, download PDF | `budget.read` |
+| Edit lines, send, accept online, reject, cancel, duplicate | `budget.write` |
+| Accept by signing in-clinic | `budget.accept_in_clinic` |
+| Renegotiate (create a new version) | `budget.renegotiate` |
+| Delete | `budget.admin` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
-## Sidebar layout
-
-The right-hand sidebar stacks (top → bottom):
-
-1. **Payments card** (mounted via the `budget.detail.sidebar` slot from
-   the `payments` module): compact `Collected / Total` summary with a
-   progress bar, a one-line pending status, and a list of payment
-   allocations with method icon + relative date. The "Collect" CTA
-   lives in the card header and is hidden once the budget is settled.
-2. **Totals card**: subtotal, discount, tax, total.
-3. **Info card**: budget number, version, creator, date, linked plan.
-
+- **No *Create invoice* button.** The budget is not accepted yet
+  (valid: `accepted`), or it already has a non-cancelled invoice,
+  or every item is already invoiced
+  (`invoiced_quantity == quantity`).
+- **Cannot edit lines.** The budget is no longer in `draft`. To
+  change prices or quantities on a sent/accepted budget you must
+  **renegotiate** (requires `budget.renegotiate`).
+- **No payments card.** The `payments` module is not installed.
+  The sidebar shows only totals and info.
+- **Signed PDF returns 404.** The budget is not accepted yet — the
+  signed PDF only exists from the `accepted` state on.

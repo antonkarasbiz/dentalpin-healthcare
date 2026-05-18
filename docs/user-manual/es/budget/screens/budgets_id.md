@@ -36,38 +36,105 @@ related_permissions:
   - budget.accept_in_clinic
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/[id].vue
-last_verified_commit: 0ba0a4a
+  - backend/app/modules/budget/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /budgets/[id]
+# Detalle del presupuesto
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Vista completa de un presupuesto: cabecera con datos del paciente,
+columna principal con las líneas y totales, y columna lateral con
+acciones, info y la tarjeta de cobros que aporta el módulo de pagos.
+Desde aquí se mueve el presupuesto por todo su flujo
+`borrador → enviado → aceptado` y se firma, factura o renegocia.
 
-_Pantalla `/budgets/[id]` del módulo `budget`._
+## De un vistazo
+
+- **Layout en dos columnas.** Izquierda: líneas del presupuesto con
+  ítem del catálogo, diente, superficies, cantidad, descuento e IVA.
+  Derecha (de arriba abajo): tarjeta de **cobros** (slot
+  `budget.detail.sidebar` rellenado por `payments`), **totales**
+  (subtotal, descuento, IVA, total), **info** (número, versión,
+  validez, creador, plan asociado).
+- **Estado del presupuesto** — chip de color en la cabecera. Las
+  acciones disponibles dependen del estado.
+- **Versionado.** Cada renegociación crea una versión nueva
+  enlazada con `parent_budget_id`; el historial se ve desde
+  *Historial de versiones*.
+- **Firma y PDF.** Un presupuesto aceptado guarda la firma
+  (BudgetSignature) y un PDF firmado con su SHA-256 como sello
+  anti-manipulación. Hay dos descargas: PDF sin firmar y PDF
+  firmado.
+- **Crear factura.** Si el presupuesto está *aceptado* y aún tiene
+  ítems sin facturar, aparece el botón *Crear factura* que lleva a
+  `/invoices/from-budget/{id}`.
+
+## Editar líneas
+
+> Requiere `budget.write` y que el presupuesto esté en `draft`.
+
+1. Pulsa **Editar** sobre la línea o **Añadir ítem** abajo de la
+   tabla.
+2. Cambia ítem del catálogo, diente, superficies, cantidad,
+   descuento o IVA. Los totales se recalculan al guardar.
+3. Al guardar se publica un `budget.updated` lógico interno (no
+   evento aún), pero el invariante de totales se reescribe en el
+   backend.
+
+## Enviar al paciente
+
+> Requiere `budget.write`.
+
+1. Pulsa **Enviar al paciente**. El presupuesto pasa a `sent`,
+   se genera un código público y se envía el correo.
+2. Se publica `budget.sent` para que módulos de comunicación
+   puedan complementar el envío.
+3. La barra lateral muestra entonces la tarjeta del
+   [enlace público](./p_budget_token.md) con el código de
+   verificación.
+
+## Aceptar o rechazar
+
+> Requiere `budget.write` para aceptar online,
+> `budget.accept_in_clinic` para aceptación firmada en tablet.
+
+1. **Aceptar (online)** — usado cuando el paciente acepta por el
+   enlace público. La aceptación crea una `BudgetSignature` y un
+   PDF firmado. Publica `budget.accepted`.
+2. **Aceptar en clínica** — botón solo visible con permiso. Abre el
+   modal de firma en tablet (firma dibujada). Mismo resultado que
+   la aceptación online.
+3. **Rechazar** — registra motivo y publica `budget.rejected`.
+
+## Renegociar
+
+> Requiere `budget.renegotiate`.
+
+1. Pulsa **Renegociar**. Crea una nueva versión enlazada con la
+   actual; la antigua queda como histórica.
+2. Edita ítems y guarda. Publica `budget.renegotiated`.
 
 ## Permisos
 
-- `budget.read`
-- `budget.write`
-- `budget.admin`
-- `budget.renegotiate`
-- `budget.accept_in_clinic`
+| Lo que ves / puedes hacer | Permiso |
+|---------------------------|---------|
+| Ver detalle, líneas, historial de versiones, descargar PDF | `budget.read` |
+| Editar líneas, enviar, aceptar online, rechazar, cancelar, duplicar | `budget.write` |
+| Aceptar firmando en clínica | `budget.accept_in_clinic` |
+| Renegociar (crear nueva versión) | `budget.renegotiate` |
+| Borrar | `budget.admin` |
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
-## Layout del sidebar
-
-La columna derecha apila (de arriba a abajo):
-
-1. **Tarjeta de cobros** (montada vía el slot `budget.detail.sidebar`
-   desde el módulo `payments`): resumen compacto `Cobrado / Total` con
-   barra de progreso, estado de pendiente en una sola línea e
-   historial de cobros con icono de método y fecha relativa. El CTA
-   "Cobrar" vive en el header de la tarjeta y se oculta cuando el
-   presupuesto está saldado.
-2. **Tarjeta de totales**: subtotal, descuento, IVA y total.
-3. **Tarjeta de info**: número de presupuesto, versión, creador, fecha
-   y plan de tratamiento asociado.
-
+- **No veo el botón *Crear factura*.** El presupuesto no está
+  aceptado (estado válido: `accepted`), o ya hay una factura no
+  cancelada, o todos los ítems se facturaron ya
+  (`invoiced_quantity == quantity`).
+- **No puedo editar líneas.** El presupuesto ya no está en
+  `draft`. Para cambiar precios o cantidades de un presupuesto
+  enviado/aceptado debes **renegociar** (requiere
+  `budget.renegotiate`).
+- **No aparece la tarjeta de cobros.** El módulo `payments` no está
+  instalado. La columna lateral muestra solo totales e info.
+- **El PDF firmado da 404.** El presupuesto no está aceptado todavía.
+  El PDF firmado solo existe a partir del estado `accepted`.

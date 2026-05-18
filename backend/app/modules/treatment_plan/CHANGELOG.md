@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(user-manual): reescribir pantallas con guía operativa (ES + EN).
 - **0.2.0 (issue #55)** — `TreatmentMedia` model + `treatment_media`
   table dropped (migration `tp_0004`, depends on `med_0002`). Existing
   rows are migrated into `media.media_attachments` with

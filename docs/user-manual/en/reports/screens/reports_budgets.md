@@ -3,47 +3,60 @@ module: reports
 screen: budgets
 route: /reports/budgets
 related_endpoints:
-  - GET /api/v1/reports/billing/by-payment-method
-  - GET /api/v1/reports/billing/by-professional
-  - GET /api/v1/reports/billing/gaps
-  - GET /api/v1/reports/billing/overdue
-  - GET /api/v1/reports/billing/summary
-  - GET /api/v1/reports/billing/vat-summary
   - GET /api/v1/reports/budgets/by-professional
   - GET /api/v1/reports/budgets/by-status
   - GET /api/v1/reports/budgets/by-treatment
   - GET /api/v1/reports/budgets/summary
-  - GET /api/v1/reports/scheduling/by-cabinet
-  - GET /api/v1/reports/scheduling/by-day-of-week
-  - GET /api/v1/reports/scheduling/by-professional
-  - GET /api/v1/reports/scheduling/duration-variance
-  - GET /api/v1/reports/scheduling/first-visits
-  - GET /api/v1/reports/scheduling/funnel
-  - GET /api/v1/reports/scheduling/punctuality
-  - GET /api/v1/reports/scheduling/summary
-  - GET /api/v1/reports/scheduling/waiting-times
 related_permissions:
-  - reports.billing.read
   - reports.budgets.read
-  - reports.scheduling.read
 related_paths:
   - backend/app/modules/reports/frontend/pages/reports/budgets.vue
-last_verified_commit: 0000000
+  - backend/app/modules/reports/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /reports/budgets
+# Budget reports
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+Budget dashboard. Measures **conversion** from draft to accepted,
+average time in each state, and closure reasons. It is the
+management view to spot bottlenecks in patient acceptance and to
+understand which treatments convert best.
 
-_Screen `/reports/budgets` of the `reports` module._
+## At a glance
+
+- **Summary** — totals per state in the range (`draft`, `sent`,
+  `accepted`, `rejected`, `expired`, `cancelled`), monetary
+  totals, and overall conversion rate (`accepted / sent`).
+- **By status** — distribution across statuses for the selected
+  range.
+- **By professional** — conversion rate and monetary volume per
+  assigned professional. Useful for internal benchmarking and
+  coaching.
+- **By treatment** — which catalog items appear most often and
+  which have the worst conversion.
+
+## Drill-downs
+
+- Every bar or row links to the budget list
+  ([/budgets](../../budget/screens/budgets.md)) filtered by status,
+  professional, or closure reason.
+- To audit a specific budget from here, open the drill-down and
+  enter the detail.
 
 ## Permissions
 
-- `reports.billing.read`
-- `reports.budgets.read`
-- `reports.scheduling.read`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| View the dashboard and breakdowns | `reports.budgets.read` |
+| Open the budget list (drill-down) | `budget.read` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **0% conversion.** No budgets in `accepted` for the range. Widen
+  the range or check the acceptance pipeline.
+- **No-one in *By professional*.** Budgets lack
+  `assigned_professional_id`. It is optional; assign a
+  professional when creating/editing a budget to see them here.
+- **A card opens an empty list.** The drill-down combines range +
+  status/professional, and that combination has no budgets. Drop a
+  filter.

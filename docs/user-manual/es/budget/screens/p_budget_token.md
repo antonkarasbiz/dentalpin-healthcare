@@ -1,59 +1,90 @@
 ---
 module: budget
-screen: detail
+screen: public
 route: /p/budget/[token]
 related_endpoints:
-  - DELETE /api/v1/budget/budgets/{budget_id}
-  - DELETE /api/v1/budget/budgets/{budget_id}/items/{item_id}
-  - GET /api/v1/budget/budgets
-  - GET /api/v1/budget/budgets/{budget_id}
-  - GET /api/v1/budget/budgets/{budget_id}/history
-  - GET /api/v1/budget/budgets/{budget_id}/pdf
-  - GET /api/v1/budget/budgets/{budget_id}/pdf/preview
-  - GET /api/v1/budget/budgets/{budget_id}/pdf/signed
-  - GET /api/v1/budget/budgets/{budget_id}/signature
-  - GET /api/v1/budget/budgets/{budget_id}/versions
-  - POST /api/v1/budget/budgets
-  - POST /api/v1/budget/budgets/{budget_id}/accept
-  - POST /api/v1/budget/budgets/{budget_id}/accept-in-clinic
-  - POST /api/v1/budget/budgets/{budget_id}/cancel
-  - POST /api/v1/budget/budgets/{budget_id}/duplicate
-  - POST /api/v1/budget/budgets/{budget_id}/items
-  - POST /api/v1/budget/budgets/{budget_id}/reject
-  - POST /api/v1/budget/budgets/{budget_id}/renegotiate
-  - POST /api/v1/budget/budgets/{budget_id}/resend
-  - POST /api/v1/budget/budgets/{budget_id}/send
-  - POST /api/v1/budget/budgets/{budget_id}/send-reminder
-  - POST /api/v1/budget/budgets/{budget_id}/set-public-code
-  - POST /api/v1/budget/budgets/{budget_id}/unlock-public
-  - PUT /api/v1/budget/budgets/{budget_id}
-  - PUT /api/v1/budget/budgets/{budget_id}/items/{item_id}
+  - GET /api/v1/public/budgets/{token}
+  - GET /api/v1/public/budgets/{token}/meta
+  - GET /api/v1/public/budgets/{token}/pdf/signed
+  - POST /api/v1/public/budgets/{token}/accept
+  - POST /api/v1/public/budgets/{token}/reject
+  - POST /api/v1/public/budgets/{token}/verify
 related_permissions:
-  - budget.read
-  - budget.write
-  - budget.admin
-  - budget.renegotiate
-  - budget.accept_in_clinic
 related_paths:
   - backend/app/modules/budget/frontend/pages/p/budget/[token].vue
-last_verified_commit: 0000000
+  - backend/app/modules/budget/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /p/budget/[token]
+# Aceptación pública del paciente
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Vista pública del presupuesto que el paciente abre desde el enlace
+que recibe por correo o WhatsApp. **No requiere sesión** de la app;
+se autentica por token + un segundo factor (código numérico) según
+[ADR 0006](../../../../adr/0006-budget-public-link-2-factor-auth.md).
+Desde aquí el paciente puede ver el detalle, descargar el PDF y
+aceptar o rechazar el presupuesto.
 
-_Pantalla `/p/budget/[token]` del módulo `budget`._
+Esta pantalla es para el **paciente**, no para el personal de la
+clínica. La describimos aquí para que recepción sepa qué ve el
+paciente cuando le pasan el enlace.
+
+## De un vistazo
+
+- **Doble factor.** Para abrir el contenido el paciente teclea el
+  código numérico que la clínica le ha facilitado (lo configuras
+  desde el detalle del presupuesto, *Definir código público*). El
+  endpoint `POST /verify` impone un *rate-limit* y, al acertar,
+  guarda una cookie HttpOnly de sesión limitada al path
+  `/api/v1/public/budgets/{token}`. La cookie no sirve para abrir
+  otro presupuesto distinto.
+- **Idempotente al primer visto.** La primera vez que el paciente
+  abre la vista (tras verificar) publicamos `budget.viewed` con un
+  timestamp. Reabrir no genera más eventos.
+- **Acciones del paciente.** *Aceptar* y *Rechazar* son acciones
+  públicas: dejan la firma asociada y publican
+  `budget.accepted` / `budget.rejected`. Aceptar genera el PDF
+  firmado y guarda su SHA-256 como huella anti-manipulación.
+- **PDF firmado.** Tras aceptar, el botón *Descargar PDF firmado*
+  llama a `GET /pdf/signed` con la cookie. Está limitado a 10
+  descargas/minuto por token; cada acceso queda registrado en
+  `BudgetAccessLog`.
+
+## Lo que ve el paciente
+
+1. Pantalla de bienvenida con el nombre de la clínica y un campo de
+   código.
+2. Tras verificar: cabecera con clínica + paciente, listado de
+   ítems con totales, validez y profesional asignado.
+3. Botones **Aceptar** y **Rechazar** (este último pide motivo).
+4. **Descargar PDF** del presupuesto.
+
+## Cómo ayudar a un paciente con problemas
+
+> Acciones del lado clínica.
+
+- **Reenviar enlace** desde el detalle: *Reenviar*. Publica
+  `budget.reminder_sent`.
+- **Cambiar / generar nuevo código público** desde *Definir código
+  público*.
+- **Desbloquear si pasó el límite de intentos** — endpoint
+  `POST /unlock-public` (botón en el detalle cuando hay bloqueo
+  vigente).
 
 ## Permisos
 
-- `budget.read`
-- `budget.write`
-- `budget.admin`
-- `budget.renegotiate`
-- `budget.accept_in_clinic`
+Pantalla pública: no hay permisos de DentalPin asociados. Las
+acciones internas que la soportan sí requieren `budget.write` en la
+clínica (enviar, reenviar, generar/cambiar código, desbloquear).
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
+- **"Código incorrecto" repetido.** El paciente teclea mal el
+  código; tras varios intentos se bloquea el enlace temporalmente.
+  Desbloquéalo desde el detalle.
+- **El paciente acepta pero no ve el PDF firmado.** El PDF firmado
+  se genera al aceptar; pídele recargar tras unos segundos. Si
+  persiste, comprueba en `BudgetAccessLog` si hay errores.
+- **La sesión caduca.** La cookie es por token y de duración
+  corta. Si el paciente cierra el navegador, tendrá que volver a
+  meter el código.

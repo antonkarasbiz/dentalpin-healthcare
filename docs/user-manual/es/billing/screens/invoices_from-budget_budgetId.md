@@ -1,56 +1,74 @@
 ---
 module: billing
-screen: detail
+screen: from-budget
 route: /invoices/from-budget/[budgetId]
 related_endpoints:
-  - DELETE /api/v1/billing/invoices/{invoice_id}
-  - DELETE /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - GET /api/v1/billing/invoices
-  - GET /api/v1/billing/invoices/{invoice_id}
-  - GET /api/v1/billing/invoices/{invoice_id}/history
-  - GET /api/v1/billing/invoices/{invoice_id}/payments
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf/preview
-  - GET /api/v1/billing/patients/{patient_id}/summary
   - GET /api/v1/billing/series
   - GET /api/v1/billing/settings
-  - PATCH /api/v1/billing/invoices/{invoice_id}/billing-party
-  - POST /api/v1/billing/invoices
+  - GET /api/v1/budget/budgets/{budget_id}
   - POST /api/v1/billing/invoices/from-budget/{budget_id}
-  - POST /api/v1/billing/invoices/{invoice_id}/credit-note
-  - POST /api/v1/billing/invoices/{invoice_id}/issue
-  - POST /api/v1/billing/invoices/{invoice_id}/items
-  - POST /api/v1/billing/invoices/{invoice_id}/payments
-  - POST /api/v1/billing/invoices/{invoice_id}/send-email
-  - POST /api/v1/billing/invoices/{invoice_id}/void
-  - POST /api/v1/billing/series
-  - POST /api/v1/billing/series/{series_id}/reset
-  - PUT /api/v1/billing/invoices/{invoice_id}
-  - PUT /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - PUT /api/v1/billing/series/{series_id}
-  - PUT /api/v1/billing/settings
 related_permissions:
   - billing.read
   - billing.write
-  - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/from-budget/[budgetId].vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices/from-budget/[budgetId]
+# Factura desde presupuesto
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Asistente para emitir una factura a partir de un presupuesto aceptado
+del módulo `budget`. Permite **facturar total o parcialmente**: por
+defecto todos los ítems sin facturar, pero puedes elegir qué líneas
+y qué cantidades incluir.
 
-_Pantalla `/invoices/from-budget/[budgetId]` del módulo `billing`._
+## De un vistazo
+
+- **Solo desde presupuestos aceptados.** Si el presupuesto no está
+  en estado `accepted` (o tiene una factura activa sin cancelar),
+  el botón *Crear factura* en el detalle del presupuesto no
+  aparece.
+- **Marcado por ítem.** Cada línea del presupuesto muestra `cantidad
+  facturada / cantidad total`. Solo puedes añadir la diferencia o
+  parte de ella; el backend rechaza superar la cantidad
+  pendiente.
+- **Snapshot de precios.** Las líneas se copian del presupuesto con
+  su precio e IVA del momento — así la factura no se ve afectada
+  por cambios posteriores del catálogo.
+- **Receptor.** Por defecto el paciente. Puedes definir un pagador
+  distinto (compañía, mutua, familiar) antes de emitir.
+
+## Facturar desde presupuesto
+
+> Requiere `billing.write`.
+
+1. Llega aquí desde el detalle del presupuesto (*Crear factura*).
+2. Revisa la lista: marca o desmarca líneas y ajusta cantidades a
+   facturar.
+3. Si la factura va a un tercero, configura el pagador distinto.
+4. **Crear factura**. Se invoca
+   `POST /billing/invoices/from-budget/{budget_id}` con los ítems
+   seleccionados. La factura nace en `draft` con los snapshots
+   copiados.
+5. Para emitirla, abre el [detalle](./invoices_id.md) y pulsa
+   **Emitir**.
 
 ## Permisos
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| Lo que ves / puedes hacer | Permiso |
+|---------------------------|---------|
+| Cargar el asistente y ver el presupuesto | `billing.read` |
+| Crear la factura | `billing.write` |
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
+- **El botón *Crear factura* no estaba en el presupuesto.** El
+  presupuesto no está en `accepted`, ya tiene una factura no
+  cancelada o todos los ítems están facturados al 100%.
+- **El backend devuelve 400 al crear.** Has marcado más cantidad de
+  la pendiente. Comprueba `invoiced_quantity` vs `quantity` en cada
+  ítem.
+- **Falta una línea del presupuesto.** Está marcada como ya
+  facturada al 100% (`invoiced_quantity == quantity`). Para revertir,
+  anula la factura previa y vuelve a entrar aquí.

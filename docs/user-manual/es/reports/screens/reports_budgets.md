@@ -3,47 +3,60 @@ module: reports
 screen: budgets
 route: /reports/budgets
 related_endpoints:
-  - GET /api/v1/reports/billing/by-payment-method
-  - GET /api/v1/reports/billing/by-professional
-  - GET /api/v1/reports/billing/gaps
-  - GET /api/v1/reports/billing/overdue
-  - GET /api/v1/reports/billing/summary
-  - GET /api/v1/reports/billing/vat-summary
   - GET /api/v1/reports/budgets/by-professional
   - GET /api/v1/reports/budgets/by-status
   - GET /api/v1/reports/budgets/by-treatment
   - GET /api/v1/reports/budgets/summary
-  - GET /api/v1/reports/scheduling/by-cabinet
-  - GET /api/v1/reports/scheduling/by-day-of-week
-  - GET /api/v1/reports/scheduling/by-professional
-  - GET /api/v1/reports/scheduling/duration-variance
-  - GET /api/v1/reports/scheduling/first-visits
-  - GET /api/v1/reports/scheduling/funnel
-  - GET /api/v1/reports/scheduling/punctuality
-  - GET /api/v1/reports/scheduling/summary
-  - GET /api/v1/reports/scheduling/waiting-times
 related_permissions:
-  - reports.billing.read
   - reports.budgets.read
-  - reports.scheduling.read
 related_paths:
   - backend/app/modules/reports/frontend/pages/reports/budgets.vue
-last_verified_commit: 0000000
+  - backend/app/modules/reports/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /reports/budgets
+# Informes de presupuestos
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Cuadro de mando de presupuestos. Mide la **conversión** desde
+borrador a aceptado, el tiempo medio en cada estado y los motivos
+de cierre. Es la herramienta de gerencia para detectar cuellos de
+botella en la captación y para entender qué tratamientos se aceptan
+mejor.
 
-_Pantalla `/reports/budgets` del módulo `reports`._
+## De un vistazo
+
+- **Resumen** — totales por estado en el rango (`draft`, `sent`,
+  `accepted`, `rejected`, `expired`, `cancelled`), totales
+  monetarios y tasa de conversión global (`accepted / sent`).
+- **Por estado** — distribución de presupuestos por estado, sobre el
+  rango elegido.
+- **Por profesional** — tasa de conversión y volumen monetario por
+  profesional asignado. Útil para benchmarking interno y formación.
+- **Por tratamiento** — qué ítems del catálogo aparecen con más
+  frecuencia y cuáles tienen peor conversión.
+
+## Drill-downs
+
+- Cada barra o fila lleva al listado de presupuestos
+  ([/budgets](../../budget/screens/budgets.md)) filtrado por estado,
+  profesional o motivo de cierre.
+- Para auditar un presupuesto concreto desde aquí, abre el
+  *drill-down* y entra al detalle.
 
 ## Permisos
 
-- `reports.billing.read`
-- `reports.budgets.read`
-- `reports.scheduling.read`
+| Lo que ves / puedes hacer | Permiso |
+|---------------------------|---------|
+| Ver el cuadro y los desgloses | `reports.budgets.read` |
+| Abrir el listado de presupuestos (drill-down) | `budget.read` |
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
+- **Conversión 0%.** En el rango aún no hay presupuestos en
+  `accepted`. Amplía el rango o revisa el pipeline de aceptaciones.
+- **Por profesional no aparece nadie.** El presupuesto no tiene
+  `assigned_professional_id` informado. Es opcional; asigna
+  profesional al crear/editar el presupuesto para verlos aquí.
+- **Una tarjeta abre el listado vacío.** El filtro del drill-down
+  combina rango + estado/profesional, y la combinación quizá no
+  tiene presupuestos. Quita un filtro.

@@ -1,29 +1,42 @@
 ---
 module: reports
-last_verified_commit: 0000000
+last_verified_commit: b1b82f5
 ---
 
 # Reports
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
-
-Landing page for the `reports` module in the end-user manual.
+The clinic's reporting hub. `reports` is a **read-only** module
+that aggregates data from the business modules (billing, budgets,
+agenda) into dashboards. Other modules can add their own reports to
+the dashboard through the `reports.categories` slot — for example,
+`payments` contributes the payments report (see
+[payment reports](../payments/screens/reports_payments.md)).
 
 ## Screens
 
-- `/reports` — _Documentation pending._
-- `/reports/billing` — _Documentation pending._
-- `/reports/budgets` — _Documentation pending._
-- `/reports/scheduling` — _Documentation pending._
+- [Reports dashboard](./screens/reports.md) — entry point with one
+  card per report family.
+- [Billing](./screens/reports_billing.md) — totals invoiced, by
+  series, by payment method, evolution.
+- [Budgets](./screens/reports_budgets.md) — conversion, time in
+  each state, rejection / closure reasons.
+- [Agenda and occupancy](./screens/reports_scheduling.md) — busy
+  hours, no-shows, cancellations, professional mix.
 
-## Permissions
+## Quick reference
 
-- `reports.billing.read`
-- `reports.budgets.read`
-- `reports.scheduling.read`
+| Action | Required permission |
+|--------|---------------------|
+| View the dashboard | any of the three permissions below |
+| See billing reports | `reports.billing.read` |
+| See budget reports | `reports.budgets.read` |
+| See agenda reports | `reports.scheduling.read` |
+| See payment reports (contributed by `payments`) | `payments.reports.read` |
 
-## Technical references
+## Related modules
 
-- [Technical overview](../../../technical/reports/overview.md)
-- [Permissions](../../../technical/reports/permissions.md)
-- [Events](../../../technical/reports/events.md)
+- **Billing, budgets, agenda** — sources of the aggregated reports.
+- **Payments** — contributes the payments card via the
+  `reports.categories` slot.
+- **Catalog, patients** — references and enrichments in aggregated
+  rows (treatment category, patient, professional).

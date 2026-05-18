@@ -3,54 +3,68 @@ module: billing
 screen: edit
 route: /invoices/[id]/edit
 related_endpoints:
-  - DELETE /api/v1/billing/invoices/{invoice_id}
   - DELETE /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - GET /api/v1/billing/invoices
   - GET /api/v1/billing/invoices/{invoice_id}
-  - GET /api/v1/billing/invoices/{invoice_id}/history
-  - GET /api/v1/billing/invoices/{invoice_id}/payments
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf/preview
-  - GET /api/v1/billing/patients/{patient_id}/summary
   - GET /api/v1/billing/series
   - GET /api/v1/billing/settings
   - PATCH /api/v1/billing/invoices/{invoice_id}/billing-party
-  - POST /api/v1/billing/invoices
-  - POST /api/v1/billing/invoices/from-budget/{budget_id}
-  - POST /api/v1/billing/invoices/{invoice_id}/credit-note
-  - POST /api/v1/billing/invoices/{invoice_id}/issue
   - POST /api/v1/billing/invoices/{invoice_id}/items
-  - POST /api/v1/billing/invoices/{invoice_id}/payments
-  - POST /api/v1/billing/invoices/{invoice_id}/send-email
-  - POST /api/v1/billing/invoices/{invoice_id}/void
-  - POST /api/v1/billing/series
-  - POST /api/v1/billing/series/{series_id}/reset
   - PUT /api/v1/billing/invoices/{invoice_id}
   - PUT /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - PUT /api/v1/billing/series/{series_id}
-  - PUT /api/v1/billing/settings
 related_permissions:
   - billing.read
   - billing.write
-  - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/[id]/edit.vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices/[id]/edit
+# Edit invoice draft
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+Form to edit an invoice draft. **Only available when the invoice
+is in `draft`.** Issued invoices are not editable — you have to
+void and re-issue, or issue a credit note.
 
-_Screen `/invoices/[id]/edit` of the `billing` module._
+## At a glance
+
+- **Valid state:** `draft`. Any other state redirects to the
+  [detail](./invoices_id.md) and shows the data read-only.
+- **Receiver (payer).** Defaults to the patient. Click *Different
+  payer* (PATCH `billing-party`) to point to a third party
+  (company, insurer, family member) — the invoice is issued in
+  the alternate payer's name.
+- **Line items.** Add, edit, delete lines. Each line references a
+  catalog item with description, quantity, unit price, discount,
+  and VAT (snapshot of the catalog at the time the invoice was
+  created).
+- **Invoice series.** Not picked here: the active series assigns a
+  number on issue. To use a different series, change the active
+  one under *Settings → Invoice series*.
+
+## Edit an invoice
+
+> Requires `billing.write`.
+
+1. Change discount, quantity, VAT, or add lines.
+2. If the payer is not the patient, click *Different payer* and
+   fill in the third-party legal data.
+3. **Save**. The invoice stays in `draft`. To issue it, return to
+   the [detail](./invoices_id.md) and click **Issue**.
 
 ## Permissions
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| Load the form | `billing.read` |
+| Edit lines and receiver data | `billing.write` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **This screen redirects to the detail.** The invoice is no
+  longer in `draft`. Only drafts can be edited.
+- **Cannot add an item.** Check the item is active in the clinic's
+  catalog and that you have `catalog.read`.
+- **Total doesn't update when changing VAT.** Save so the server
+  recomputes; the frontend shows a live result but the source of
+  truth is the backend response.

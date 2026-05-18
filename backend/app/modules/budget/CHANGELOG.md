@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs(user-manual): reescribir pantallas con guía operativa (ES + EN).
+
 ### Added (lists redesign, 2026-05-14)
 
 - `GET /api/v1/budget/budgets` accepts new params: `budget_ids[]`,

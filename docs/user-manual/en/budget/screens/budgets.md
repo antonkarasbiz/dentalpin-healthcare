@@ -36,24 +36,76 @@ related_permissions:
   - budget.accept_in_clinic
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/index.vue
-last_verified_commit: 0000000
+  - backend/app/modules/budget/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /budgets
+# Budget list
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+The clinic's operational queue of budgets. Search by patient or
+number, filter by workflow status, payment state, validity, and
+assigned professional, sort, and open the detail to work each
+budget.
 
-_Screen `/budgets` of the `budget` module._
+## At a glance
+
+- **Filters from two sources.** Status, professional, validity, and
+  date range go to the native `GET /budgets` endpoint. The
+  *Payment* filter (unpaid / partial / paid) is contributed by the
+  payments module: the page calls
+  `/payments/filters/budgets-by-status` and intersects the IDs.
+- **Collected / Outstanding column** — filled by `payments` through
+  the `budget.list.row.payments` slot. Uninstall payments and the
+  column disappears without breaking anything.
+- **Validity** — *Valid*, *Expiring soon* (next 7 days), *Expired*.
+  Picking *Expiring soon* sets `valid_until_after=today` and
+  `valid_until_before=today+7`.
+- **Search** — the search box maps to `?search=` and matches budget
+  number and patient. Filters live in the URL: a shared link is a
+  shared filter.
+- **Versioning.** Every renegotiation creates a new version without
+  deleting the previous one. The list shows only the current version
+  by default.
+
+## Find a budget
+
+1. Type the number or patient into the search bar.
+2. Combine with the status or payment filters to narrow down.
+3. Click a row to open the [detail](./budgets_id.md).
+
+## Create a budget
+
+> Requires `budget.write`.
+
+1. Click **New budget**. It takes you to `/budgets/new`.
+2. Select the patient and add catalog items, discounts, and VAT.
+   See [New budget](./budgets_new.md).
+
+## Row actions
+
+> Some actions need extra permissions — see the permissions table.
+
+- **Download PDF** — for the current budget state.
+- **Duplicate** — creates a new draft with the same items.
+- **Cancel / Delete** — admin only.
 
 ## Permissions
 
-- `budget.read`
-- `budget.write`
-- `budget.admin`
-- `budget.renegotiate`
-- `budget.accept_in_clinic`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| Browse, search, and download PDFs | `budget.read` |
+| Create, edit, send, duplicate | `budget.write` |
+| Delete | `budget.admin` |
+| Renegotiate (create a new version) | `budget.renegotiate` |
+| Accept in-clinic (tablet signature) | `budget.accept_in_clinic` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **No *Payment* filter shows up.** The `payments` module is not
+  installed; the slot stays empty.
+- **"Results truncated" warning.** The *Payment* filter intersects
+  against a capped payments response — narrow by date or
+  professional to reduce the universe.
+- **A freshly renegotiated budget is missing.** The list shows the
+  current version: the new version is visible, the previous one is
+  available from the version history inside the detail.

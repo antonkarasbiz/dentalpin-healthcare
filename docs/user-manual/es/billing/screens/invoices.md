@@ -35,22 +35,65 @@ related_permissions:
   - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/index.vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices
+# Listado de facturas
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Cola operativa de facturas: borradores en preparación, facturas
+emitidas, abonos, anuladas. Desde aquí se buscan, filtran y abren
+para emitir, enviar por email o anular.
 
-_Pantalla `/invoices` del módulo `billing`._
+## De un vistazo
+
+- **Estados.** `draft` (borrador editable), `issued` (emitida — número
+  fiscal asignado, ya no se puede editar), `paid` (cobrada total),
+  `void` (anulada). Los abonos son un tipo de documento distinto
+  (`credit_note`) que aparece junto con sus facturas relacionadas.
+- **Numeración fiscal.** Solo al **emitir** la factura se asigna el
+  número de la serie. Borrar un borrador no consume número; anular
+  una emitida sí queda en el histórico.
+- **Búsqueda y filtros.** Buscar por número, paciente o NIF.
+  Filtros: estado, rango de fechas de emisión, serie y *con
+  presupuesto*.
+- **Cumplimiento.** Cuando el módulo `verifactu` está instalado,
+  emitir una factura encola el envío a AEAT a través del *hook*
+  asociado a `invoice.issued`. El estado de envío se ve en el
+  detalle.
+
+## Encontrar una factura
+
+1. Escribe número (`FACT-2026-####`), nombre del paciente o NIF en
+   la búsqueda.
+2. Aplica filtros: estado, serie, fechas.
+3. Pulsa una fila para abrir el [detalle](./invoices_id.md).
+
+## Crear una factura
+
+> Requiere `billing.write`.
+
+- **Desde presupuesto** — desde el detalle de un presupuesto
+  aceptado, *Crear factura*. Pasa los ítems al borrador.
+  [Ver factura desde presupuesto](./invoices_from-budget_budgetId.md).
+- **Factura libre** — desde el listado **Nueva factura**.
+  [Ver nueva factura](./invoices_new.md).
 
 ## Permisos
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| Lo que ves / puedes hacer | Permiso |
+|---------------------------|---------|
+| Listar, buscar y descargar PDF | `billing.read` |
+| Crear borradores, editar, emitir, enviar email, crear abonos | `billing.write` |
+| Anular factura emitida | `billing.admin` |
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
+- **No veo una factura recién creada.** Tu filtro activo la excluye.
+  Quita filtros o busca por número.
+- **No me deja editar.** La factura ya está emitida (`issued`). Para
+  cambiar datos legales emite un abono (*Crear nota de crédito*) y
+  factura de nuevo.
+- **"Sin serie activa".** En *Ajustes → Series de facturación* no hay
+  ninguna serie marcada como activa para el ejercicio. Activa o
+  crea una.

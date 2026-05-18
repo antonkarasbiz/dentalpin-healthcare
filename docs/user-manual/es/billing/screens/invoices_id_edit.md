@@ -3,54 +3,68 @@ module: billing
 screen: edit
 route: /invoices/[id]/edit
 related_endpoints:
-  - DELETE /api/v1/billing/invoices/{invoice_id}
   - DELETE /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - GET /api/v1/billing/invoices
   - GET /api/v1/billing/invoices/{invoice_id}
-  - GET /api/v1/billing/invoices/{invoice_id}/history
-  - GET /api/v1/billing/invoices/{invoice_id}/payments
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf/preview
-  - GET /api/v1/billing/patients/{patient_id}/summary
   - GET /api/v1/billing/series
   - GET /api/v1/billing/settings
   - PATCH /api/v1/billing/invoices/{invoice_id}/billing-party
-  - POST /api/v1/billing/invoices
-  - POST /api/v1/billing/invoices/from-budget/{budget_id}
-  - POST /api/v1/billing/invoices/{invoice_id}/credit-note
-  - POST /api/v1/billing/invoices/{invoice_id}/issue
   - POST /api/v1/billing/invoices/{invoice_id}/items
-  - POST /api/v1/billing/invoices/{invoice_id}/payments
-  - POST /api/v1/billing/invoices/{invoice_id}/send-email
-  - POST /api/v1/billing/invoices/{invoice_id}/void
-  - POST /api/v1/billing/series
-  - POST /api/v1/billing/series/{series_id}/reset
   - PUT /api/v1/billing/invoices/{invoice_id}
   - PUT /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - PUT /api/v1/billing/series/{series_id}
-  - PUT /api/v1/billing/settings
 related_permissions:
   - billing.read
   - billing.write
-  - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/[id]/edit.vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices/[id]/edit
+# Editar borrador de factura
 
-> _Esqueleto generado automáticamente — reemplazar con documentación real cuando se toque este módulo._
+Formulario para editar un borrador de factura. **Solo disponible
+cuando la factura está en estado `draft`.** Las facturas emitidas no
+se editan: hay que anular y volver a emitir, o emitir un abono.
 
-_Pantalla `/invoices/[id]/edit` del módulo `billing`._
+## De un vistazo
+
+- **Estado válido:** `draft`. Cualquier otro estado redirige al
+  [detalle](./invoices_id.md) y muestra los datos en solo lectura.
+- **Receptor (pagador).** Por defecto el paciente. Si pulsas
+  *Pagador distinto* (PATCH `billing-party`) puedes apuntar a un
+  tercero (compañía, mutua, familiar) — la factura se emite a
+  nombre del pagador alternativo.
+- **Líneas.** Añadir, editar, borrar líneas. Cada línea referencia
+  un ítem del catálogo con descripción, cantidad, precio
+  unitario, descuento e IVA (snapshot del catálogo al crear la
+  factura).
+- **Serie de facturación.** No se elige aquí: la serie activa
+  asigna número al emitir. Si necesitas otra serie, cambia la
+  serie activa desde *Ajustes → Series de facturación*.
+
+## Editar una factura
+
+> Requiere `billing.write`.
+
+1. Cambia descuento, cantidad, IVA o añade líneas.
+2. Si el pagador no es el paciente, pulsa *Pagador distinto* y
+   rellena los datos legales del tercero.
+3. **Guardar**. La factura sigue en `draft`. Para emitirla, vuelve
+   al [detalle](./invoices_id.md) y pulsa **Emitir**.
 
 ## Permisos
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| Lo que ves / puedes hacer | Permiso |
+|---------------------------|---------|
+| Cargar el formulario | `billing.read` |
+| Editar líneas y datos del receptor | `billing.write` |
 
-## Para qué sirve
+## Resolución de problemas
 
-_Pendiente de documentar._
-
+- **Esta pantalla redirige al detalle.** La factura no está en
+  `draft`. Solo se editan borradores.
+- **No me deja añadir un ítem.** Comprueba que el ítem está activo
+  en el catálogo de la clínica y que tienes `catalog.read`.
+- **El total no actualiza al cambiar IVA.** Guarda para que el
+  servidor recalcule; el frontend muestra el resultado en directo,
+  pero la fuente de verdad es la respuesta del backend.

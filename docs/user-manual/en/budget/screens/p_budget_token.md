@@ -1,59 +1,87 @@
 ---
 module: budget
-screen: detail
+screen: public
 route: /p/budget/[token]
 related_endpoints:
-  - DELETE /api/v1/budget/budgets/{budget_id}
-  - DELETE /api/v1/budget/budgets/{budget_id}/items/{item_id}
-  - GET /api/v1/budget/budgets
-  - GET /api/v1/budget/budgets/{budget_id}
-  - GET /api/v1/budget/budgets/{budget_id}/history
-  - GET /api/v1/budget/budgets/{budget_id}/pdf
-  - GET /api/v1/budget/budgets/{budget_id}/pdf/preview
-  - GET /api/v1/budget/budgets/{budget_id}/pdf/signed
-  - GET /api/v1/budget/budgets/{budget_id}/signature
-  - GET /api/v1/budget/budgets/{budget_id}/versions
-  - POST /api/v1/budget/budgets
-  - POST /api/v1/budget/budgets/{budget_id}/accept
-  - POST /api/v1/budget/budgets/{budget_id}/accept-in-clinic
-  - POST /api/v1/budget/budgets/{budget_id}/cancel
-  - POST /api/v1/budget/budgets/{budget_id}/duplicate
-  - POST /api/v1/budget/budgets/{budget_id}/items
-  - POST /api/v1/budget/budgets/{budget_id}/reject
-  - POST /api/v1/budget/budgets/{budget_id}/renegotiate
-  - POST /api/v1/budget/budgets/{budget_id}/resend
-  - POST /api/v1/budget/budgets/{budget_id}/send
-  - POST /api/v1/budget/budgets/{budget_id}/send-reminder
-  - POST /api/v1/budget/budgets/{budget_id}/set-public-code
-  - POST /api/v1/budget/budgets/{budget_id}/unlock-public
-  - PUT /api/v1/budget/budgets/{budget_id}
-  - PUT /api/v1/budget/budgets/{budget_id}/items/{item_id}
+  - GET /api/v1/public/budgets/{token}
+  - GET /api/v1/public/budgets/{token}/meta
+  - GET /api/v1/public/budgets/{token}/pdf/signed
+  - POST /api/v1/public/budgets/{token}/accept
+  - POST /api/v1/public/budgets/{token}/reject
+  - POST /api/v1/public/budgets/{token}/verify
 related_permissions:
-  - budget.read
-  - budget.write
-  - budget.admin
-  - budget.renegotiate
-  - budget.accept_in_clinic
 related_paths:
   - backend/app/modules/budget/frontend/pages/p/budget/[token].vue
-last_verified_commit: 0000000
+  - backend/app/modules/budget/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /p/budget/[token]
+# Public patient acceptance
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+The public view of a budget that the patient opens from the link
+they receive by email or messaging. **No app session is required**;
+the page authenticates via a token + a second-factor numeric code
+per
+[ADR 0006](../../../../adr/0006-budget-public-link-2-factor-auth.md).
+From here the patient can review the budget, download the PDF, and
+accept or reject it.
 
-_Screen `/p/budget/[token]` of the `budget` module._
+This screen is for the **patient**, not for clinic staff. We
+document it here so the front desk knows what the patient sees when
+the link is forwarded to them.
+
+## At a glance
+
+- **Two-factor.** The patient enters the numeric code the clinic
+  provided (you configure it from the budget detail under *Set
+  public code*). `POST /verify` is rate-limited and, on success,
+  sets an HttpOnly session cookie scoped to
+  `/api/v1/public/budgets/{token}`. The cookie cannot unlock a
+  different budget.
+- **Idempotent first view.** The first time the patient opens the
+  page (after verifying) we publish `budget.viewed` with a
+  timestamp. Reopening does not emit more events.
+- **Patient actions.** *Accept* and *Reject* are public actions:
+  they create the signature record and publish
+  `budget.accepted` / `budget.rejected`. Acceptance generates the
+  signed PDF and stores its SHA-256 as a tamper-evident fingerprint.
+- **Signed PDF.** After acceptance, *Download signed PDF* calls
+  `GET /pdf/signed` with the cookie. Capped at 10 downloads per
+  minute per token; each hit is logged in `BudgetAccessLog`.
+
+## What the patient sees
+
+1. A welcome screen with the clinic name and a code field.
+2. After verifying: header with clinic + patient, line items with
+   totals, validity, and assigned professional.
+3. **Accept** and **Reject** buttons (Reject asks for a reason).
+4. **Download PDF** of the budget.
+
+## How to help a patient who is stuck
+
+> Clinic-side actions.
+
+- **Resend link** from the detail: *Resend*. Publishes
+  `budget.reminder_sent`.
+- **Change or generate a new public code** from *Set public code*.
+- **Unlock after too many failed attempts** — endpoint
+  `POST /unlock-public` (button on the detail when a lockout is
+  active).
 
 ## Permissions
 
-- `budget.read`
-- `budget.write`
-- `budget.admin`
-- `budget.renegotiate`
-- `budget.accept_in_clinic`
+This is a public screen: no DentalPin permissions are tied to it.
+The clinic-side actions that support it require `budget.write` in
+the clinic (send, resend, set/change code, unlock).
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **"Wrong code" repeatedly.** The patient is mistyping the code;
+  after a few attempts the link is temporarily locked. Unlock it
+  from the detail.
+- **Patient accepts but no signed PDF.** The signed PDF is
+  generated on accept; ask them to refresh after a few seconds. If
+  it persists, check `BudgetAccessLog` for errors.
+- **Session expired.** The cookie is per-token and short-lived. If
+  the patient closes the browser they will have to re-enter the
+  code.

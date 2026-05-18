@@ -3,54 +3,71 @@ module: billing
 screen: create
 route: /invoices/new
 related_endpoints:
-  - DELETE /api/v1/billing/invoices/{invoice_id}
-  - DELETE /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - GET /api/v1/billing/invoices
-  - GET /api/v1/billing/invoices/{invoice_id}
-  - GET /api/v1/billing/invoices/{invoice_id}/history
-  - GET /api/v1/billing/invoices/{invoice_id}/payments
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf/preview
-  - GET /api/v1/billing/patients/{patient_id}/summary
   - GET /api/v1/billing/series
   - GET /api/v1/billing/settings
-  - PATCH /api/v1/billing/invoices/{invoice_id}/billing-party
   - POST /api/v1/billing/invoices
-  - POST /api/v1/billing/invoices/from-budget/{budget_id}
-  - POST /api/v1/billing/invoices/{invoice_id}/credit-note
-  - POST /api/v1/billing/invoices/{invoice_id}/issue
   - POST /api/v1/billing/invoices/{invoice_id}/items
-  - POST /api/v1/billing/invoices/{invoice_id}/payments
-  - POST /api/v1/billing/invoices/{invoice_id}/send-email
-  - POST /api/v1/billing/invoices/{invoice_id}/void
-  - POST /api/v1/billing/series
-  - POST /api/v1/billing/series/{series_id}/reset
-  - PUT /api/v1/billing/invoices/{invoice_id}
-  - PUT /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - PUT /api/v1/billing/series/{series_id}
-  - PUT /api/v1/billing/settings
 related_permissions:
   - billing.read
   - billing.write
-  - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/new.vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices/new
+# New invoice
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+Form to create a **free** invoice (without a budget). On save the
+invoice is born as a draft (`draft`) and the
+[detail](./invoices_id.md) opens so you can issue it when ready.
 
-_Screen `/invoices/new` of the `billing` module._
+To invoice from an accepted budget use the
+[budget-based screen](./invoices_from-budget_budgetId.md) — it
+copies items with their price and VAT snapshots and avoids data
+entry errors.
+
+## At a glance
+
+- **Receiver.** Defaults to the patient. *Different payer* lets you
+  point to a third party (company, insurer, family member) with
+  their own fiscal data.
+- **Free lines.** Add catalog items with quantity, discount, VAT.
+  You can also add manual lines (no catalog item) when needed for
+  special charges.
+- **No issuing yet.** Creating does not issue: it only saves the
+  draft. Issuance lives on the detail.
+- **Numbering.** Not assigned here; the fiscal number is set only
+  when you **issue** (button on the detail), which takes the next
+  one from the active series.
+
+## Create a free invoice
+
+> Requires `billing.write`.
+
+1. Pick the patient. If the invoice is for a different payer,
+   click *Different payer* and fill in tax ID, name, and fiscal
+   address.
+2. Add lines: catalog item, quantity, discount, VAT.
+3. Review totals (subtotal, discount, VAT, total).
+4. **Save**. The invoice is born in `draft`. To issue, open the
+   [detail](./invoices_id.md) and click **Issue**.
 
 ## Permissions
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| Access the form | `billing.read` |
+| Create a draft | `billing.write` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **"No active series" warning.** No series is marked active for
+  the fiscal year under *Settings → Invoice series*. You can save
+  the draft but not issue it.
+- **Cannot find a catalog item.** Make sure it is active and that
+  your role has `catalog.read`. If you need a special charge, add
+  a manual line.
+- **No *Different payer* button.** Available on any draft (no
+  extra permission). If it doesn't show, refresh; it may be a
+  load failure of the catalog or the clinic settings.

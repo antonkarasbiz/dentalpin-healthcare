@@ -1,56 +1,72 @@
 ---
 module: billing
-screen: detail
+screen: from-budget
 route: /invoices/from-budget/[budgetId]
 related_endpoints:
-  - DELETE /api/v1/billing/invoices/{invoice_id}
-  - DELETE /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - GET /api/v1/billing/invoices
-  - GET /api/v1/billing/invoices/{invoice_id}
-  - GET /api/v1/billing/invoices/{invoice_id}/history
-  - GET /api/v1/billing/invoices/{invoice_id}/payments
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf
-  - GET /api/v1/billing/invoices/{invoice_id}/pdf/preview
-  - GET /api/v1/billing/patients/{patient_id}/summary
   - GET /api/v1/billing/series
   - GET /api/v1/billing/settings
-  - PATCH /api/v1/billing/invoices/{invoice_id}/billing-party
-  - POST /api/v1/billing/invoices
+  - GET /api/v1/budget/budgets/{budget_id}
   - POST /api/v1/billing/invoices/from-budget/{budget_id}
-  - POST /api/v1/billing/invoices/{invoice_id}/credit-note
-  - POST /api/v1/billing/invoices/{invoice_id}/issue
-  - POST /api/v1/billing/invoices/{invoice_id}/items
-  - POST /api/v1/billing/invoices/{invoice_id}/payments
-  - POST /api/v1/billing/invoices/{invoice_id}/send-email
-  - POST /api/v1/billing/invoices/{invoice_id}/void
-  - POST /api/v1/billing/series
-  - POST /api/v1/billing/series/{series_id}/reset
-  - PUT /api/v1/billing/invoices/{invoice_id}
-  - PUT /api/v1/billing/invoices/{invoice_id}/items/{item_id}
-  - PUT /api/v1/billing/series/{series_id}
-  - PUT /api/v1/billing/settings
 related_permissions:
   - billing.read
   - billing.write
-  - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/from-budget/[budgetId].vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices/from-budget/[budgetId]
+# Invoice from budget
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+Wizard to issue an invoice from an accepted budget on the `budget`
+module. Supports **full or partial billing**: by default all
+uninvoiced items, but you can pick which lines and quantities to
+include.
 
-_Screen `/invoices/from-budget/[budgetId]` of the `billing` module._
+## At a glance
+
+- **Only from accepted budgets.** If the budget is not in
+  `accepted` (or already has a non-cancelled active invoice), the
+  *Create invoice* button on the budget detail does not appear.
+- **Per-item check.** Each budget line shows `invoiced / total`.
+  You can only add the remainder or part of it; the backend
+  rejects exceeding the pending quantity.
+- **Price snapshot.** Lines are copied from the budget with their
+  current price and VAT — so the invoice isn't affected by later
+  catalog changes.
+- **Receiver.** Defaults to the patient. You can switch to a
+  different payer (company, insurer, family member) before issuing.
+
+## Invoice from a budget
+
+> Requires `billing.write`.
+
+1. You arrive here from the budget detail (*Create invoice*).
+2. Review the list: tick / untick lines and adjust the quantities
+   to invoice.
+3. If the invoice goes to a third party, configure the alternate
+   payer.
+4. **Create invoice**. The endpoint
+   `POST /billing/invoices/from-budget/{budget_id}` is called with
+   the selected items. The invoice is born in `draft` with the
+   snapshots copied.
+5. To issue, open the [detail](./invoices_id.md) and click
+   **Issue**.
 
 ## Permissions
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| Load the wizard and see the budget | `billing.read` |
+| Create the invoice | `billing.write` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **No *Create invoice* button on the budget.** The budget is not
+  `accepted`, already has a non-cancelled invoice, or every item
+  is invoiced 100%.
+- **Backend returns 400 on create.** You picked more quantity than
+  pending. Check `invoiced_quantity` vs `quantity` per line.
+- **A budget line is missing.** It is already 100% invoiced
+  (`invoiced_quantity == quantity`). To revert, void the previous
+  invoice and re-enter this wizard.

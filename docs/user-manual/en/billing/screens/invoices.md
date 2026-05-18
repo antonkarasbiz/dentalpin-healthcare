@@ -35,22 +35,64 @@ related_permissions:
   - billing.admin
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/index.vue
-last_verified_commit: 0000000
+  - backend/app/modules/billing/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /invoices
+# Invoice list
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+The operational invoice queue: drafts in progress, issued invoices,
+credit notes, voided documents. From here you search, filter, and
+open invoices to issue, email, or void them.
 
-_Screen `/invoices` of the `billing` module._
+## At a glance
+
+- **States.** `draft` (editable draft), `issued` (a fiscal number
+  is assigned — no longer editable), `paid` (fully collected),
+  `void` (voided). Credit notes are a separate document type
+  (`credit_note`) that shows up alongside their related invoices.
+- **Fiscal numbering.** Only **issuing** an invoice assigns the
+  series number. Deleting a draft does not consume a number;
+  voiding an issued invoice leaves it in the audit history.
+- **Search and filters.** Search by number, patient, or tax ID.
+  Filters: status, issue date range, series, and *with budget*.
+- **Compliance.** When the `verifactu` module is installed,
+  issuing an invoice queues the AEAT submission through the
+  `invoice.issued` hook. The submission state is visible on the
+  detail.
+
+## Find an invoice
+
+1. Type the number (`FACT-2026-####`), patient name, or tax ID
+   into the search box.
+2. Apply filters: status, series, dates.
+3. Click a row to open the [detail](./invoices_id.md).
+
+## Create an invoice
+
+> Requires `billing.write`.
+
+- **From budget** — on an accepted budget detail, *Create invoice*.
+  Copies the items into the draft.
+  [See invoice from budget](./invoices_from-budget_budgetId.md).
+- **Free invoice** — from the list, **New invoice**.
+  [See new invoice](./invoices_new.md).
 
 ## Permissions
 
-- `billing.read`
-- `billing.write`
-- `billing.admin`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| List, search, and download PDFs | `billing.read` |
+| Create drafts, edit, issue, send email, create credit notes | `billing.write` |
+| Void an issued invoice | `billing.admin` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **A newly created invoice is missing.** An active filter is
+  excluding it. Clear filters or search by number.
+- **Editing is blocked.** The invoice is already `issued`. To
+  amend legal data, issue a credit note (*Create credit note*) and
+  invoice again.
+- **"No active series".** No invoice series is marked active for
+  this fiscal year under *Settings → Invoice series*. Activate or
+  create one.

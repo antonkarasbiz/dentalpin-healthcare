@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(user-manual): reescribir pantallas con guía operativa (ES + EN).
 - **Slot uniqueness now ignores terminal statuses.** Migration
   `ag_0004` rebuilds the partial unique index
   `idx_appointment_slot` with

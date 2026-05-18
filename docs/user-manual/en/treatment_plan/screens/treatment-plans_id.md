@@ -32,24 +32,88 @@ related_permissions:
   - treatment_plan.plans.reactivate
 related_paths:
   - backend/app/modules/treatment_plan/frontend/pages/treatment-plans/[id].vue
-last_verified_commit: 0000000
+  - backend/app/modules/treatment_plan/router.py
+last_verified_commit: b1b82f5
 ---
 
-# /treatment-plans/[id]
+# Treatment plan detail
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
+Plan view: header with patient, professional, and status; main
+column with the items (catalog or odontogram tooth treatment); and
+sidebar with the linked budget, executions, and contacts. This is
+where you confirm, sync with the budget, mark items as performed,
+and close or reactivate.
 
-_Screen `/treatment-plans/[id]` of the `treatment_plan` module._
+## At a glance
+
+- **Status chip.** The header chip reflects the state: `draft`,
+  `pending`, `active`, `completed`, `closed`. Actions change with
+  the state.
+- **Items** — add, reorder, complete. Each item references a
+  catalog item and, optionally, an odontogram tooth treatment.
+  Completing an item publishes
+  `treatment_plan.treatment_completed` (with
+  `treatment_category_key` for recalls).
+- **Linked budget.** **Generate budget** / **Link to existing
+  budget** / **Sync** buttons as needed. The plan publishes
+  `treatment_plan.treatment_added / _removed /
+  budget_sync_requested` so `budget` keeps the budget up to date.
+- **Contacts** — front-desk touchpoint history. Useful when the
+  plan is *pending* awaiting acceptance.
+- **Clinical notes.** Can be attached to the plan from the
+  `clinical_notes` module (slot `patient.detail.clinical.notes`).
+
+## Confirm a plan
+
+> Requires `treatment_plan.plans.confirm`.
+
+1. On a `draft` plan, click **Confirm**.
+2. `treatment_plan.confirmed` is published. The plan moves to
+   `pending`.
+3. If no budget was linked, **Generate budget** creates a new one
+   on the `budget` module.
+
+## Mark items as performed
+
+> Requires `treatment_plan.plans.write`.
+
+1. On the item, click **Mark as done**.
+2. `treatment_plan.treatment_completed` is published. `recalls` can
+   suggest a follow-up recall based on `treatment_category_key`.
+3. To record a clinical note at that moment, use the *Add note*
+   button (contributed by `clinical_notes`).
+
+## Close or reactivate
+
+> Closing requires `treatment_plan.plans.close`. Reactivating
+> requires `treatment_plan.plans.reactivate`.
+
+1. **Close** — pick reason: rejected, expired, cancelled,
+   abandoned, or *other*. Publishes `treatment_plan.closed` with
+   `closure_reason`.
+2. **Reactivate** — back to `draft`. Publishes
+   `treatment_plan.reactivated`.
 
 ## Permissions
 
-- `treatment_plan.plans.read`
-- `treatment_plan.plans.write`
-- `treatment_plan.plans.confirm`
-- `treatment_plan.plans.close`
-- `treatment_plan.plans.reactivate`
+| What you see / can do | Permission |
+|-----------------------|------------|
+| View detail, items, and contacts | `treatment_plan.plans.read` |
+| Add/reorder items, complete them, log contacts | `treatment_plan.plans.write` |
+| Confirm (draft → pending) | `treatment_plan.plans.confirm` |
+| Close | `treatment_plan.plans.close` |
+| Reactivate | `treatment_plan.plans.reactivate` |
 
-## What this screen does
+## Troubleshooting
 
-_Documentation pending._
-
+- **Confirmed the plan but no budget appears.** Click **Generate
+  budget** or **Link to existing budget**. Confirming does not
+  auto-create a budget unless you use *Generate* afterwards.
+- **Patient accepted the budget but the plan is still pending.**
+  Check that `budget.accepted` is flowing (the `budget` module must
+  be installed and the budget actually accepted). The
+  `on_budget_accepted` handler moves it to *active*.
+- **Cannot delete an item.** The item is already marked as done.
+  Completed items remain as history.
+- **Cannot complete an item.** Your role lacks
+  `treatment_plan.plans.write`.
