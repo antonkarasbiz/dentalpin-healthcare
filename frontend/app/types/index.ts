@@ -2180,6 +2180,7 @@ export interface ClinicalNoteEntry {
   plan_item_id: string | null
   body: string
   author_id: string | null
+  author: ClinicalNoteAuthor | null
   created_at: string
   updated_at: string | null
   attachments: NoteAttachment[]

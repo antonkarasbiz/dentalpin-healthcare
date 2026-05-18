@@ -236,6 +236,21 @@ function formatDate(iso: string): string {
   }
 }
 
+function entryAuthorLabel(entry: ClinicalNoteEntry): string {
+  const a = entry.author
+  return a?.full_name || a?.email || t('clinicalNotes.author.unknown')
+}
+
+function entryAuthorInitials(entry: ClinicalNoteEntry): string {
+  return entryAuthorLabel(entry)
+    .split(/\s+/)
+    .map(w => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
 watch(() => props.planId, refresh, { immediate: true })
 </script>
 
@@ -337,27 +352,42 @@ watch(() => props.planId, refresh, { immediate: true })
         :style="{ borderLeft: `3px solid ${sourceMeta(entry.source).borderColor}` }"
       >
         <header class="flex items-start justify-between gap-2 mb-2">
-          <div class="flex flex-wrap items-center gap-1.5 min-w-0">
-            <UBadge
-              :color="sourceMeta(entry.source).color"
-              variant="subtle"
+          <div class="flex items-start gap-2 min-w-0 flex-1">
+            <UAvatar
               size="xs"
+              :alt="entryAuthorLabel(entry)"
+              class="shrink-0 mt-0.5"
             >
-              <UIcon
-                :name="sourceMeta(entry.source).icon"
-                class="w-3 h-3 mr-1 shrink-0"
-              />
-              {{ sourceTypeLabel(entry.source) }}
-            </UBadge>
-            <span
-              v-if="entryTreatmentName(entry)"
-              class="text-caption text-default font-medium truncate max-w-[18rem]"
-            >
-              · {{ entryTreatmentName(entry) }}
-            </span>
-            <span class="text-caption text-muted truncate">
-              · {{ formatDate(entry.created_at) }}
-            </span>
+              <span class="text-caption font-semibold">{{ entryAuthorInitials(entry) }}</span>
+            </UAvatar>
+            <div class="flex flex-col min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                <span class="font-medium text-sm truncate">
+                  {{ entryAuthorLabel(entry) }}
+                </span>
+                <UBadge
+                  :color="sourceMeta(entry.source).color"
+                  variant="subtle"
+                  size="xs"
+                  class="shrink-0"
+                >
+                  <UIcon
+                    :name="sourceMeta(entry.source).icon"
+                    class="w-3 h-3 mr-1 shrink-0"
+                  />
+                  {{ sourceTypeLabel(entry.source) }}
+                </UBadge>
+                <span
+                  v-if="entryTreatmentName(entry)"
+                  class="text-caption text-default font-medium truncate max-w-[18rem]"
+                >
+                  · {{ entryTreatmentName(entry) }}
+                </span>
+              </div>
+              <span class="text-caption text-muted truncate">
+                {{ formatDate(entry.created_at) }}
+              </span>
+            </div>
           </div>
           <div
             v-if="isOwnPlanNote(entry)"

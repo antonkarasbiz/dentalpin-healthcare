@@ -591,6 +591,7 @@ async def list_merged_for_plan(db: AsyncSession, clinic_id: UUID, plan_id: UUID)
             ClinicalNote.deleted_at.is_(None),
             owner_filter,
         )
+        .options(selectinload(ClinicalNote.author))
         .order_by(ClinicalNote.created_at.desc())
     )
     notes = list(notes_result.scalars().all())
@@ -608,6 +609,7 @@ async def list_merged_for_plan(db: AsyncSession, clinic_id: UUID, plan_id: UUID)
                 "plan_item_id": plan_item_id,
                 "body": note.body,
                 "author_id": note.author_id,
+                "author": _author_brief(note.author) if note.author else None,
                 "created_at": note.created_at,
                 "updated_at": note.updated_at,
                 "attachments": attachments,
@@ -617,8 +619,9 @@ async def list_merged_for_plan(db: AsyncSession, clinic_id: UUID, plan_id: UUID)
     if item_rows:
         item_ids = [row[0] for row in item_rows]
         visit_result = await db.execute(
-            select(AppointmentTreatment, Appointment.created_at)
+            select(AppointmentTreatment, Appointment)
             .join(Appointment, AppointmentTreatment.appointment_id == Appointment.id)
+            .options(selectinload(Appointment.professional))
             .where(
                 AppointmentTreatment.planned_treatment_item_id.in_(item_ids),
                 AppointmentTreatment.notes.is_not(None),
@@ -626,7 +629,8 @@ async def list_merged_for_plan(db: AsyncSession, clinic_id: UUID, plan_id: UUID)
                 Appointment.clinic_id == clinic_id,
             )
         )
-        for apt_tr, apt_created in visit_result.all():
+        for apt_tr, appointment in visit_result.all():
+            professional = appointment.professional if appointment else None
             entries.append(
                 {
                     "source": "visit",
@@ -634,8 +638,9 @@ async def list_merged_for_plan(db: AsyncSession, clinic_id: UUID, plan_id: UUID)
                     "owner_id": apt_tr.id,
                     "plan_item_id": apt_tr.planned_treatment_item_id,
                     "body": apt_tr.notes or "",
-                    "author_id": None,
-                    "created_at": apt_tr.created_at or apt_created,
+                    "author_id": appointment.professional_id if appointment else None,
+                    "author": _author_brief(professional) if professional else None,
+                    "created_at": apt_tr.created_at or appointment.created_at,
                     "updated_at": None,
                     "attachments": [],
                 }

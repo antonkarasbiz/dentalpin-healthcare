@@ -172,6 +172,7 @@ class ClinicalNoteEntry(BaseModel):
     plan_item_id: UUID | None = None
     body: str
     author_id: UUID | None
+    author: AuthorBrief | None = None
     created_at: datetime
     updated_at: datetime | None = None
     attachments: list[NoteAttachmentResponse] = Field(default_factory=list)

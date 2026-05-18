@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- feat(timeline): surface author (avatar + name) on every entry in the plan notes timeline. ``ClinicalNoteEntry`` now carries an ``author: AuthorBrief | None`` (notes: from ``ClinicalNote.author``; visits: from ``Appointment.professional``). ``PlanNotesTimeline.vue`` renders the author header so the dentist can tell who wrote each note at a glance.
 - refactor(perms): migrate hardcoded ``can('clinical_notes.notes.{read,write}')`` strings in ``TreatmentNoteButton`` / ``DiagnosisNotesSidebar`` / ``PlanNotesTimeline`` / ``RecentNotesFeed`` to ``PERMISSIONS.clinicalNotes.*``.
 - fix(isolation): declare ``agenda`` in ``manifest.depends`` — the
   service already imported ``Appointment`` / ``AppointmentTreatment``
