@@ -2053,6 +2053,7 @@ export interface PlannedTreatmentItem {
   completed_without_appointment: boolean
   completed_at?: string
   completed_by?: string
+  assigned_professional_id?: string | null
   notes?: string
   created_at: string
   updated_at: string
@@ -2067,11 +2068,13 @@ export interface PlannedTreatmentItemCreate {
   treatment_id: string
   sequence_order?: number
   notes?: string
+  assigned_professional_id?: string | null
 }
 
 export interface PlannedTreatmentItemUpdate {
   sequence_order?: number
   notes?: string
+  assigned_professional_id?: string | null
 }
 
 export interface CompleteItemRequest {
@@ -2278,6 +2281,12 @@ export interface TreatmentPlanUpdate {
   assigned_professional_id?: string
   diagnosis_notes?: string
   internal_notes?: string
+  /**
+   * When true and the plan's `assigned_professional_id` changes, the backend
+   * reassigns pending items still pointing at the previous plan doctor.
+   * Items with an explicit override or completed items are left alone.
+   */
+  reassign_pending_items?: boolean
 }
 
 export interface TreatmentPlanStatusUpdate {

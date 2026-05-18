@@ -6,16 +6,39 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.auth.models import ClinicMembership
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.modules.odontogram.models import Treatment
 from app.modules.patients.models import Patient
 
 from .models import PlannedTreatmentItem, TreatmentPlan
+
+
+async def _validate_professional_in_clinic(
+    db: AsyncSession, clinic_id: UUID, user_id: UUID
+) -> None:
+    """Confirm ``user_id`` is a dentist/hygienist member of ``clinic_id``.
+
+    Used when assigning a doctor to a plan item (or the plan itself) to
+    avoid leaking users across tenants or assigning a non-clinical role.
+    Raises ``ValueError`` so the router maps it to a 400 response, in
+    line with the other validation errors in this module.
+    """
+    result = await db.execute(
+        select(ClinicMembership.id).where(
+            ClinicMembership.clinic_id == clinic_id,
+            ClinicMembership.user_id == user_id,
+            ClinicMembership.role.in_(("dentist", "hygienist")),
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise ValueError("Invalid professional for this clinic")
+
 
 logger = logging.getLogger(__name__)
 
@@ -256,9 +279,38 @@ class TreatmentPlanService:
         if not plan:
             return None
 
+        # Pull the cascade flag out before generic setattr — it is a
+        # write-only directive, not a column on TreatmentPlan.
+        reassign_pending = bool(data.pop("reassign_pending_items", False))
+        old_professional_id = plan.assigned_professional_id
+        new_professional_id = data.get("assigned_professional_id", old_professional_id)
+
+        if new_professional_id is not None and new_professional_id != old_professional_id:
+            await _validate_professional_in_clinic(db, clinic_id, new_professional_id)
+
         for key, value in data.items():
             if value is not None and hasattr(plan, key):
                 setattr(plan, key, value)
+
+        # Cascade is opt-in. Only pending items still pointing at the previous
+        # plan-doctor are reassigned; explicit overrides (other doctor) and
+        # completed items are intentionally left alone.
+        if (
+            reassign_pending
+            and old_professional_id is not None
+            and new_professional_id is not None
+            and old_professional_id != new_professional_id
+        ):
+            await db.execute(
+                update(PlannedTreatmentItem)
+                .where(
+                    PlannedTreatmentItem.treatment_plan_id == plan_id,
+                    PlannedTreatmentItem.clinic_id == clinic_id,
+                    PlannedTreatmentItem.status == "pending",
+                    PlannedTreatmentItem.assigned_professional_id == old_professional_id,
+                )
+                .values(assigned_professional_id=new_professional_id)
+            )
 
         return plan
 
@@ -420,12 +472,22 @@ class TreatmentPlanService:
             max_order = result.scalar_one() or 0
             sequence_order = max_order + 1
 
+        # Inherit the plan's doctor unless the caller passes an explicit value.
+        # Snapshot semantics: once stored on the item it stays put even if the
+        # plan's doctor changes later (cascade is opt-in on plan update).
+        assigned_professional_id = data.get("assigned_professional_id")
+        if assigned_professional_id is None:
+            assigned_professional_id = plan.assigned_professional_id
+        if assigned_professional_id is not None:
+            await _validate_professional_in_clinic(db, clinic_id, assigned_professional_id)
+
         item = PlannedTreatmentItem(
             clinic_id=clinic_id,
             treatment_plan_id=plan_id,
             treatment_id=treatment_id,
             sequence_order=sequence_order,
             notes=data.get("notes"),
+            assigned_professional_id=assigned_professional_id,
         )
         db.add(item)
         await db.flush()
@@ -467,6 +529,9 @@ class TreatmentPlanService:
                     if treatment and treatment.price_snapshot is not None
                     else None
                 ),
+                "assigned_professional_id": (
+                    str(item.assigned_professional_id) if item.assigned_professional_id else None
+                ),
             },
         )
 
@@ -484,7 +549,14 @@ class TreatmentPlanService:
         plan = await TreatmentPlanService.get(db, clinic_id, plan_id)
         if not plan:
             return None
-        if _is_plan_locked(plan):
+
+        # The plan-lock guard protects the patient-facing contract: items,
+        # prices, sequence. Reassigning who performs a treatment doesn't
+        # change that contract, so doctor-only updates skip the guard —
+        # clinicians need to swap responsibility even after the plan is
+        # validated. Any other field still respects the lock.
+        non_doctor_keys = {k for k in data if k != "assigned_professional_id"}
+        if non_doctor_keys and _is_plan_locked(plan):
             raise PlanLockedError("Plan is locked by an active budget")
 
         result = await db.execute(
@@ -501,6 +573,21 @@ class TreatmentPlanService:
         item = result.scalar_one_or_none()
         if not item:
             return None
+
+        # Completed/cancelled items preserve the doctor that was responsible
+        # at the time. ``completed_by`` is the source of truth for "who did
+        # it" once an item is done — don't let later edits rewrite history.
+        if "assigned_professional_id" in data and item.status != "pending":
+            raise ValueError("Cannot change the assigned doctor on a non-pending item")
+
+        # ``assigned_professional_id`` is nullable on purpose — the caller may
+        # want to clear it. The router passes ``model_dump(exclude_unset=True)``
+        # so a missing key means "do not touch", while ``None`` means "unset".
+        if "assigned_professional_id" in data:
+            new_professional_id = data.pop("assigned_professional_id")
+            if new_professional_id is not None:
+                await _validate_professional_in_clinic(db, clinic_id, new_professional_id)
+            item.assigned_professional_id = new_professional_id
 
         for key, value in data.items():
             if value is not None and hasattr(item, key):

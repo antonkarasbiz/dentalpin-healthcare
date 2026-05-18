@@ -253,6 +253,18 @@ export function useTreatmentPlans() {
     }
   }
 
+  // Change the doctor assigned to a single item. ``null`` clears the override
+  // (server-side that becomes "no doctor assigned to this item").
+  async function changeItemDoctor(
+    planId: string,
+    itemId: string,
+    professionalId: string | null
+  ) {
+    return await updateItem(planId, itemId, {
+      assigned_professional_id: professionalId
+    })
+  }
+
   // Remove item
   async function removeItem(planId: string, itemId: string) {
     loading.value = true
@@ -602,6 +614,7 @@ export function useTreatmentPlans() {
     removeItem,
     reorderItems,
     completeItem,
+    changeItemDoctor,
 
     // Workflow transitions
     confirmPlan,

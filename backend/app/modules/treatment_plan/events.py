@@ -210,12 +210,25 @@ async def on_treatment_performed(data: dict[str, Any]) -> None:
 
     async with async_session_maker() as db:
         try:
+            # ``SKIP LOCKED`` avoids a deadlock when this handler runs as a
+            # sub-step of ``TreatmentPlanService.complete_item``: the parent
+            # transaction already holds a row lock on this item (it flushed
+            # its own ``status='completed'`` UPDATE before publishing the
+            # event). Without ``SKIP LOCKED`` the handler would open a new
+            # session, block waiting for the parent to commit, and the
+            # parent would block waiting for this handler to return —
+            # surfaced as a request timeout in the client. When the lock is
+            # held we treat the originator as responsible for the
+            # state transition and exit silently; the parent's UPDATE
+            # achieves the same end state.
             result = await db.execute(
-                select(PlannedTreatmentItem).where(
+                select(PlannedTreatmentItem)
+                .where(
                     PlannedTreatmentItem.treatment_id == UUID(treatment_id),
                     PlannedTreatmentItem.clinic_id == UUID(clinic_id),
                     PlannedTreatmentItem.status == "pending",
                 )
+                .with_for_update(skip_locked=True)
             )
             item = result.scalar_one_or_none()
 

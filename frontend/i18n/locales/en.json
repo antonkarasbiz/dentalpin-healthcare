@@ -1458,7 +1458,18 @@
       "add": "Add treatment",
       "addSelected": "Add {count} treatment | Add {count} treatments",
       "remove": "Remove treatment",
-      "empty": "No treatments in this plan"
+      "empty": "No treatments in this plan",
+      "assignedProfessional": "Assigned dentist",
+      "assignedProfessionalAriaLabel": "Change assigned dentist for this treatment",
+      "useUsersPlanDoctor": "Use plan's dentist",
+      "noProfessional": "No dentist assigned",
+      "inactiveProfessional": "Inactive professional",
+      "cascadeReassign": {
+        "title": "Reassign pending treatments?",
+        "body": "You changed the plan dentist. {count} pending treatment(s) were assigned to {previousName}. Reassign them to the new dentist as well?",
+        "confirm": "Yes, reassign pending",
+        "cancel": "No, keep as they are"
+      }
     },
     "filters": {
       "allStatuses": "All statuses"

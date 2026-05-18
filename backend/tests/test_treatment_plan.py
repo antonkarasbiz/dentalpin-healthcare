@@ -474,3 +474,470 @@ async def test_cancel_plan_removes_planned_treatments(
     assert r.status_code == 200, r.text
 
     assert await _treatment_is_deleted(client, auth_headers, setup["patient_id"], treatment_id)
+
+
+# ---------------------------------------------------------------------------
+# Per-item assigned professional (doctor por tratamiento)
+# ---------------------------------------------------------------------------
+
+
+async def _add_professional(
+    db_session: AsyncSession,
+    clinic_id: str,
+    email: str,
+    role: str = "dentist",
+) -> str:
+    """Create a User + ClinicMembership for tests that need extra doctors."""
+    from app.core.auth.models import User
+    from app.core.auth.service import hash_password
+
+    user = User(
+        id=uuid4(),
+        email=email,
+        password_hash=hash_password("TestPass123"),
+        first_name="Dr",
+        last_name=email.split("@")[0],
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    db_session.add(ClinicMembership(id=uuid4(), user_id=user.id, clinic_id=clinic_id, role=role))
+    await db_session.commit()
+    return str(user.id)
+
+
+@pytest.mark.asyncio
+async def test_add_item_inherits_plan_doctor(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    doctor_id = await _add_professional(db_session, setup["clinic_id"], "doc-a@test.com")
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={
+            "patient_id": setup["patient_id"],
+            "title": "Inherit",
+            "assigned_professional_id": doctor_id,
+        },
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_id = await _create_treatment(client, auth_headers, setup)
+
+    r = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["assigned_professional_id"] == doctor_id
+
+
+@pytest.mark.asyncio
+async def test_add_item_with_explicit_doctor_overrides_plan(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    doctor_a = await _add_professional(db_session, setup["clinic_id"], "doc-a2@test.com")
+    doctor_b = await _add_professional(db_session, setup["clinic_id"], "doc-b@test.com")
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={
+            "patient_id": setup["patient_id"],
+            "assigned_professional_id": doctor_a,
+        },
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_id = await _create_treatment(client, auth_headers, setup)
+
+    r = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id, "assigned_professional_id": doctor_b},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["assigned_professional_id"] == doctor_b
+
+
+@pytest.mark.asyncio
+async def test_add_item_plan_without_doctor_yields_null(
+    client: AsyncClient, auth_headers: dict, setup: dict
+) -> None:
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"]},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_id = await _create_treatment(client, auth_headers, setup)
+
+    r = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["assigned_professional_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_add_item_rejects_user_not_in_clinic(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    # User exists but has no membership in our clinic.
+    from app.core.auth.models import User
+    from app.core.auth.service import hash_password
+
+    other = User(
+        id=uuid4(),
+        email="not-here@test.com",
+        password_hash=hash_password("TestPass123"),
+        first_name="Foreign",
+        last_name="Doc",
+        is_active=True,
+    )
+    db_session.add(other)
+    await db_session.commit()
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"]},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_id = await _create_treatment(client, auth_headers, setup)
+
+    r = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id, "assigned_professional_id": str(other.id)},
+    )
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_item_doctor_can_be_unset_to_null(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    doctor_id = await _add_professional(db_session, setup["clinic_id"], "doc-c@test.com")
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"], "assigned_professional_id": doctor_id},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_id = await _create_treatment(client, auth_headers, setup)
+
+    add = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    item_id = add.json()["data"]["id"]
+
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}",
+        headers=auth_headers,
+        json={"assigned_professional_id": None},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["assigned_professional_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_plan_cascade_reassigns_matching_pending(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    doctor_a = await _add_professional(db_session, setup["clinic_id"], "doc-cas-a@test.com")
+    doctor_b = await _add_professional(db_session, setup["clinic_id"], "doc-cas-b@test.com")
+    doctor_c = await _add_professional(db_session, setup["clinic_id"], "doc-cas-c@test.com")
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"], "assigned_professional_id": doctor_a},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+
+    # Two items inherit doctor_a, one explicit override to doctor_b.
+    t1 = await _create_treatment(client, auth_headers, setup, tooth_number=16)
+    t2 = await _create_treatment(client, auth_headers, setup, tooth_number=15)
+    t3 = await _create_treatment(client, auth_headers, setup, tooth_number=14)
+
+    i1 = (
+        await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": t1},
+        )
+    ).json()["data"]["id"]
+    i2 = (
+        await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": t2, "assigned_professional_id": doctor_b},
+        )
+    ).json()["data"]["id"]
+    i3 = (
+        await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": t3},
+        )
+    ).json()["data"]["id"]
+
+    # Move plan doctor a → c with cascade.
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}",
+        headers=auth_headers,
+        json={"assigned_professional_id": doctor_c, "reassign_pending_items": True},
+    )
+    assert r.status_code == 200, r.text
+
+    detail = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}",
+        headers=auth_headers,
+    )
+    by_id = {i["id"]: i for i in detail.json()["data"]["items"]}
+    assert by_id[i1]["assigned_professional_id"] == doctor_c
+    assert by_id[i2]["assigned_professional_id"] == doctor_b  # override survives
+    assert by_id[i3]["assigned_professional_id"] == doctor_c
+
+
+@pytest.mark.asyncio
+async def test_update_plan_without_cascade_flag_leaves_items(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    doctor_a = await _add_professional(db_session, setup["clinic_id"], "doc-nc-a@test.com")
+    doctor_c = await _add_professional(db_session, setup["clinic_id"], "doc-nc-c@test.com")
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"], "assigned_professional_id": doctor_a},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, setup)
+    i1 = (
+        await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": t1},
+        )
+    ).json()["data"]["id"]
+
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}",
+        headers=auth_headers,
+        json={"assigned_professional_id": doctor_c},  # no flag
+    )
+    assert r.status_code == 200
+
+    detail = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}",
+        headers=auth_headers,
+    )
+    items = {i["id"]: i for i in detail.json()["data"]["items"]}
+    assert items[i1]["assigned_professional_id"] == doctor_a
+
+
+@pytest.mark.asyncio
+async def test_update_plan_cascade_skips_completed_items(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    doctor_a = await _add_professional(db_session, setup["clinic_id"], "doc-sk-a@test.com")
+    doctor_c = await _add_professional(db_session, setup["clinic_id"], "doc-sk-c@test.com")
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"], "assigned_professional_id": doctor_a},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, setup, tooth_number=16)
+    t2 = await _create_treatment(client, auth_headers, setup, tooth_number=15)
+
+    i1 = (
+        await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": t1},
+        )
+    ).json()["data"]["id"]
+    i2 = (
+        await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": t2},
+        )
+    ).json()["data"]["id"]
+
+    # Complete item 1.
+    c = await client.patch(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{i1}/complete",
+        headers=auth_headers,
+        json={"completed_without_appointment": True},
+    )
+    assert c.status_code == 200, c.text
+
+    # Cascade: i1 should keep doctor_a (completed); i2 should switch to doctor_c.
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}",
+        headers=auth_headers,
+        json={"assigned_professional_id": doctor_c, "reassign_pending_items": True},
+    )
+    assert r.status_code == 200, r.text
+
+    detail = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}",
+        headers=auth_headers,
+    )
+    items = {i["id"]: i for i in detail.json()["data"]["items"]}
+    assert items[i1]["assigned_professional_id"] == doctor_a
+    assert items[i2]["assigned_professional_id"] == doctor_c
+
+
+@pytest.mark.asyncio
+async def test_treatment_added_event_carries_assigned_professional(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    from app.core.events import event_bus
+
+    captured: list[dict] = []
+
+    def _spy(payload: dict) -> None:
+        captured.append(payload)
+
+    event_bus.subscribe("treatment_plan.treatment_added", _spy)
+    try:
+        doctor_id = await _add_professional(db_session, setup["clinic_id"], "doc-event@test.com")
+        plan_resp = await client.post(
+            "/api/v1/treatment_plan/treatment-plans",
+            headers=auth_headers,
+            json={
+                "patient_id": setup["patient_id"],
+                "assigned_professional_id": doctor_id,
+            },
+        )
+        plan_id = plan_resp.json()["data"]["id"]
+        treatment_id = await _create_treatment(client, auth_headers, setup)
+
+        r = await client.post(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+            headers=auth_headers,
+            json={"treatment_id": treatment_id},
+        )
+        assert r.status_code == 201, r.text
+    finally:
+        event_bus.unsubscribe("treatment_plan.treatment_added", _spy)
+
+    assert captured, "treatment_added event was not published"
+    assert captured[-1]["assigned_professional_id"] == doctor_id
+
+
+@pytest.mark.asyncio
+async def test_change_item_doctor_works_when_plan_is_locked(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    """Doctor reassignment bypasses the plan-lock guard.
+
+    Reassigning who performs a treatment doesn't change the patient-facing
+    contract, so it must stay possible even after the plan is confirmed and
+    its budget is active.
+    """
+    doctor_b = await _add_professional(db_session, setup["clinic_id"], "doc-lock-b@test.com")
+
+    plan_id, item_ids = await _create_plan_with_items(client, auth_headers, setup, [16])
+    item_id = item_ids[0]
+
+    # Confirm + activate → plan ends up locked by an active budget.
+    r = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/confirm",
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    r = await client.patch(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/status",
+        headers=auth_headers,
+        json={"status": "active"},
+    )
+    assert r.status_code == 200, r.text
+
+    # Sanity: a structural change on the same item is still rejected.
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}",
+        headers=auth_headers,
+        json={"notes": "blocked by lock"},
+    )
+    assert r.status_code == 409, r.text
+
+    # But the doctor change goes through.
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}",
+        headers=auth_headers,
+        json={"assigned_professional_id": doctor_b},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["assigned_professional_id"] == doctor_b
+
+
+@pytest.mark.asyncio
+async def test_change_doctor_rejected_on_completed_item(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+) -> None:
+    """Once an item is completed, the planned doctor is frozen.
+
+    ``completed_by`` is the source of truth for "who did it" after the fact;
+    rewriting ``assigned_professional_id`` post-completion would distort
+    clinical history.
+    """
+    doctor_b = await _add_professional(db_session, setup["clinic_id"], "doc-comp-b@test.com")
+
+    plan_id, item_ids = await _create_plan_with_items(client, auth_headers, setup, [16])
+    item_id = item_ids[0]
+
+    r = await client.patch(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/complete",
+        headers=auth_headers,
+        json={"completed_without_appointment": True},
+    )
+    assert r.status_code == 200, r.text
+
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}",
+        headers=auth_headers,
+        json={"assigned_professional_id": doctor_b},
+    )
+    assert r.status_code == 400, r.text

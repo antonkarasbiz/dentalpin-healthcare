@@ -42,6 +42,7 @@ const {
   completeItem,
   removeItem,
   reorderItems,
+  changeItemDoctor,
   fetchPlan,
   loading,
   confirmPlan,
@@ -374,6 +375,11 @@ async function handleReorder(itemIds: string[]) {
   emit('updated')
 }
 
+async function handleItemDoctorChange(itemId: string, professionalId: string | null) {
+  await changeItemDoctor(props.plan.id, itemId, professionalId)
+  emit('updated')
+}
+
 // The legacy "Activate plan" CTA used to fire ``update_status`` with
 // ``status='active'`` — an invalid transition under the new state
 // machine (must go through ``pending``). Both the in-page CTA and
@@ -624,10 +630,12 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
             :readonly="effectiveReadonly"
             :allow-complete="isLocked && !readonly"
             :plan-status="plan.status"
+            :plan-professional-id="plan.assigned_professional_id ?? null"
             @item-hover="hoveredItemId = $event"
             @item-complete="handleCompleteItem"
             @item-remove="handleRemoveItem"
             @reorder="handleReorder"
+            @item-doctor-change="handleItemDoctorChange"
           />
 
           <!-- Sticky confirm-plan CTA: only in draft, adapts to whether items exist. -->

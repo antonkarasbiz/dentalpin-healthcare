@@ -141,6 +141,14 @@ class PlannedTreatmentItem(Base, TimestampMixin):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
 
+    # Doctor responsible for performing this treatment line. Snapshot from the
+    # plan's assigned_professional_id at creation time; once set it is
+    # independent — changing the plan-level doctor does not cascade here unless
+    # the caller passes ``reassign_pending_items=True`` on the plan update.
+    assigned_professional_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+
     notes: Mapped[str | None] = mapped_column(Text)
 
     # Relationships
@@ -148,10 +156,18 @@ class PlannedTreatmentItem(Base, TimestampMixin):
     treatment_plan: Mapped["TreatmentPlan"] = relationship(back_populates="items")
     treatment: Mapped["Treatment"] = relationship()
     completer: Mapped["User | None"] = relationship(foreign_keys=[completed_by])
+    assigned_professional: Mapped["User | None"] = relationship(
+        foreign_keys=[assigned_professional_id]
+    )
 
     __table_args__ = (
         UniqueConstraint("treatment_id", name="uq_planned_item_treatment"),
         Index("idx_planned_items_plan", "treatment_plan_id"),
         Index("idx_planned_items_treatment", "treatment_id"),
         Index("idx_planned_items_status", "treatment_plan_id", "status"),
+        Index(
+            "idx_planned_items_plan_professional",
+            "treatment_plan_id",
+            "assigned_professional_id",
+        ),
     )

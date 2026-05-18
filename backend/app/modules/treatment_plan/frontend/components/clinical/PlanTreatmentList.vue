@@ -12,6 +12,7 @@
 import type { PlannedTreatmentItem } from '~~/app/types'
 import { VueDraggable } from 'vue-draggable-plus'
 import CompletionNudgeModal from './notes/CompletionNudgeModal.vue'
+import PlanItemDoctorChip from './PlanItemDoctorChip.vue'
 
 const props = defineProps<{
   items: PlannedTreatmentItem[]
@@ -25,6 +26,8 @@ const props = defineProps<{
   allowComplete?: boolean
   /** Plan status — drives empty-state guidance copy (draft shows 3-step onboarding). */
   planStatus?: string
+  /** Doctor of the parent plan. Drives "override" detection on each item chip. */
+  planProfessionalId?: string | null
 }>()
 
 const completeEnabled = computed(() => !props.readonly || props.allowComplete)
@@ -40,6 +43,8 @@ const emit = defineEmits<{
   'item-remove': [itemId: string]
   /** Fired after the user reorders pending items (drag or keyboard). */
   'reorder': [itemIds: string[]]
+  /** Fired when the user picks a different doctor for a single item. */
+  'item-doctor-change': [itemId: string, professionalId: string | null]
 }>()
 
 const { t, locale } = useI18n()
@@ -264,6 +269,15 @@ const { format: formatCurrency } = useCurrency()
             <span class="text-subtle text-caption tnum w-6 text-center shrink-0">
               {{ index + 1 }}.
             </span>
+            <!-- Doctor chip stays editable on pending items regardless of
+                 the plan-lock state — reassignment is operational and does
+                 not touch the patient-facing contract. -->
+            <PlanItemDoctorChip
+              :professional-id="item.assigned_professional_id ?? null"
+              :plan-professional-id="planProfessionalId"
+              :readonly="item.status !== 'pending'"
+              @change="(professionalId) => emit('item-doctor-change', item.id, professionalId)"
+            />
             <div class="min-w-0 flex-1">
               <div class="font-medium break-words">
                 {{ getItemName(item) }}
@@ -339,6 +353,16 @@ const { format: formatCurrency } = useCurrency()
               <UIcon
                 name="i-lucide-check-circle"
                 class="w-4 h-4 text-success-accent shrink-0"
+              />
+              <!-- Indicator chip: the doctor assigned to this treatment.
+                   We intentionally show ``assigned_professional_id`` (the
+                   planned/responsible clinician) rather than ``completed_by``
+                   — completion can be triggered by reception or an admin
+                   on behalf of the clinician, and the relevant doctor for
+                   the chart is the one who owns the treatment. -->
+              <PlanItemDoctorChip
+                :professional-id="item.assigned_professional_id ?? null"
+                readonly
               />
               <span class="line-through flex-1 min-w-0 break-words">
                 {{ getItemName(item) }}

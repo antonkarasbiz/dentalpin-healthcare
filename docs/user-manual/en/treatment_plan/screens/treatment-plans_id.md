@@ -54,6 +54,20 @@ and close or reactivate.
   Completing an item publishes
   `treatment_plan.treatment_completed` (with
   `treatment_category_key` for recalls).
+- **Doctor per treatment.** Every item carries its own
+  `assigned_professional_id`. New items inherit the plan's doctor.
+  Click the coloured chip next to the item name to assign a
+  different professional (e.g. filling by Dr A, endodontics by
+  Dr B). When two or more doctors are involved in the plan, the
+  chip colours make the mix visible at a glance. The chip stays
+  editable while the item is pending, even after the plan is
+  validated and the budget is active — reassignment is operational
+  and does not change the patient-facing contract. Once an item is
+  marked as completed, the chip becomes a read-only indicator and
+  keeps showing `assigned_professional_id` (the clinician
+  responsible for the treatment); completion can be triggered by
+  reception or an admin on behalf of the clinician, so "who clicked
+  Complete" is intentionally not the chart's reference.
 - **Linked budget.** **Generate budget** / **Link to existing
   budget** / **Sync** buttons as needed. The plan publishes
   `treatment_plan.treatment_added / _removed /
@@ -82,6 +96,20 @@ and close or reactivate.
    suggest a follow-up recall based on `treatment_category_key`.
 3. To record a clinical note at that moment, use the *Add note*
    button (contributed by `clinical_notes`).
+
+## Change the plan's doctor
+
+> Requires `treatment_plan.plans.write`.
+
+1. Open **Edit plan** and pick a new professional.
+2. If there are pending items still assigned to the previous
+   doctor, a confirmation appears: *"Reassign pending treatments?"*.
+3. Choose **Yes, reassign pending** to push all matching pending
+   items onto the new doctor in the same save. Items with an
+   explicit override (different doctor) and completed items are
+   never touched.
+4. Choose **No, keep as they are** to update only the plan-level
+   doctor; the items stay where they were.
 
 ## Close or reactivate
 

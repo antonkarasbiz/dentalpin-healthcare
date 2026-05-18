@@ -1480,7 +1480,18 @@
       "add": "Añadir tratamiento",
       "addSelected": "Añadir {count} tratamiento | Añadir {count} tratamientos",
       "remove": "Eliminar tratamiento",
-      "empty": "No hay tratamientos en este plan"
+      "empty": "No hay tratamientos en este plan",
+      "assignedProfessional": "Doctor asignado",
+      "assignedProfessionalAriaLabel": "Cambiar el doctor asignado a este tratamiento",
+      "useUsersPlanDoctor": "Usar el doctor del plan",
+      "noProfessional": "Sin doctor asignado",
+      "inactiveProfessional": "Profesional inactivo",
+      "cascadeReassign": {
+        "title": "¿Reasignar los tratamientos pendientes?",
+        "body": "Has cambiado el doctor del plan. {count} tratamiento(s) pendientes estaban asignados a {previousName}. ¿Quieres reasignarlos también al nuevo doctor?",
+        "confirm": "Sí, reasignar pendientes",
+        "cancel": "No, dejar como están"
+      }
     },
     "filters": {
       "allStatuses": "Todos los estados"

@@ -54,6 +54,20 @@ ejecutados y se cierra o reactiva.
   Al completar un ítem se publica
   `treatment_plan.treatment_completed` (con `treatment_category_key`
   para recalls).
+- **Doctor por tratamiento.** Cada ítem lleva su propio
+  `assigned_professional_id`. Los nuevos ítems heredan el doctor del
+  plan. Pulsa el chip de color junto al nombre del tratamiento para
+  asignar a otro profesional (p. ej. empaste por Dr. A, endodoncia
+  por Dr. B). Cuando intervienen dos o más doctores en el plan, el
+  color del chip deja visible la mezcla de un vistazo. El chip
+  sigue editable mientras el ítem esté pendiente, incluso después
+  de validar el plan y de que el presupuesto esté activo —
+  reasignar es operativo y no cambia el acuerdo con el paciente.
+  Al completarlo, el chip pasa a ser un indicador de solo lectura
+  que sigue mostrando `assigned_professional_id` (el doctor
+  responsable del tratamiento); marcarlo como completado puede
+  hacerlo recepción o un admin en nombre del clínico, así que
+  "quién pulsó Completar" no es la referencia del chart.
 - **Presupuesto enlazado.** Botones **Generar presupuesto** /
   **Enlazar con presupuesto existente** / **Sincronizar** según el
   caso. El plan publica `treatment_plan.treatment_added /
@@ -82,6 +96,20 @@ ejecutados y se cierra o reactiva.
    sugerir un próximo recall basado en `treatment_category_key`.
 3. Para anotar una nota clínica en ese momento, usa el botón de
    *Añadir nota* (lo aporta `clinical_notes`).
+
+## Cambiar el doctor del plan
+
+> Requiere `treatment_plan.plans.write`.
+
+1. Abre **Editar plan** y selecciona otro profesional.
+2. Si hay tratamientos pendientes asignados al doctor anterior,
+   aparece un confirm: *"¿Reasignar los tratamientos pendientes?"*.
+3. Pulsa **Sí, reasignar pendientes** para mover todos los ítems
+   pendientes que coincidían con el doctor anterior al nuevo en el
+   mismo guardado. Los ítems con override explícito (otro doctor)
+   y los completados no se tocan nunca.
+4. Pulsa **No, dejar como están** si solo quieres cambiar el
+   doctor del plan; los ítems mantienen su asignación.
 
 ## Cerrar o reactivar
 

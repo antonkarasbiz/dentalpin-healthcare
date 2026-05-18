@@ -205,9 +205,12 @@ async def update_treatment_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
     """Update a treatment plan."""
-    plan = await TreatmentPlanService.update(
-        db, ctx.clinic_id, plan_id, data.model_dump(exclude_unset=True)
-    )
+    try:
+        plan = await TreatmentPlanService.update(
+            db, ctx.clinic_id, plan_id, data.model_dump(exclude_unset=True)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not plan:
         raise HTTPException(status_code=404, detail="Treatment plan not found")
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
@@ -414,6 +417,8 @@ async def update_plan_item(
         )
     except PlanLockedError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not item:
         raise HTTPException(status_code=404, detail="Treatment item not found")
     return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))

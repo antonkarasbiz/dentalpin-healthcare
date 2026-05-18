@@ -91,6 +91,11 @@ class TreatmentPlanUpdate(BaseModel):
     assigned_professional_id: UUID | None = None
     diagnosis_notes: str | None = None
     internal_notes: str | None = None
+    # Write-only directive. When ``True`` and the doctor of the plan changes,
+    # pending items still pointing at the previous doctor are reassigned in
+    # the same transaction. Items with an explicit override (different doctor)
+    # and completed items are never touched.
+    reassign_pending_items: bool = False
 
 
 class TreatmentPlanStatusUpdate(BaseModel):
@@ -200,6 +205,9 @@ class PlannedTreatmentItemCreate(BaseModel):
     treatment_id: UUID
     sequence_order: int | None = None
     notes: str | None = None
+    # When omitted, the service inherits the plan's ``assigned_professional_id``.
+    # Pass an explicit value to override at creation time.
+    assigned_professional_id: UUID | None = None
 
 
 class PlannedTreatmentItemUpdate(BaseModel):
@@ -207,6 +215,10 @@ class PlannedTreatmentItemUpdate(BaseModel):
 
     sequence_order: int | None = None
     notes: str | None = None
+    # Nullable: passing ``None`` explicitly clears the assignment. The router
+    # serializes with ``exclude_unset=True`` so omitting the field leaves the
+    # item untouched.
+    assigned_professional_id: UUID | None = None
 
 
 class PlannedTreatmentItemResponse(BaseModel):
@@ -223,6 +235,7 @@ class PlannedTreatmentItemResponse(BaseModel):
     completed_without_appointment: bool
     completed_at: datetime | None
     completed_by: UUID | None
+    assigned_professional_id: UUID | None
     notes: str | None
     created_at: datetime
     updated_at: datetime

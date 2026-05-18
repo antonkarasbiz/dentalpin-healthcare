@@ -1969,6 +1969,15 @@ def generate_treatment_plans_data(catalog_items_map: dict[str, dict]) -> dict:
                 }
             )
 
+            # Per-item doctor assignment. Items inherit the plan's doctor by
+            # default; hygiene-typical codes (cleanings, scaling) are assigned
+            # to the hygienist instead so the demo plans visibly show a mix
+            # of professionals — that's the whole point of the per-item field.
+            is_hygiene_code = catalog_code in ("PREV-CLEAN", "PERIO-RAR")
+            assigned_professional_id = (
+                USER_HYGIENIST_ID if is_hygiene_code else USER_DENTIST_ID
+            )
+
             planned_items.append(
                 {
                     "id": planned_item_id,
@@ -1979,7 +1988,10 @@ def generate_treatment_plans_data(catalog_items_map: dict[str, dict]) -> dict:
                     "status": "completed" if is_completed else "pending",
                     "completed_without_appointment": is_completed,
                     "completed_at": datetime.now() - timedelta(days=10) if is_completed else None,
-                    "completed_by": USER_DENTIST_ID if is_completed else None,
+                    "completed_by": (
+                        assigned_professional_id if is_completed else None
+                    ),
+                    "assigned_professional_id": assigned_professional_id,
                     "notes": None,
                 }
             )

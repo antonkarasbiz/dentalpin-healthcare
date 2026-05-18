@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- fix(events): ``on_treatment_performed`` handler uses
+  ``SELECT FOR UPDATE SKIP LOCKED`` when looking up the matching
+  planned item. Avoids a deadlock that surfaced as a client timeout
+  on ``PATCH /treatment-plans/{id}/items/{id}/complete``: under the
+  async-first event bus (sprint 3) the parent transaction held the
+  row lock on ``planned_treatment_items`` and the handler — running
+  inline before the parent commit, in a new session — blocked
+  trying to update the same row. When the row is locked we skip
+  silently; the originator's UPDATE drives the state transition.
+- feat(plans): per-item assigned professional. `PlannedTreatmentItem` gains
+  `assigned_professional_id` (FK to `users.id`, nullable). New items inherit
+  the plan's doctor by default; the API and `PlanItemDoctorChip` lets the
+  clinician override it (e.g. fillings by Dr A, endodontics by Dr B). When
+  the plan-level doctor changes, the cascade is opt-in via a new write-only
+  `reassign_pending_items` flag on `TreatmentPlanUpdate` — only pending items
+  still pointing at the previous plan doctor are reassigned; explicit
+  overrides and completed items are left alone. Migration `tp_0005` backfills
+  existing items from the parent plan. Event payload
+  `treatment_plan.treatment_added` now carries `assigned_professional_id`
+  (additive, safe for the `budget` subscriber). Doctor reassignment bypasses
+  the plan-lock guard (`_is_plan_locked`) — reassigning who performs a
+  treatment doesn't change the patient-facing contract, so it stays
+  available even after the plan is validated and the budget is active.
+  Completed/cancelled items reject doctor changes (400) — the planned
+  doctor is frozen at completion time. The completed-items section of
+  `PlanTreatmentList` shows a read-only chip with the
+  `assigned_professional_id` (the responsible clinician), not
+  ``completed_by``: reception or an admin can mark items complete on
+  behalf of the clinician and the chart's reference should stay on the
+  treatment owner.
 - fix(clinical/plans): treatment names in `PlanTreatmentList` no longer truncate with ellipsis and now take the full available row width — switched `truncate` to `break-words` and replaced the flex row with a `grid-cols-[1fr_auto]` layout so the name column grows deterministically into the free space before wrapping.
 - refactor(perms): migrate hardcoded ``can('treatment_plan.plans.write')`` and ``can('clinical_notes.notes.write')`` strings in the treatment-plans page, ``PlansListPanel`` and ``VisitNotePanel`` to ``PERMISSIONS.treatmentPlans.write`` / ``PERMISSIONS.clinicalNotes.write``.
 - perf(list): collapse the duplicated ``items → treatment`` eager-load

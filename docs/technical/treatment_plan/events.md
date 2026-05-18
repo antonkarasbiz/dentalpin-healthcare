@@ -17,7 +17,7 @@ Per-module slice of [`docs/events-catalog.md`](../../events-catalog.md)
 | `treatment_plan.budget_sync_requested` | _When does this fire?_ | _Payload keys._ |
 | `treatment_plan.created` | _When does this fire?_ | _Payload keys._ |
 | `treatment_plan.status_changed` | _When does this fire?_ | _Payload keys._ |
-| `treatment_plan.treatment_added` | _When does this fire?_ | _Payload keys._ |
+| `treatment_plan.treatment_added` | A `PlannedTreatmentItem` is added to a plan via `POST /treatment-plans/{id}/items`. | `plan_id`, `item_id`, `treatment_id`, `clinic_id`, `patient_id`, `budget_id` (nullable), `catalog_item_id` (nullable), `tooth_number` (nullable), `surfaces` (nullable), `unit_price` (nullable, decimal-as-string), `assigned_professional_id` (nullable, snapshot of the doctor responsible for this line). |
 | `treatment_plan.treatment_completed` | _When does this fire?_ | _Payload keys._ |
 | `treatment_plan.treatment_removed` | _When does this fire?_ | _Payload keys._ |
 
