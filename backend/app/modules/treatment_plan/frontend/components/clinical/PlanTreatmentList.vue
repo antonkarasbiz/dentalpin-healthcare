@@ -247,7 +247,7 @@ const { format: formatCurrency } = useCurrency()
         @mouseleave="emit('item-hover', null)"
         @keydown="handleKeydown($event, index)"
       >
-        <div class="flex items-center justify-between">
+        <div class="grid grid-cols-[1fr_auto] items-center gap-2 w-full">
           <div class="flex items-center gap-2 min-w-0">
             <button
               v-if="!readonly && localPending.length > 1"
@@ -264,8 +264,8 @@ const { format: formatCurrency } = useCurrency()
             <span class="text-subtle text-caption tnum w-6 text-center shrink-0">
               {{ index + 1 }}.
             </span>
-            <div class="min-w-0">
-              <div class="font-medium truncate">
+            <div class="min-w-0 flex-1">
+              <div class="font-medium break-words">
                 {{ getItemName(item) }}
               </div>
               <div
@@ -340,7 +340,7 @@ const { format: formatCurrency } = useCurrency()
                 name="i-lucide-check-circle"
                 class="w-4 h-4 text-success-accent shrink-0"
               />
-              <span class="line-through truncate flex-1 min-w-0">
+              <span class="line-through flex-1 min-w-0 break-words">
                 {{ getItemName(item) }}
               </span>
               <span

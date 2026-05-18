@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(clinical/plans): treatment names in `PlanTreatmentList` no longer truncate with ellipsis and now take the full available row width — switched `truncate` to `break-words` and replaced the flex row with a `grid-cols-[1fr_auto]` layout so the name column grows deterministically into the free space before wrapping.
 - refactor(perms): migrate hardcoded ``can('treatment_plan.plans.write')`` and ``can('clinical_notes.notes.write')`` strings in the treatment-plans page, ``PlansListPanel`` and ``VisitNotePanel`` to ``PERMISSIONS.treatmentPlans.write`` / ``PERMISSIONS.clinicalNotes.write``.
 - perf(list): collapse the duplicated ``items → treatment`` eager-load
   chain in ``TreatmentPlanService.list`` into a single chain that
