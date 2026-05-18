@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(perms): migrate hardcoded ``can('treatment_plan.plans.write')`` and ``can('clinical_notes.notes.write')`` strings in the treatment-plans page, ``PlansListPanel`` and ``VisitNotePanel`` to ``PERMISSIONS.treatmentPlans.write`` / ``PERMISSIONS.clinicalNotes.write``.
 - perf(list): collapse the duplicated ``items → treatment`` eager-load
   chain in ``TreatmentPlanService.list`` into a single chain that
   attaches both ``Treatment.teeth`` and ``Treatment.catalog_item``

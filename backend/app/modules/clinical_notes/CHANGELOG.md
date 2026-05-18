@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(perms): migrate hardcoded ``can('clinical_notes.notes.{read,write}')`` strings in ``TreatmentNoteButton`` / ``DiagnosisNotesSidebar`` / ``PlanNotesTimeline`` / ``RecentNotesFeed`` to ``PERMISSIONS.clinicalNotes.*``.
 - fix(isolation): declare ``agenda`` in ``manifest.depends`` — the
   service already imported ``Appointment`` / ``AppointmentTreatment``
   to surface visit-level notes. The dependency was real, just

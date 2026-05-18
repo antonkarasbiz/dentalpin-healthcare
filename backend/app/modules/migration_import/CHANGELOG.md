@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- refactor(perms): migrate hardcoded ``can('migration_import.job.execute')`` in ``DataMigrationPage`` to ``PERMISSIONS.migrationImport.jobExecute``.
+- refactor(errors): switch ``catch (err: any)`` to ``catch (err: unknown)`` + shared ``errorMessage`` helper in the upload flow.
 - perf(lists): drop the ``select_from(query.subquery())`` count
   anti-pattern in ``ImportJobService.list_jobs``,
   ``list_warnings`` and the warnings-count after each execute. All

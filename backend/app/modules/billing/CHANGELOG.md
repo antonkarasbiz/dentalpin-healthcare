@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- refactor(invoices): dedup the ``toListItem`` builder (3 sites → 1 helper) in ``useInvoices``.
+- refactor(invoices): drop the hardcoded Spanish ``PAYMENT_METHOD_LABELS`` map and route ``getPaymentMethodLabel`` through the new shared ``paymentMethodLabel`` util (reads the canonical ``invoice.payments.methods.*`` i18n keys; adds the missing ``insurance`` translation).
+- refactor(types): drop the ``as unknown as Record<string, unknown>`` cast pattern (14 sites) in ``useInvoices`` now that ``useApi`` accepts ``object`` payloads.
+- refactor(perms): migrate hardcoded ``can('billing.{read,write,admin}')`` strings on the invoice list and detail pages to ``PERMISSIONS.billing.*``.
+- refactor(errors): switch ``catch (e: any)`` to ``catch (e: unknown)`` on the invoice detail page and route through the shared ``errorMessage`` helper.
 - perf(invoices-list): drop the ``select_from(query.subquery())``
   count anti-pattern. ``COUNT(Invoice.id)`` runs directly over the
   filter set, and the search-by-patient-name join is added only to

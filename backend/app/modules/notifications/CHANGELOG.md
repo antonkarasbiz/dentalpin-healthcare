@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(types): drop the ``as unknown as Record<string, unknown>`` cast pattern (4 sites) in ``useNotificationSettings`` now that ``useApi`` accepts ``object`` payloads.
 - fix(isolation): declare ``catalog`` in ``manifest.depends`` — the
   email-template handlers and the preview endpoint already imported
   catalog models to render line items. The dependency was real,

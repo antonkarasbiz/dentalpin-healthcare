@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(i18n): ``useReports.getPaymentMethodLabel`` was calling the non-existent ``invoice.paymentMethods.*`` i18n key and rendering the raw key as fallback; now uses the shared ``paymentMethodLabel`` util reading the canonical ``invoice.payments.methods.*`` path.
 - safety(billing-overdue): ``GET /reports/billing/overdue`` accepts a
   ``limit`` query parameter (default 200, max 1000) and the service
   enforces it. Previously the endpoint returned every overdue

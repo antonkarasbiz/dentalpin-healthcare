@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(perms): migrate the hardcoded ``can('recalls.read')`` route guard on ``/recalls`` to ``PERMISSIONS.recalls.read`` (new entry in the host permissions config; also covers ``recalls.write`` / ``recalls.delete``).
 - perf(list): rewrite ``RecallService.list`` to count via a direct
   ``COUNT(Recall.id)`` over the joined ``recalls × patients`` filter
   set instead of materialising the data query as a subquery. Pairs

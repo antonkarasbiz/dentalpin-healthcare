@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(perms): migrate the hardcoded ``can('payments.record.read')`` gate on the patients list to ``PERMISSIONS.payments.recordRead``.
 - fix(isolation): drop the cross-module ORM coupling to ``agenda`` and
   ``patient_timeline``. ``Patient`` no longer declares
   ``relationship(back_populates=...)`` to ``Appointment`` /

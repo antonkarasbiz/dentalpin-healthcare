@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(perms): migrate hardcoded ``can('schedules.{clinic_hours.write, professional.read, professional.write, professional.own.write}')`` strings in ``ClinicHoursPage`` and ``ProfessionalSchedulesPage`` to ``PERMISSIONS.schedules.*`` (new entries in the host permissions config).
 - Settings UI migrated to host's settings registry: clinic-hours and
   professional-schedules are now registered as cards/pages under
   `/settings/workspace`. Replaces the legacy `settings.sections` slot

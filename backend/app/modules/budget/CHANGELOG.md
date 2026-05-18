@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- refactor(useBudgets): dedup the ``toListItem`` builder (2 sites → 1 helper).
+- refactor(types): drop the ``as unknown as Record<string, unknown>`` cast pattern (8 sites) now that ``useApi`` accepts ``object`` payloads.
+- refactor(perms): migrate hardcoded ``can('budget.{write,admin}')`` strings on the budget list and detail pages to ``PERMISSIONS.budget.*``.
 - perf(cron): ``expire_budgets`` and ``send_budget_reminders`` now
   process clinics concurrently behind an ``asyncio.Semaphore(5)``
   instead of serially. A slow clinic no longer delays the rest of

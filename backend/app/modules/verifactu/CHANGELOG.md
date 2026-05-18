@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- refactor(perms): migrate hardcoded ``can('verifactu.{settings.read, settings.configure, queue.manage, records.read, environment.promote}')`` strings across the settings pages, queue, ``InvoiceVerifactuSlot`` and ``RejectedGlobalBanner`` to the typed ``PERMISSIONS.verifactu.*`` (new entries in the host permissions config).
+- refactor(errors): switch ``catch (e: any)`` to ``catch (e: unknown)`` across ``producer`` / ``queue`` / ``vat-mapping`` / ``certificate`` / settings index / ``InvoiceVerifactuSlot`` and route messages through the shared ``errorMessage`` / ``errorStatus`` helpers.
 - chore(migrations): isolate ``vfy_0001`` from the main upgrade
   chain — ``down_revision`` switches from ``tp_0002`` to ``0001``
   (core init) and a new ``depends_on="bil_0001"`` enforces the

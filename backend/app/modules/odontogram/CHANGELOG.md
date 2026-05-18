@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(types): drop the ``as unknown as Record<string, unknown>`` cast in ``useTreatments`` now that ``useApi`` accepts ``object`` payloads.
 - Added per-module `CLAUDE.md` for AI-agent context (2026-04-27).
 - Issue #60: `DiagnosisMode.vue` exposes a right-rail
   `odontogram.diagnosis.sidebar` slot (with mobile slideover) and

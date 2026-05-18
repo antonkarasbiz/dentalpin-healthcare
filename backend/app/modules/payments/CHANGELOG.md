@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- refactor(perms): migrate hardcoded ``can('payments.record.{write,refund,read}')`` strings in the payments list, ``PatientPaymentsPanel`` and ``BudgetPaymentsCard`` to ``PERMISSIONS.payments.*`` (new entries in the host permissions config).
 - docs(user-manual): reescribir pantalla /payments e index del módulo (ES + EN).
 
 ### Changed (reports dashboard redesign, 2026-05-17)
