@@ -43,11 +43,11 @@ Visit [**dentalpin.com**](https://www.dentalpin.com) for product info, features,
 ### Weekly Schedule
 ![Weekly Schedule](docs/screenshots/schedule-week.png)
 
-### Daily Schedule
-![Daily Schedule](docs/screenshots/schedule-day.png)
+### Kanban Schedule
+![Kanban Schedule](docs/screenshots/schedule-canban.png)
 
-### Dental Chart (Odontogram)
-![Dental Chart](docs/screenshots/dental-chart.png)
+### Payments Chart
+![Payments Chart](docs/screenshots/payments-chart.png)
 
 ### Settings
 ![Settings](docs/screenshots/settings.png)
