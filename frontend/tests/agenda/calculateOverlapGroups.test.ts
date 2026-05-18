@@ -26,7 +26,7 @@ function apt(id: string, start: string, end: string): Appointment {
     patient: null,
     professional: null,
     created_at: '2026-05-18T00:00:00Z',
-    updated_at: '2026-05-18T00:00:00Z',
+    updated_at: '2026-05-18T00:00:00Z'
   } as Appointment
 }
 
@@ -44,7 +44,7 @@ describe('calculateOverlapGroups', () => {
     const r = calculateOverlapGroups([
       apt('a', '09:00', '09:30'),
       apt('b', '10:00', '10:30'),
-      apt('c', '11:00', '11:30'),
+      apt('c', '11:00', '11:30')
     ])
     expect(r.get('a')).toEqual({ index: 0, total: 1 })
     expect(r.get('b')).toEqual({ index: 0, total: 1 })
@@ -54,7 +54,7 @@ describe('calculateOverlapGroups', () => {
   it('two overlapping appointments → group size 2', () => {
     const r = calculateOverlapGroups([
       apt('a', '09:00', '10:00'),
-      apt('b', '09:30', '10:30'),
+      apt('b', '09:30', '10:30')
     ])
     expect(r.get('a')).toEqual({ index: 0, total: 2 })
     expect(r.get('b')).toEqual({ index: 1, total: 2 })
@@ -64,7 +64,7 @@ describe('calculateOverlapGroups', () => {
     const r = calculateOverlapGroups([
       apt('a', '09:00', '10:00'),
       apt('b', '09:30', '10:30'),
-      apt('c', '10:15', '11:00'),
+      apt('c', '10:15', '11:00')
     ])
     expect(r.get('a')?.total).toBe(3)
     expect(r.get('b')?.total).toBe(3)
@@ -78,7 +78,7 @@ describe('calculateOverlapGroups', () => {
     const r = calculateOverlapGroups([
       apt('a', '09:00', '09:45'),
       apt('b', '09:30', '10:00'),
-      apt('c', '11:00', '11:30'),
+      apt('c', '11:00', '11:30')
     ])
     expect(r.get('a')?.total).toBe(2)
     expect(r.get('b')?.total).toBe(2)
@@ -88,7 +88,7 @@ describe('calculateOverlapGroups', () => {
   it('identical start times → grouped, deterministic indices', () => {
     const r = calculateOverlapGroups([
       apt('a', '09:00', '10:00'),
-      apt('b', '09:00', '10:00'),
+      apt('b', '09:00', '10:00')
     ])
     expect(r.get('a')?.total).toBe(2)
     expect(r.get('b')?.total).toBe(2)
@@ -97,7 +97,7 @@ describe('calculateOverlapGroups', () => {
   it('touching endpoints do not overlap (end===start)', () => {
     const r = calculateOverlapGroups([
       apt('a', '09:00', '10:00'),
-      apt('b', '10:00', '11:00'),
+      apt('b', '10:00', '11:00')
     ])
     expect(r.get('a')).toEqual({ index: 0, total: 1 })
     expect(r.get('b')).toEqual({ index: 0, total: 1 })
@@ -105,7 +105,7 @@ describe('calculateOverlapGroups', () => {
 
   it('handles 20 overlapping items without timing out', () => {
     const items = Array.from({ length: 20 }, (_, i) =>
-      apt(`x${i}`, '09:00', '10:00'),
+      apt(`x${i}`, '09:00', '10:00')
     )
     const r = calculateOverlapGroups(items)
     for (const it of items) expect(r.get(it.id)?.total).toBe(20)

@@ -20,7 +20,7 @@ const {
   search,
   getItemName,
   formatPrice,
-  getCategoryName,
+  getCategoryName
 } = useTreatmentCatalogSearch()
 
 const selectedItems = ref<TreatmentCatalogItem[]>(props.modelValue || [])
@@ -56,7 +56,7 @@ const availableSearchResults = computed(() => {
 })
 
 const totalDuration = computed(() =>
-  selectedItems.value.reduce((acc, item) => acc + (item.default_duration_minutes || 0), 0),
+  selectedItems.value.reduce((acc, item) => acc + (item.default_duration_minutes || 0), 0)
 )
 </script>
 

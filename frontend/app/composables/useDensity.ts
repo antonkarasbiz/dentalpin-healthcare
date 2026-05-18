@@ -16,7 +16,7 @@ export function useDensity() {
   const cookie = useCookie<Density>(STORAGE_KEYS.DENSITY, {
     default: () => 'comfortable',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 365,
+    maxAge: 60 * 60 * 24 * 365
   })
 
   const density = useState<Density>('ui:density', () => cookie.value ?? 'comfortable')
@@ -24,7 +24,7 @@ export function useDensity() {
   // Bind the class to <html> on both server and client so SSR ships the
   // right density and there is no FOUC for compact-mode users.
   useHead({
-    htmlAttrs: { class: () => `density-${density.value}` },
+    htmlAttrs: { class: () => `density-${density.value}` }
   })
 
   function applyToHtml(value: Density) {

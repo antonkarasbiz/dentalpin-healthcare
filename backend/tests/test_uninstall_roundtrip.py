@@ -129,7 +129,7 @@ def test_dump_tables_hard_fails_on_empty_output(
 
     monkeypatch.setattr(processor_module, "BACKUP_ROOT", tmp_path / "backups")
 
-    def _fake_run(args, *, stdout, check):  # noqa: ARG001
+    def _fake_run(args, *, stdout, check, timeout=None):  # noqa: ARG001
         # stdout is the open file handle; write nothing → zero bytes.
         return subprocess.CompletedProcess(args, 0)
 

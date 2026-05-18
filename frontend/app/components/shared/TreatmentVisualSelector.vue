@@ -21,7 +21,7 @@ const {
   search,
   getItemName,
   formatPrice,
-  getCategoryName,
+  getCategoryName
 } = useTreatmentCatalogSearch()
 
 const selectedItem = ref<TreatmentCatalogItem | null>(props.modelValue || null)

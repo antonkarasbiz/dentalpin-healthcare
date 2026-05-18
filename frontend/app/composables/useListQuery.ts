@@ -213,7 +213,10 @@ export function useListQuery<F extends FiltersBag, R>(
   }
   watch(
     filters,
-    () => { searchKey ? scheduleResetAndPush() : resetPageAndPush() },
+    () => {
+      if (searchKey) scheduleResetAndPush()
+      else resetPageAndPush()
+    },
     { deep: true }
   )
   watch(page, pushUrl)

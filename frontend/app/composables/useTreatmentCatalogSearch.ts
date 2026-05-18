@@ -19,7 +19,7 @@ export function useTreatmentCatalogSearch() {
     isLoadingPopular.value = true
     try {
       const response = await api.get<ApiResponse<TreatmentCatalogItem[]>>(
-        '/api/v1/catalog/items/popular?limit=8',
+        '/api/v1/catalog/items/popular?limit=8'
       )
       popularItems.value = response.data
     } catch {
@@ -61,6 +61,6 @@ export function useTreatmentCatalogSearch() {
     search,
     getItemName,
     formatPrice,
-    getCategoryName,
+    getCategoryName
   }
 }

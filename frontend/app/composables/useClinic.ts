@@ -90,7 +90,7 @@ export function useClinic() {
 
   async function updateCabinet(cabinetId: string, data: CabinetUpdate): Promise<Cabinet | null> {
     const rollback = patchCabinets(list =>
-      list.map(c => c.id === cabinetId ? { ...c, ...data } as Cabinet : c),
+      list.map(c => c.id === cabinetId ? { ...c, ...data } as Cabinet : c)
     )
     try {
       const response = await api.put<ApiResponse<Cabinet>>(`/api/v1/agenda/cabinets/${cabinetId}`, data)

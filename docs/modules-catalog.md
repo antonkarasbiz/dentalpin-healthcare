@@ -10,14 +10,13 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 
 | Module | Version | Category | Depends | Install | Removable | Permissions | Emits | Consumes | FE layer |
 |--------|---------|----------|---------|---------|-----------|-------------|-------|----------|----------|
-| `agenda` | 0.4.0 | official | patients, catalog | auto | no | 4 | 5 | 0 | yes |
+| `agenda` | 0.4.0 | official | patients, catalog, odontogram | auto | no | 4 | 5 | 0 | yes |
 | `billing` | 0.1.0 | official | patients, catalog, budget, payments | auto | no | 3 | 3 | 1 | yes |
 | `budget` | 0.1.0 | official | patients, catalog, odontogram | auto | no | 5 | 7 | 4 | yes |
 | `catalog` | 0.1.0 | official | — | auto | no | 3 | 0 | 0 | yes |
-| `clinical_notes` | 0.2.0 | official | patients, odontogram, treatment_plan, media | auto | no | 2 | 0 | 0 | yes |
+| `clinical_notes` | 0.2.0 | official | patients, odontogram, treatment_plan, media, agenda | auto | no | 2 | 0 | 0 | yes |
 | `media` | 0.2.0 | official | patients | auto | no | 4 | 7 | 1 | yes |
-| `migration_import` | 0.1.0 | official | patients, schedules, treatment_plan, billing, payments, media | manual | yes | 4 | 5 | 1 | yes |
-| `notifications` | 0.1.0 | official | patients, agenda, budget, billing | auto | no | 8 | 0 | 6 | yes |
+| `notifications` | 0.1.0 | official | patients, agenda, budget, billing, catalog | auto | no | 8 | 0 | 6 | yes |
 | `odontogram` | 0.3.0 | official | patients, catalog | auto | no | 4 | 4 | 0 | yes |
 | `patient_timeline` | 0.1.0 | official | patients | auto | no | 1 | 0 | 34 | yes |
 | `patients` | 0.1.0 | official | — | auto | no | 2 | 3 | 0 | yes |
@@ -39,7 +38,7 @@ Appointments, scheduling, cabinets.
 - **License:** BSL-1.1
 - **Category:** official
 - **Install policy:** installable=True · auto_install=True · removable=False
-- **Depends:** `patients`, `catalog`
+- **Depends:** `patients`, `catalog`, `odontogram`
 - **Frontend layer:** `frontend`
 - **Permissions:**
   - `agenda.appointments.read`
@@ -134,7 +133,7 @@ Polymorphic clinical notes (administrative, diagnosis, treatment, treatment plan
 - **License:** BSL-1.1
 - **Category:** official
 - **Install policy:** installable=True · auto_install=True · removable=False
-- **Depends:** `patients`, `odontogram`, `treatment_plan`, `media`
+- **Depends:** `patients`, `odontogram`, `treatment_plan`, `media`, `agenda`
 - **Frontend layer:** `frontend`
 - **Permissions:**
   - `clinical_notes.notes.read`
@@ -170,31 +169,6 @@ Patient documents, photos, X-rays + polymorphic attachments.
   - `patient.archived`
 - **Module CLAUDE.md:** [`backend/app/modules/media/CLAUDE.md`](../backend/app/modules/media/CLAUDE.md)
 
-### `migration_import` — v0.1.0
-
-Importa datos de pacientes, citas, presupuestos, pagos y documentos desde un archivo DPMF generado por dental-bridge.
-
-- **Author:** DentalPin Core Team
-- **License:** BSL-1.1
-- **Category:** official
-- **Install policy:** installable=True · auto_install=False · removable=True
-- **Depends:** `patients`, `schedules`, `treatment_plan`, `billing`, `payments`, `media`
-- **Frontend layer:** `frontend`
-- **Permissions:**
-  - `migration_import.binary.write`
-  - `migration_import.job.execute`
-  - `migration_import.job.read`
-  - `migration_import.job.write`
-- **Events emitted:**
-  - `migration.binary.resolved`
-  - `migration.entity.persisted`
-  - `migration.job.completed`
-  - `migration.job.failed`
-  - `migration.job.started`
-- **Events consumed:**
-  - `migration.entity.persisted`
-- **Module CLAUDE.md:** [`backend/app/modules/migration_import/CLAUDE.md`](../backend/app/modules/migration_import/CLAUDE.md)
-
 ### `notifications` — v0.1.0
 
 Email templates, preferences, SMTP, event-driven sending.
@@ -203,7 +177,7 @@ Email templates, preferences, SMTP, event-driven sending.
 - **License:** BSL-1.1
 - **Category:** official
 - **Install policy:** installable=True · auto_install=True · removable=False
-- **Depends:** `patients`, `agenda`, `budget`, `billing`
+- **Depends:** `patients`, `agenda`, `budget`, `billing`, `catalog`
 - **Frontend layer:** `frontend`
 - **Permissions:**
   - `notifications.logs.read`
