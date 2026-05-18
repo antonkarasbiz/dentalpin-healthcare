@@ -7,6 +7,10 @@ class EventType:
     Naming convention: {entity}.{action}
     """
 
+    # Tenant lifecycle (multi-tenancy Fase 1 — declared; first publisher
+    # arrives in Fase 2a when the resolver is wired into `get_db`).
+    TENANT_RESOLVED = "tenant.resolved"
+
     # Patient events
     PATIENT_CREATED = "patient.created"
     PATIENT_UPDATED = "patient.updated"
@@ -171,6 +175,9 @@ class EventType:
     # Sync agent uploaded a binary that matched a `_files` staging row.
     # Payload: (job_id, staging_id, document_id).
     MIGRATION_BINARY_RESOLVED = "migration.binary.resolved"
+    # Internal progress signal — mapper bumps ImportJob.processed_entities.
+    # Payload: (job_id, entity_type, count).
+    MIGRATION_ENTITY_PERSISTED = "migration.entity.persisted"
 
     # Recalls events (recalls module — patient call-back workflow, issue #62)
     # Foundation for a future outreach module that will subscribe to react

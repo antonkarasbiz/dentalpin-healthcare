@@ -68,7 +68,7 @@ def publish_binary_resolved(job_id: UUID, staging_id: UUID, document_id: UUID) -
 
 def publish_entity_persisted(job_id: UUID, entity_type: str, count: int = 1) -> None:
     event_bus.publish(
-        "migration.entity.persisted",
+        EventType.MIGRATION_ENTITY_PERSISTED,
         {"job_id": str(job_id), "entity_type": entity_type, "count": count},
     )
 
