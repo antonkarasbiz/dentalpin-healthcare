@@ -357,7 +357,7 @@ async function submitCreate() {
 
       <UFormField
         :label="t('patientSelector.createForm.phone')"
-        :hint="t('patientSelector.createForm.phoneHint')"
+        :description="t('patientSelector.createForm.phoneHint')"
       >
         <UInput
           v-model="form.phone"
