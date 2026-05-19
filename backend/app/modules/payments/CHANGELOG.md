@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- feat(earned-per-session): ``PatientEarnedEntry`` gains
+  ``source_session_id`` + ``description`` and is now keyed on
+  ``(treatment_id, source_session_id)`` so multi-session treatments
+  produce one row per session. Replaced the ``treatment_plan
+  .treatment_completed`` subscription with
+  ``treatment_plan.item_session_completed`` (handler
+  ``on_session_completed``). Migration ``pay_0002`` adds the column,
+  best-effort backfills ``source_session_id`` from
+  ``planned_treatment_item_sessions`` when the module is installed, and
+  swaps the unique index.
+- feat(pending-charges): new ``GET /payments/patients/{id}/pending-charges``
+  returns the FIFO-virtual list of earned entries not yet covered by
+  net payments. ``PatientPaymentsPanel`` renders a "Pendiente de
+  cobrar" card at the top of the patient ``Pagos`` tab so reception
+  can collect when the patient leaves the box, with the amount
+  pre-filled in ``PaymentCreateModal``.
 - refactor(perms): migrate hardcoded ``can('payments.record.{write,refund,read}')`` strings in the payments list, ``PatientPaymentsPanel`` and ``BudgetPaymentsCard`` to ``PERMISSIONS.payments.*`` (new entries in the host permissions config).
 - docs(user-manual): reescribir pantalla /payments e index del módulo (ES + EN).
 

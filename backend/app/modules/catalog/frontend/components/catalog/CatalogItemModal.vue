@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  CatalogItemSessionInput,
   TreatmentCatalogCategory,
   TreatmentCatalogItem,
   TreatmentCatalogItemUpdate,
@@ -59,6 +60,40 @@ const itemName = computed({
 const odontogramType = ref<string | undefined>(undefined)
 const clinicalCategory = ref<string | undefined>(undefined)
 
+// Session template state (multi-session billing)
+interface SessionRow {
+  sequence?: number
+  label: string
+  default_price: number
+}
+const sessionsEnabled = ref(false)
+const sessions = ref<SessionRow[]>([])
+
+function sessionsToPayload(): CatalogItemSessionInput[] {
+  return sessions.value.map((s, idx) => ({
+    sequence: idx + 1,
+    labels: { [locale.value]: s.label },
+    default_price: Number(s.default_price) || 0
+  }))
+}
+
+function addSession() {
+  sessions.value.push({ label: '', default_price: 0 })
+}
+
+function removeSession(idx: number) {
+  sessions.value.splice(idx, 1)
+}
+
+const sessionsSum = computed(() =>
+  sessions.value.reduce((acc, s) => acc + (Number(s.default_price) || 0), 0)
+)
+
+const sessionsSumMatches = computed(() => {
+  const total = Number(formData.value.default_price) || 0
+  return Math.abs(sessionsSum.value - total) <= 0.01
+})
+
 // Watch for item changes to populate form
 watch(
   () => props.item,
@@ -92,6 +127,21 @@ watch(
         odontogramType.value = undefined
         clinicalCategory.value = undefined
       }
+      // Load existing session template
+      if (newItem.sessions && newItem.sessions.length > 0) {
+        sessionsEnabled.value = true
+        sessions.value = newItem.sessions
+          .slice()
+          .sort((a, b) => a.sequence - b.sequence)
+          .map(s => ({
+            sequence: s.sequence,
+            label: s.labels?.[locale.value] || s.labels?.es || s.labels?.en || '',
+            default_price: Number(s.default_price)
+          }))
+      } else {
+        sessionsEnabled.value = false
+        sessions.value = []
+      }
     } else {
       // Create mode: set default values, use default VAT type
       formData.value = {
@@ -113,10 +163,21 @@ watch(
       }
       odontogramType.value = undefined
       clinicalCategory.value = undefined
+      sessionsEnabled.value = false
+      sessions.value = []
     }
   },
   { immediate: true }
 )
+
+// Clear sessions whenever the toggle is turned off
+watch(sessionsEnabled, (enabled) => {
+  if (!enabled) {
+    sessions.value = []
+  } else if (sessions.value.length === 0) {
+    addSession()
+  }
+})
 
 // Treatment scope options — aligned with Treatment.scope.
 const scopeOptions = [
@@ -227,11 +288,15 @@ function getVisualizationRules(treatmentType: string): string[] {
 
 // Form validation
 const isValid = computed(() => {
-  return (
-    formData.value.internal_code
-    && itemName.value
-    && formData.value.category_id
-  )
+  if (!formData.value.internal_code || !itemName.value || !formData.value.category_id) {
+    return false
+  }
+  if (sessionsEnabled.value) {
+    if (sessions.value.length === 0) return false
+    if (sessions.value.some(s => !s.label || s.default_price < 0)) return false
+    if (!sessionsSumMatches.value) return false
+  }
+  return true
 })
 
 function handleSubmit() {
@@ -254,6 +319,9 @@ function handleSubmit() {
       clinical_category: clinicalCategory.value
     }
   }
+
+  // Session template: emit list (server replaces atomically) or empty list to clear
+  cleanData.sessions = sessionsEnabled.value ? sessionsToPayload() : []
 
   if (isCreateMode.value) {
     emit('create', cleanData as TreatmentCatalogItemCreate)
@@ -393,6 +461,79 @@ function handleClose() {
                       @update:model-value="setTierPrice(tier, $event)"
                     />
                   </UFormField>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sessions (multi-session billing) -->
+            <div class="border-t border-default pt-4">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="font-medium text-default dark:text-white">
+                  {{ t('catalog.sessions.title') }}
+                </h4>
+                <USwitch v-model="sessionsEnabled" />
+              </div>
+              <p class="text-xs text-muted mb-3">
+                {{ t('catalog.sessions.help') }}
+              </p>
+              <div v-if="sessionsEnabled" class="space-y-2">
+                <div
+                  v-for="(session, idx) in sessions"
+                  :key="idx"
+                  class="flex items-end gap-2"
+                >
+                  <div class="w-10 text-center text-sm text-muted pb-2.5">
+                    {{ idx + 1 }}
+                  </div>
+                  <UFormField
+                    :label="idx === 0 ? t('catalog.sessions.label') : undefined"
+                    class="flex-1"
+                  >
+                    <UInput
+                      v-model="session.label"
+                      :placeholder="t('catalog.sessions.labelPlaceholder')"
+                    />
+                  </UFormField>
+                  <UFormField
+                    :label="idx === 0 ? t('catalog.sessions.price') : undefined"
+                    class="w-32"
+                  >
+                    <UInput
+                      v-model.number="session.default_price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                    />
+                  </UFormField>
+                  <UButton
+                    icon="i-lucide-trash-2"
+                    color="error"
+                    variant="ghost"
+                    size="sm"
+                    class="mb-1"
+                    @click="removeSession(idx)"
+                  />
+                </div>
+                <div class="flex items-center justify-between pt-2">
+                  <UButton
+                    icon="i-lucide-plus"
+                    variant="ghost"
+                    size="sm"
+                    @click="addSession"
+                  >
+                    {{ t('catalog.sessions.add') }}
+                  </UButton>
+                  <UBadge
+                    :color="sessionsSumMatches ? 'success' : 'error'"
+                    variant="subtle"
+                  >
+                    {{
+                      t('catalog.sessions.sumStatus', {
+                        sum: sessionsSum.toFixed(2),
+                        total: (Number(formData.default_price) || 0).toFixed(2)
+                      })
+                    }}
+                  </UBadge>
                 </div>
               </div>
             </div>

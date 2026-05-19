@@ -13,6 +13,7 @@ import type { PlannedTreatmentItem } from '~~/app/types'
 import { VueDraggable } from 'vue-draggable-plus'
 import CompletionNudgeModal from './notes/CompletionNudgeModal.vue'
 import PlanItemDoctorChip from './PlanItemDoctorChip.vue'
+import PlanItemSessionRow from '../treatment-plans/PlanItemSessionRow.vue'
 
 const props = defineProps<{
   items: PlannedTreatmentItem[]
@@ -45,6 +46,10 @@ const emit = defineEmits<{
   'reorder': [itemIds: string[]]
   /** Fired when the user picks a different doctor for a single item. */
   'item-doctor-change': [itemId: string, professionalId: string | null]
+  /** Fired when the user completes a specific session of a multi-session item. */
+  'session-complete': [itemId: string, sessionId: string]
+  /** Fired when the user cancels a specific session. */
+  'session-cancel': [itemId: string, sessionId: string]
 }>()
 
 const { t, locale } = useI18n()
@@ -175,6 +180,18 @@ function getItemPrice(item: PlannedTreatmentItem): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+function isMultiSession(item: PlannedTreatmentItem): boolean {
+  return (item.sessions?.length ?? 0) > 1
+}
+
+function sessionProgress(item: PlannedTreatmentItem): { done: number; total: number } {
+  const sessions = item.sessions ?? []
+  return {
+    done: sessions.filter(s => s.status === 'completed').length,
+    total: sessions.length
+  }
+}
+
 // Format currency — clinic-wide via useCurrency.
 const { format: formatCurrency } = useCurrency()
 </script>
@@ -252,51 +269,64 @@ const { format: formatCurrency } = useCurrency()
         @mouseleave="emit('item-hover', null)"
         @keydown="handleKeydown($event, index)"
       >
-        <div class="grid grid-cols-[1fr_auto] items-center gap-2 w-full">
-          <div class="flex items-center gap-2 min-w-0">
-            <button
-              v-if="!readonly && localPending.length > 1"
-              type="button"
-              class="drag-handle shrink-0 text-subtle hover:text-default cursor-grab active:cursor-grabbing"
-              :title="t('clinical.plans.dragToReorder')"
-              :aria-label="t('clinical.plans.dragToReorder')"
-            >
-              <UIcon
-                name="i-lucide-grip-vertical"
-                class="w-4 h-4"
+        <div class="space-y-1">
+          <!-- Row 1: nombre del tratamiento a ancho completo, fuera del grid
+               para que nunca se vea estrujado por el contenido lateral. -->
+          <div class="font-medium break-words">
+            {{ getItemName(item) }}
+          </div>
+
+          <!-- Row 2: metadatos + acciones. La columna izquierda sigue
+               siendo flexible; la derecha encaja los iconos sin pelearse
+               con el nombre. -->
+          <div class="grid grid-cols-[1fr_auto] items-center gap-2 w-full">
+            <div class="flex items-center gap-2 flex-wrap min-w-0">
+              <button
+                v-if="!readonly && localPending.length > 1"
+                type="button"
+                class="drag-handle shrink-0 text-subtle hover:text-default cursor-grab active:cursor-grabbing"
+                :title="t('clinical.plans.dragToReorder')"
+                :aria-label="t('clinical.plans.dragToReorder')"
+              >
+                <UIcon
+                  name="i-lucide-grip-vertical"
+                  class="w-4 h-4"
+                />
+              </button>
+              <span class="text-subtle text-caption tnum w-6 text-center shrink-0">
+                {{ index + 1 }}.
+              </span>
+              <!-- Doctor chip stays editable on pending items regardless of
+                   the plan-lock state — reassignment is operational and does
+                   not touch the patient-facing contract. -->
+              <PlanItemDoctorChip
+                :professional-id="item.assigned_professional_id ?? null"
+                :plan-professional-id="planProfessionalId"
+                :readonly="item.status !== 'pending'"
+                @change="(professionalId) => emit('item-doctor-change', item.id, professionalId)"
               />
-            </button>
-            <span class="text-subtle text-caption tnum w-6 text-center shrink-0">
-              {{ index + 1 }}.
-            </span>
-            <!-- Doctor chip stays editable on pending items regardless of
-                 the plan-lock state — reassignment is operational and does
-                 not touch the patient-facing contract. -->
-            <PlanItemDoctorChip
-              :professional-id="item.assigned_professional_id ?? null"
-              :plan-professional-id="planProfessionalId"
-              :readonly="item.status !== 'pending'"
-              @change="(professionalId) => emit('item-doctor-change', item.id, professionalId)"
-            />
-            <div class="min-w-0 flex-1">
-              <div class="font-medium break-words">
-                {{ getItemName(item) }}
-              </div>
-              <div
+              <span
                 v-if="hasToothInfo(item)"
                 class="text-sm text-muted"
               >
                 {{ formatToothInfo(item) }}
-              </div>
+              </span>
+              <UBadge
+                v-if="isMultiSession(item)"
+                :color="sessionProgress(item).done > 0 ? 'primary' : 'neutral'"
+                variant="subtle"
+                size="xs"
+              >
+                {{ t('clinical.plans.sessions.progress', sessionProgress(item)) }}
+              </UBadge>
             </div>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <span
-              v-if="getItemPrice(item) !== undefined"
-              class="font-medium text-sm"
-            >
-              {{ formatCurrency(getItemPrice(item)) }}
-            </span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span
+                v-if="getItemPrice(item) !== undefined"
+                class="font-medium text-sm"
+              >
+                {{ formatCurrency(getItemPrice(item)) }}
+              </span>
             <!-- Per-treatment note button (clinical_notes module). Stays
                  mounted regardless of plan-item status so notes can be
                  added/read on every status (issue #60). -->
@@ -326,7 +356,26 @@ const { format: formatCurrency } = useCurrency()
               :title="t('clinical.plans.removeItem')"
               @click.stop="emit('item-remove', item.id)"
             />
+            </div>
           </div>
+        </div>
+
+        <!-- Multi-session billing breakdown.
+             Single-session items hide this entirely; the legacy "mark
+             complete" button still drives the lifecycle for those. -->
+        <div
+          v-if="isMultiSession(item)"
+          class="mt-2 pl-8 space-y-1"
+          @click.stop
+        >
+          <PlanItemSessionRow
+            v-for="session in item.sessions"
+            :key="session.id"
+            :session="session"
+            :can-complete="completeEnabled"
+            @complete="(sessionId) => emit('session-complete', item.id, sessionId)"
+            @cancel="(sessionId) => emit('session-cancel', item.id, sessionId)"
+          />
         </div>
       </div>
     </VueDraggable>

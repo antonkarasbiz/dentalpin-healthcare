@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- feat(sessions): plan items now own 1..N ``PlannedTreatmentItemSession``
+  rows that capture the named, billable steps of a multi-session
+  treatment (e.g. crown: "Toma de medidas" 200€ + "Colocación" 600€).
+  Sessions are snapshotted from the catalog template at ``add_item``
+  time (scaled if the treatment price overrides the catalog total) and
+  are independent thereafter. New endpoints:
+  - ``PATCH /items/{id}/sessions/{sid}/complete`` — publishes
+    ``treatment_plan.item_session_completed`` (consumed by ``payments`` →
+    earned ledger). Finalizes the parent item once all sessions are
+    terminal and at least one was completed.
+  - ``PATCH /items/{id}/sessions/{sid}/cancel`` — terminate a session
+    without generating an earned entry.
+  - ``PUT /items/{id}/sessions/{sid}`` — edit label/amount/notes on a
+    pending session.
+  - ``POST /items/{id}/sessions`` + ``DELETE /items/{id}/sessions/{sid}``
+    — append/remove a session manually.
+  The legacy ``PATCH /items/{id}/complete`` keeps working: it advances the
+  next pending session. Migration ``tp_0006`` creates the new table and
+  backfills one row per existing item.
 - fix(events): ``on_treatment_performed`` handler uses
   ``SELECT FOR UPDATE SKIP LOCKED`` when looking up the matching
   planned item. Avoids a deadlock that surfaced as a client timeout

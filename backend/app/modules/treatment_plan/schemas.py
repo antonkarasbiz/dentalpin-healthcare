@@ -221,6 +221,21 @@ class PlannedTreatmentItemUpdate(BaseModel):
     assigned_professional_id: UUID | None = None
 
 
+class PlannedItemSessionResponse(BaseModel):
+    """One billing / execution step inside a plan item."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sequence: int
+    label: str | None
+    amount: Decimal
+    status: str  # pending|completed|cancelled
+    completed_at: datetime | None
+    completed_by: UUID | None
+    notes: str | None
+
+
 class PlannedTreatmentItemResponse(BaseModel):
     """Response for planned treatment item."""
 
@@ -243,6 +258,33 @@ class PlannedTreatmentItemResponse(BaseModel):
     # Embedded Treatment + optional catalog item.
     treatment: TreatmentBrief | None = None
     catalog_item: CatalogItemBrief | None = None
+    sessions: list[PlannedItemSessionResponse] = Field(default_factory=list)
+
+
+class SessionInput(BaseModel):
+    """Manual session input — used when adding/editing sessions on a plan item.
+
+    ``sequence`` may be omitted (server assigns by array position).
+    """
+
+    sequence: int | None = Field(default=None, ge=1)
+    label: str | None = Field(default=None, max_length=120)
+    amount: Decimal = Field(ge=0)
+
+
+class CompleteSessionRequest(BaseModel):
+    """Mark one session of a plan item as completed."""
+
+    completed_without_appointment: bool = False
+    notes: str | None = None
+
+
+class UpdateSessionRequest(BaseModel):
+    """Edit a pending session (label / amount / notes)."""
+
+    label: str | None = Field(default=None, max_length=120)
+    amount: Decimal | None = Field(default=None, ge=0)
+    notes: str | None = None
 
 
 class CompleteItemRequest(BaseModel):

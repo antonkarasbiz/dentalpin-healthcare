@@ -53,8 +53,12 @@ from app.modules.patients_clinical.models import (
     SurgicalHistory,
     SystemicDisease,
 )
-from app.modules.payments.models import Payment, PaymentAllocation
-from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPlan
+from app.modules.payments.models import PatientEarnedEntry, Payment, PaymentAllocation
+from app.modules.treatment_plan.models import (
+    PlannedTreatmentItem,
+    PlannedTreatmentItemSession,
+    TreatmentPlan,
+)
 from app.seeds.demo_data import (
     CLINIC_ID,
     USER_DENTIST_ID,
@@ -108,6 +112,7 @@ async def _load_catalog_map(db: AsyncSession) -> dict[str, dict]:
         .options(
             selectinload(TreatmentCatalogItem.vat_type_rel),
             selectinload(TreatmentCatalogItem.odontogram_mapping),
+            selectinload(TreatmentCatalogItem.sessions),
         )
         .where(TreatmentCatalogItem.clinic_id == CLINIC_ID)
     )
@@ -117,12 +122,24 @@ async def _load_catalog_map(db: AsyncSession) -> dict[str, dict]:
         odontogram_type = (
             item.odontogram_mapping.odontogram_treatment_type if item.odontogram_mapping else None
         )
+        sessions = sorted(
+            (
+                {
+                    "sequence": s.sequence,
+                    "labels": dict(s.labels or {}),
+                    "default_price": s.default_price,
+                }
+                for s in (item.sessions or [])
+            ),
+            key=lambda s: s["sequence"],
+        )
         mapping[item.internal_code] = {
             "id": item.id,
             "default_price": item.default_price,
             "vat_type_id": item.vat_type_id,
             "vat_rate": rate_or_zero(vat_rate),
             "odontogram_treatment_type": odontogram_type,
+            "sessions": sessions,
         }
     return mapping
 
@@ -393,6 +410,11 @@ async def seed_treatment_plans(db: AsyncSession, catalog_map: dict) -> dict:
 
     Plans are inserted with budget_id=None; the link is wired by seed_budgets
     once the budgets exist.
+
+    Also seeds the per-item ``PlannedTreatmentItemSession`` snapshot rows
+    (always at least one per item) and the matching ``PatientEarnedEntry``
+    rows for completed sessions so the patient "Pagos" tab shows the
+    "Pendiente de cobrar" panel out of the box.
     """
     data = generate_treatment_plans_data(catalog_map)
 
@@ -410,8 +432,18 @@ async def seed_treatment_plans(db: AsyncSession, catalog_map: dict) -> dict:
         db.add(PlannedTreatmentItem(**item_dict))
     await db.flush()
 
+    for session_dict in data["item_sessions"]:
+        db.add(PlannedTreatmentItemSession(**session_dict))
+    await db.flush()
+
+    for earned_dict in data["earned_entries"]:
+        db.add(PatientEarnedEntry(**earned_dict))
+    await db.flush()
+
     _print_status_counts(f"  Created {len(data['plans'])} treatment plans:", data["plans"])
     print(f"  Created {len(data['items'])} planned items")
+    print(f"  Created {len(data['item_sessions'])} planned-item sessions")
+    print(f"  Created {len(data['earned_entries'])} earned-entry rows")
     return data
 
 

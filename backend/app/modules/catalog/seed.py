@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import (
+    CatalogItemSession,
     TreatmentCatalogItem,
     TreatmentCategory,
     TreatmentOdontogramMapping,
@@ -480,6 +481,10 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
             "odontogram_treatment_type": "crown",
             "visualization_rules": [pattern_fill("diagonal_stripes", "#F59E0B")],
             "visualization_config": {"color": "#F59E0B"},
+            "sessions": [
+                {"labels": {"es": "Toma de medidas", "en": "Impressions"}, "default_price": Decimal("150.00")},
+                {"labels": {"es": "Colocación", "en": "Placement"}, "default_price": Decimal("250.00")},
+            ],
         },
         {
             "internal_code": "REST-CROWN-ZIR",
@@ -492,6 +497,10 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
             "odontogram_treatment_type": "crown",
             "visualization_rules": [pattern_fill("diagonal_stripes", "#FBBF24")],
             "visualization_config": {"color": "#FBBF24"},
+            "sessions": [
+                {"labels": {"es": "Toma de medidas", "en": "Impressions"}, "default_price": Decimal("200.00")},
+                {"labels": {"es": "Colocación", "en": "Placement"}, "default_price": Decimal("350.00")},
+            ],
         },
         {
             "internal_code": "REST-CROWN-DISI",
@@ -504,6 +513,10 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
             "odontogram_treatment_type": "crown",
             "visualization_rules": [pattern_fill("diagonal_stripes", "#FDE68A")],
             "visualization_config": {"color": "#FDE68A"},
+            "sessions": [
+                {"labels": {"es": "Toma de medidas", "en": "Impressions"}, "default_price": Decimal("250.00")},
+                {"labels": {"es": "Colocación", "en": "Placement"}, "default_price": Decimal("400.00")},
+            ],
         },
         {
             "internal_code": "REST-CROWN-METAL",
@@ -635,6 +648,11 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
             "odontogram_treatment_type": "root_canal_full",
             "visualization_rules": [pulp_fill("#7C3AED", "full")],
             "visualization_config": {"color": "#7C3AED"},
+            "sessions": [
+                {"labels": {"es": "Apertura y conductometría", "en": "Access and length"}, "default_price": Decimal("130.00")},
+                {"labels": {"es": "Limpieza y conformación", "en": "Cleaning and shaping"}, "default_price": Decimal("130.00")},
+                {"labels": {"es": "Obturación", "en": "Obturation"}, "default_price": Decimal("120.00")},
+            ],
         },
         {
             "internal_code": "ENDO-RETREAT",
@@ -797,6 +815,11 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
             "odontogram_treatment_type": "implant",
             "visualization_rules": [lateral_icon("implant", "#10B981")],
             "visualization_config": {"color": "#10B981"},
+            "sessions": [
+                {"labels": {"es": "Cirugía de implante", "en": "Implant surgery"}, "default_price": Decimal("700.00")},
+                {"labels": {"es": "Pilar de cicatrización", "en": "Healing abutment"}, "default_price": Decimal("150.00")},
+                {"labels": {"es": "Colocación de corona", "en": "Crown placement"}, "default_price": Decimal("250.00")},
+            ],
         },
         {
             "internal_code": "SURG-IMP-ZIR",
@@ -1204,6 +1227,7 @@ async def seed_catalog(db: AsyncSession, clinic_id: UUID) -> dict:
             viz_config = treatment_data.pop("visualization_config", None) or {}
             vat_type_key = treatment_data.pop("vat_type", "exempt")
             vat_type_id = vat_type_map.get(vat_type_key, vat_type_map.get("exempt"))
+            session_template = treatment_data.pop("sessions", None)
 
             existing = await db.execute(
                 select(TreatmentCatalogItem).where(
@@ -1234,6 +1258,19 @@ async def seed_catalog(db: AsyncSession, clinic_id: UUID) -> dict:
                     clinical_category=category_key,
                 )
                 db.add(mapping)
+
+            # Per-session template (multi-session billing). Treatment plans
+            # snapshot this when the item is added — see ``treatment_plan``.
+            if session_template:
+                for idx, session_data in enumerate(session_template, start=1):
+                    db.add(
+                        CatalogItemSession(
+                            catalog_item_id=item.id,
+                            sequence=session_data.get("sequence") or idx,
+                            labels=session_data.get("labels") or {},
+                            default_price=session_data["default_price"],
+                        )
+                    )
 
             items_created += 1
 

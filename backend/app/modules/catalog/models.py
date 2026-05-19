@@ -194,6 +194,11 @@ class TreatmentCatalogItem(Base, TimestampMixin):
     odontogram_mapping: Mapped["TreatmentOdontogramMapping | None"] = relationship(
         back_populates="catalog_item", uselist=False, cascade="all, delete-orphan"
     )
+    sessions: Mapped[list["CatalogItemSession"]] = relationship(
+        back_populates="catalog_item",
+        cascade="all, delete-orphan",
+        order_by="CatalogItemSession.sequence",
+    )
 
     __table_args__ = (
         UniqueConstraint("clinic_id", "internal_code", name="uq_catalog_item_clinic_code"),
@@ -201,6 +206,37 @@ class TreatmentCatalogItem(Base, TimestampMixin):
         Index("idx_catalog_items_category", "category_id"),
         Index("idx_catalog_items_active", "clinic_id", "is_active"),
         Index("idx_catalog_items_vat_type", "vat_type_id"),
+    )
+
+
+class CatalogItemSession(Base, TimestampMixin):
+    """Session template for catalog items billed in stages.
+
+    Defines the named steps of a multi-session treatment (e.g. Crown:
+    "Toma de medidas" 200€ + "Colocación" 600€). When a catalog item
+    is added to a treatment plan, the template is snapshotted into
+    ``PlannedTreatmentItemSession`` rows owned by the plan; the
+    template can evolve without affecting past instances.
+    """
+
+    __tablename__ = "catalog_item_sessions"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    catalog_item_id: Mapped[UUID] = mapped_column(
+        ForeignKey("treatment_catalog_items.id", ondelete="CASCADE"), index=True
+    )
+
+    sequence: Mapped[int] = mapped_column(Integer)
+    # Localized session label: {"es": "Toma de medidas", "en": "Impressions"}
+    labels: Mapped[dict] = mapped_column(JSONB, default=dict)
+    default_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+
+    # Relationships
+    catalog_item: Mapped["TreatmentCatalogItem"] = relationship(back_populates="sessions")
+
+    __table_args__ = (
+        UniqueConstraint("catalog_item_id", "sequence", name="uq_catalog_session_item_sequence"),
+        Index("idx_catalog_sessions_item", "catalog_item_id"),
     )
 
 

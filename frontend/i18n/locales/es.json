@@ -643,6 +643,14 @@
       "noItems": "Sin tratamientos en el plan",
       "markComplete": "Marcar como completado",
       "removeItem": "Eliminar del plan",
+      "sessions": {
+        "progress": "{done}/{total} sesiones",
+        "markDone": "Marcar sesión realizada",
+        "cancel": "Cancelar sesión",
+        "markedDone": "Sesión realizada",
+        "cancelled": "Sesión cancelada",
+        "untitled": "Sesión {n}"
+      },
       "unknownTreatment": "Tratamiento",
       "odontogram": "Odontograma",
       "pending": "pendientes",
@@ -1341,6 +1349,15 @@
       "title": "Precios por nº de superficies",
       "help": "Define el precio para 1–5 superficies. Al seleccionar superficies en el diente, se usa el tramo correspondiente. Tramos vacíos caen al mayor tramo menor o igual.",
       "tier": "{n} sup."
+    },
+    "sessions": {
+      "title": "Sesiones (cobro fraccionado)",
+      "help": "Define las sesiones en las que se ejecuta y cobra el tratamiento (p.ej. corona: 'Toma de medidas' + 'Colocación'). La suma debe coincidir con el precio base.",
+      "label": "Nombre",
+      "labelPlaceholder": "Ej. Toma de medidas",
+      "price": "Importe",
+      "add": "Añadir sesión",
+      "sumStatus": "Suma {sum} € · Total {total} €"
     },
     "categoryCreated": "Categoría creada",
     "categoryUpdated": "Categoría actualizada",

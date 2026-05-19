@@ -362,6 +362,64 @@ export function useTreatmentPlans() {
     }
   }
 
+  async function completeSession(
+    planId: string,
+    itemId: string,
+    sessionId: string,
+    payload: { notes?: string; completed_without_appointment?: boolean } = {}
+  ) {
+    loading.value = true
+    try {
+      const response = await api.patch<ApiResponse<PlannedTreatmentItem>>(
+        `/api/v1/treatment_plan/treatment-plans/${planId}/items/${itemId}/sessions/${sessionId}/complete`,
+        payload
+      )
+      if (currentPlan.value?.id === planId) {
+        const idx = currentPlan.value.items.findIndex(i => i.id === itemId)
+        if (idx !== -1) {
+          currentPlan.value.items[idx] = response.data
+        }
+      }
+      toast.add({ title: t('clinical.plans.sessions.markedDone'), color: 'green' })
+      return response.data
+    } catch (error) {
+      console.error('Error completing session:', error)
+      toast.add({ title: t('errors.updateFailed'), color: 'red' })
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function cancelSession(
+    planId: string,
+    itemId: string,
+    sessionId: string,
+    payload: { notes?: string } = {}
+  ) {
+    loading.value = true
+    try {
+      const response = await api.patch<ApiResponse<PlannedTreatmentItem>>(
+        `/api/v1/treatment_plan/treatment-plans/${planId}/items/${itemId}/sessions/${sessionId}/cancel`,
+        payload
+      )
+      if (currentPlan.value?.id === planId) {
+        const idx = currentPlan.value.items.findIndex(i => i.id === itemId)
+        if (idx !== -1) {
+          currentPlan.value.items[idx] = response.data
+        }
+      }
+      toast.add({ title: t('clinical.plans.sessions.cancelled'), color: 'orange' })
+      return response.data
+    } catch (error) {
+      console.error('Error cancelling session:', error)
+      toast.add({ title: t('errors.updateFailed'), color: 'red' })
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Link budget
   async function linkToBudget(planId: string, data: LinkBudgetRequest) {
     loading.value = true
@@ -614,6 +672,8 @@ export function useTreatmentPlans() {
     removeItem,
     reorderItems,
     completeItem,
+    completeSession,
+    cancelSession,
     changeItemDoctor,
 
     // Workflow transitions

@@ -13,6 +13,7 @@ from app.database import get_db
 from .schemas import (
     ClosePlanRequest,
     CompleteItemRequest,
+    CompleteSessionRequest,
     ContactLogRequest,
     GenerateBudgetResponse,
     LinkBudgetRequest,
@@ -21,11 +22,13 @@ from .schemas import (
     PlannedTreatmentItemResponse,
     PlannedTreatmentItemUpdate,
     ReorderItemsRequest,
+    SessionInput,
     TreatmentPlanCreate,
     TreatmentPlanDetailResponse,
     TreatmentPlanResponse,
     TreatmentPlanStatusUpdate,
     TreatmentPlanUpdate,
+    UpdateSessionRequest,
 )
 from .service import PlanLockedError, TreatmentPlanService
 
@@ -502,6 +505,147 @@ async def complete_plan_item(
     if not item:
         raise HTTPException(status_code=404, detail="Treatment item not found")
     return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
+
+
+# -----------------------------------------------------------------------------
+# Plan item sessions (multi-session billing)
+# -----------------------------------------------------------------------------
+
+
+def _item_response_or_404(item) -> ApiResponse[PlannedTreatmentItemResponse]:
+    if not item:
+        raise HTTPException(status_code=404, detail="Treatment item not found")
+    return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
+
+
+@router.patch(
+    "/treatment-plans/{plan_id}/items/{item_id}/sessions/{session_id}/complete",
+    response_model=ApiResponse[PlannedTreatmentItemResponse],
+)
+async def complete_item_session(
+    plan_id: UUID,
+    item_id: UUID,
+    session_id: UUID,
+    data: CompleteSessionRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PlannedTreatmentItemResponse]:
+    """Mark one session of a plan item as completed."""
+    try:
+        item = await TreatmentPlanService.complete_session(
+            db,
+            ctx.clinic_id,
+            plan_id,
+            item_id,
+            session_id,
+            ctx.user_id,
+            data.completed_without_appointment,
+            data.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _item_response_or_404(item)
+
+
+@router.patch(
+    "/treatment-plans/{plan_id}/items/{item_id}/sessions/{session_id}/cancel",
+    response_model=ApiResponse[PlannedTreatmentItemResponse],
+)
+async def cancel_item_session(
+    plan_id: UUID,
+    item_id: UUID,
+    session_id: UUID,
+    data: CompleteSessionRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PlannedTreatmentItemResponse]:
+    """Mark a session as cancelled (no earned entry will be generated)."""
+    try:
+        item = await TreatmentPlanService.cancel_session(
+            db, ctx.clinic_id, plan_id, item_id, session_id, ctx.user_id, data.notes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _item_response_or_404(item)
+
+
+@router.put(
+    "/treatment-plans/{plan_id}/items/{item_id}/sessions/{session_id}",
+    response_model=ApiResponse[PlannedTreatmentItemResponse],
+)
+async def update_item_session(
+    plan_id: UUID,
+    item_id: UUID,
+    session_id: UUID,
+    data: UpdateSessionRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PlannedTreatmentItemResponse]:
+    """Edit label / amount / notes on a pending session."""
+    try:
+        item = await TreatmentPlanService.update_session(
+            db,
+            ctx.clinic_id,
+            plan_id,
+            item_id,
+            session_id,
+            data.model_dump(exclude_unset=True),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _item_response_or_404(item)
+
+
+@router.post(
+    "/treatment-plans/{plan_id}/items/{item_id}/sessions",
+    response_model=ApiResponse[PlannedTreatmentItemResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_item_session(
+    plan_id: UUID,
+    item_id: UUID,
+    data: SessionInput,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PlannedTreatmentItemResponse]:
+    """Append a new session to a plan item (manual; outside catalog template)."""
+    try:
+        item = await TreatmentPlanService.add_session_manual(
+            db,
+            ctx.clinic_id,
+            plan_id,
+            item_id,
+            data.model_dump(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _item_response_or_404(item)
+
+
+@router.delete(
+    "/treatment-plans/{plan_id}/items/{item_id}/sessions/{session_id}",
+    response_model=ApiResponse[PlannedTreatmentItemResponse],
+)
+async def delete_item_session(
+    plan_id: UUID,
+    item_id: UUID,
+    session_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PlannedTreatmentItemResponse]:
+    """Remove a pending session. Returns the updated item."""
+    try:
+        item = await TreatmentPlanService.delete_session(
+            db, ctx.clinic_id, plan_id, item_id, session_id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _item_response_or_404(item)
 
 
 # -----------------------------------------------------------------------------

@@ -97,6 +97,23 @@ and close or reactivate.
 3. To record a clinical note at that moment, use the *Add note*
    button (contributed by `clinical_notes`).
 
+## Multi-session treatments
+
+Some catalog items (e.g. crown, root canal) carry a **session
+template** with a label and price per step. When the treatment is
+added to a plan, one session is created per step.
+
+- The item header shows an **X/Y sessions** progress chip.
+- Below the item, the session list renders one row per session (✓
+  icon when completed, dashed circle when pending).
+- Click the check on a pending session to mark it done — publishes
+  `treatment_plan.item_session_completed`; `payments` records an
+  "earned" entry for that amount.
+- The item is finalized automatically when the last pending session
+  is completed (the legacy completion flow runs at that point).
+- Cancel a session if it was not delivered — no earned entry is
+  generated.
+
 ## Change the plan's doctor
 
 > Requires `treatment_plan.plans.write`.

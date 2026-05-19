@@ -639,6 +639,19 @@ export interface OdontogramMappingCreate {
 /** Strategy used by the backend to compute Treatment.price_snapshot from a catalog item. */
 export type PricingStrategy = 'flat' | 'per_tooth' | 'per_surface' | 'per_role'
 
+export interface CatalogItemSession {
+  id: string
+  sequence: number
+  labels: Record<string, string>
+  default_price: number
+}
+
+export interface CatalogItemSessionInput {
+  sequence?: number
+  labels: Record<string, string>
+  default_price: number
+}
+
 export interface TreatmentCatalogItem {
   id: string
   clinic_id: string
@@ -674,6 +687,7 @@ export interface TreatmentCatalogItem {
   // Related
   category?: TreatmentCatalogCategory
   odontogram_mapping?: OdontogramMapping
+  sessions?: CatalogItemSession[]
 }
 
 export interface TreatmentCatalogItemCreate {
@@ -700,6 +714,8 @@ export interface TreatmentCatalogItemCreate {
   material_notes?: string
   // Odontogram mapping
   odontogram_mapping?: OdontogramMappingCreate
+  // Session template (multi-session billing)
+  sessions?: CatalogItemSessionInput[]
 }
 
 export interface TreatmentCatalogItemUpdate {
@@ -721,6 +737,7 @@ export interface TreatmentCatalogItemUpdate {
   material_notes?: string
   is_active?: boolean
   odontogram_mapping?: OdontogramMappingCreate
+  sessions?: CatalogItemSessionInput[]
 }
 
 /** Layered visualization rule. Each layer renders on top of the previous. */
@@ -2043,6 +2060,19 @@ export interface TreatmentPlanBrief {
 }
 
 // Planned Treatment Item (references a single Treatment via treatment_id).
+export type PlanItemSessionStatus = 'pending' | 'completed' | 'cancelled'
+
+export interface PlanItemSession {
+  id: string
+  sequence: number
+  label?: string | null
+  amount: number | string
+  status: PlanItemSessionStatus
+  completed_at?: string | null
+  completed_by?: string | null
+  notes?: string | null
+}
+
 export interface PlannedTreatmentItem {
   id: string
   clinic_id: string
@@ -2060,6 +2090,7 @@ export interface PlannedTreatmentItem {
   // Nested data
   treatment?: TreatmentBrief
   catalog_item?: TreatmentCatalogItemBrief
+  sessions?: PlanItemSession[]
   // Optional plan info (enriched client-side for appointment selector)
   treatment_plan?: TreatmentPlanBrief
 }

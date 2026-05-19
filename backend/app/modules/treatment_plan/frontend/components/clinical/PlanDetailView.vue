@@ -40,6 +40,8 @@ const toast = useToast()
 
 const {
   completeItem,
+  completeSession,
+  cancelSession,
   removeItem,
   reorderItems,
   changeItemDoctor,
@@ -380,6 +382,17 @@ async function handleItemDoctorChange(itemId: string, professionalId: string | n
   emit('updated')
 }
 
+async function handleSessionComplete(itemId: string, sessionId: string) {
+  await completeSession(props.plan.id, itemId, sessionId, {})
+  await odontogramRef.value?.refetchTreatments()
+  emit('updated')
+}
+
+async function handleSessionCancel(itemId: string, sessionId: string) {
+  await cancelSession(props.plan.id, itemId, sessionId, {})
+  emit('updated')
+}
+
 // The legacy "Activate plan" CTA used to fire ``update_status`` with
 // ``status='active'`` — an invalid transition under the new state
 // machine (must go through ``pending``). Both the in-page CTA and
@@ -634,6 +647,8 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
             @item-hover="hoveredItemId = $event"
             @item-complete="handleCompleteItem"
             @item-remove="handleRemoveItem"
+            @session-complete="handleSessionComplete"
+            @session-cancel="handleSessionCancel"
             @reorder="handleReorder"
             @item-doctor-change="handleItemDoctorChange"
           />

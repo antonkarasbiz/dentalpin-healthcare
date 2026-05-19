@@ -153,6 +153,14 @@ class EventType:
     # when an item is completed without a clinical note, consumed by
     # patient_timeline for compliance audit).
     TREATMENT_PLAN_ITEM_COMPLETED_WITHOUT_NOTE = "treatment_plan.item_completed_without_note"
+    # Per-session completion of a multi-step plan item. Payload:
+    # (plan_id, item_id, session_id, sequence, label, amount,
+    # treatment_id, patient_id, clinic_id, completed_by, occurred_at).
+    # Subscribers: payments (earned ledger upsert keyed on
+    # (treatment_id, session_id)). Single-session items still publish
+    # this once on completion; payments stops listening to the legacy
+    # TREATMENT_PLAN_TREATMENT_COMPLETED earned path.
+    TREATMENT_PLAN_ITEM_SESSION_COMPLETED = "treatment_plan.item_session_completed"
 
     # Clinical-notes events (clinical_notes module — replaces the legacy
     # ``treatment_plan.{plan,item}_note_created`` pair).

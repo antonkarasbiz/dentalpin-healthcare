@@ -994,3 +994,152 @@ async def test_setting_new_default_unsets_old(
         headers=auth_headers,
     )
     assert exempt_response.json()["data"]["is_default"] is False
+
+
+# ============================================================================
+# Session template (multi-session billing)
+# ============================================================================
+
+
+async def _create_catalog_category(client: AsyncClient, auth_headers: dict, key: str) -> str:
+    response = await client.post(
+        "/api/v1/catalog/categories",
+        json={"key": key, "names": {"es": key, "en": key}},
+        headers=auth_headers,
+    )
+    return response.json()["data"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_create_item_with_session_template(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict
+):
+    """Sessions whose prices sum to default_price are accepted."""
+    category_id = await _create_catalog_category(client, auth_headers, "sessions_ok")
+
+    response = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "CROWN-SESS",
+            "names": {"es": "Corona", "en": "Crown"},
+            "default_price": 800.00,
+            "sessions": [
+                {"labels": {"es": "Toma de medidas"}, "default_price": 200.00},
+                {"labels": {"es": "Colocación"}, "default_price": 600.00},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()["data"]
+    assert len(data["sessions"]) == 2
+    assert data["sessions"][0]["sequence"] == 1
+    assert float(data["sessions"][0]["default_price"]) == 200.00
+    assert data["sessions"][1]["labels"]["es"] == "Colocación"
+
+
+@pytest.mark.asyncio
+async def test_create_item_session_sum_mismatch_rejected(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict
+):
+    """Sessions whose prices don't sum to default_price get 422."""
+    category_id = await _create_catalog_category(client, auth_headers, "sessions_mismatch")
+
+    response = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "CROWN-BAD",
+            "names": {"es": "Corona", "en": "Crown"},
+            "default_price": 800.00,
+            "sessions": [
+                {"labels": {"es": "Sesión 1"}, "default_price": 100.00},
+                {"labels": {"es": "Sesión 2"}, "default_price": 600.00},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_item_replaces_session_template(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict
+):
+    """PUT /items with sessions replaces the stored template atomically."""
+    category_id = await _create_catalog_category(client, auth_headers, "sessions_replace")
+    create = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "ENDO-SESS",
+            "names": {"es": "Endodoncia"},
+            "default_price": 300.00,
+            "sessions": [
+                {"labels": {"es": "Sesión 1"}, "default_price": 150.00},
+                {"labels": {"es": "Sesión 2"}, "default_price": 150.00},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    item_id = create.json()["data"]["id"]
+
+    # Replace template with 3 sessions
+    update = await client.put(
+        f"/api/v1/catalog/items/{item_id}",
+        json={
+            "sessions": [
+                {"labels": {"es": "S1"}, "default_price": 100.00},
+                {"labels": {"es": "S2"}, "default_price": 100.00},
+                {"labels": {"es": "S3"}, "default_price": 100.00},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert update.status_code == 200
+    sessions = update.json()["data"]["sessions"]
+    assert len(sessions) == 3
+    assert [s["sequence"] for s in sessions] == [1, 2, 3]
+
+    # Empty list clears the template
+    clear = await client.put(
+        f"/api/v1/catalog/items/{item_id}",
+        json={"sessions": []},
+        headers=auth_headers,
+    )
+    assert clear.status_code == 200
+    assert clear.json()["data"]["sessions"] == []
+
+
+@pytest.mark.asyncio
+async def test_update_item_sessions_omitted_preserves_template(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict
+):
+    """Omitting `sessions` in PUT leaves the existing template untouched."""
+    category_id = await _create_catalog_category(client, auth_headers, "sessions_preserve")
+    create = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "BRIDGE-SESS",
+            "names": {"es": "Puente"},
+            "default_price": 500.00,
+            "sessions": [
+                {"labels": {"es": "A"}, "default_price": 250.00},
+                {"labels": {"es": "B"}, "default_price": 250.00},
+            ],
+        },
+        headers=auth_headers,
+    )
+    item_id = create.json()["data"]["id"]
+
+    # Update only the cost_price; sessions key absent
+    update = await client.put(
+        f"/api/v1/catalog/items/{item_id}",
+        json={"cost_price": 100.00},
+        headers=auth_headers,
+    )
+    assert update.status_code == 200
+    assert len(update.json()["data"]["sessions"]) == 2

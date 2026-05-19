@@ -21,7 +21,7 @@ from fastapi import APIRouter
 from app.core.events import EventType
 from app.core.plugins import BaseModule
 
-from .events import on_plan_item_completed, on_treatment_performed
+from .events import on_session_completed, on_treatment_performed
 from .models import (
     PatientEarnedEntry,
     Payment,
@@ -82,5 +82,9 @@ class PaymentsModule(BaseModule):
     def get_event_handlers(self) -> dict:
         return {
             EventType.ODONTOGRAM_TREATMENT_PERFORMED: on_treatment_performed,
-            EventType.TREATMENT_PLAN_TREATMENT_COMPLETED: on_plan_item_completed,
+            # Per-session earned signal (multi-session billing).
+            # Single-session items publish this once too — the legacy
+            # ``treatment_plan.treatment_completed`` handler was removed
+            # to avoid double-booking the same treatment.
+            EventType.TREATMENT_PLAN_ITEM_SESSION_COMPLETED: on_session_completed,
         }

@@ -23,7 +23,13 @@ from .schemas import (
     VatTypeResponse,
     VatTypeUpdate,
 )
-from .service import CatalogService, CategoryService, OdontogramCatalogService, VatTypeService
+from .service import (
+    CatalogService,
+    CategoryService,
+    OdontogramCatalogService,
+    SessionTemplateError,
+    VatTypeService,
+)
 
 router = APIRouter()
 
@@ -363,7 +369,12 @@ async def create_item(
             detail=f"Item with code '{data.internal_code}' already exists",
         )
 
-    item = await CatalogService.create_item(db, ctx.clinic_id, data.model_dump())
+    try:
+        item = await CatalogService.create_item(db, ctx.clinic_id, data.model_dump())
+    except SessionTemplateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     # Reload to get relationships
     item = await CatalogService.get_item(db, ctx.clinic_id, item.id)
@@ -407,9 +418,14 @@ async def update_item(
                 detail=f"Item with code '{data.internal_code}' already exists",
             )
 
-    updated = await CatalogService.update_item(
-        db, ctx.clinic_id, item, data.model_dump(exclude_unset=True)
-    )
+    try:
+        updated = await CatalogService.update_item(
+            db, ctx.clinic_id, item, data.model_dump(exclude_unset=True)
+        )
+    except SessionTemplateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     # Reload to get fresh relationships
     updated = await CatalogService.get_item(db, ctx.clinic_id, item_id)

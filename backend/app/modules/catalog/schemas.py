@@ -140,6 +140,32 @@ class OdontogramMappingResponse(BaseModel):
 
 
 # ============================================================================
+# Session Template Schemas
+# ============================================================================
+
+
+class CatalogItemSessionInput(BaseModel):
+    """Input shape for a session in the catalog template.
+
+    Used inside CatalogItemCreate/Update.sessions[]. Sequence is assigned
+    in array order at the server; client may omit or send a hint.
+    """
+
+    sequence: int | None = Field(default=None, ge=1)
+    labels: dict[str, str] = Field(default_factory=dict)
+    default_price: Decimal = Field(ge=0)
+
+
+class CatalogItemSessionResponse(BaseModel):
+    id: UUID
+    sequence: int
+    labels: dict[str, str]
+    default_price: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
 # Catalog Item Schemas
 # ============================================================================
 
@@ -181,6 +207,9 @@ class CatalogItemCreate(BaseModel):
     # Odontogram mapping (optional)
     odontogram_mapping: OdontogramMappingCreate | None = None
 
+    # Session template (optional). Empty list and None both mean single-session.
+    sessions: list[CatalogItemSessionInput] | None = None
+
 
 class CatalogItemUpdate(BaseModel):
     """Schema for updating a catalog item."""
@@ -219,6 +248,10 @@ class CatalogItemUpdate(BaseModel):
 
     # Odontogram mapping
     odontogram_mapping: OdontogramMappingCreate | None = None
+
+    # Session template. When provided (even as empty list) the server
+    # atomically replaces the stored template.
+    sessions: list[CatalogItemSessionInput] | None = None
 
 
 class CatalogItemResponse(BaseModel):
@@ -270,6 +303,7 @@ class CatalogItemResponse(BaseModel):
     # Related
     category: CategoryResponse | None = None
     odontogram_mapping: OdontogramMappingResponse | None = None
+    sessions: list[CatalogItemSessionResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

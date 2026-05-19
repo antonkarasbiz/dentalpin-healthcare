@@ -584,6 +584,64 @@ class LedgerService:
         entries.sort(key=lambda x: x.occurred_at)
         return entries
 
+    @staticmethod
+    async def compute_pending_charges(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID
+    ) -> list[dict]:
+        """Return earned entries that are not yet covered by net payments.
+
+        FIFO virtual settle: walk earned entries in chronological order,
+        deduct net paid; whatever remains uncovered is the patient's
+        outstanding balance. No FK between Payment and earned entries —
+        the order alone implies the assignment. Reception uses this
+        directly from the patient "Pagos" tab to know what to charge
+        when the patient leaves the box.
+        """
+        total_paid_row = await db.execute(
+            select(func.coalesce(func.sum(Payment.amount), Decimal("0"))).where(
+                Payment.clinic_id == clinic_id, Payment.patient_id == patient_id
+            )
+        )
+        total_refunded_row = await db.execute(
+            select(func.coalesce(func.sum(Refund.amount), Decimal("0")))
+            .join(Payment, Payment.id == Refund.payment_id)
+            .where(Payment.clinic_id == clinic_id, Payment.patient_id == patient_id)
+        )
+        net_paid = total_paid_row.scalar_one() - total_refunded_row.scalar_one()
+
+        result = await db.execute(
+            select(PatientEarnedEntry)
+            .where(
+                PatientEarnedEntry.clinic_id == clinic_id,
+                PatientEarnedEntry.patient_id == patient_id,
+            )
+            .order_by(PatientEarnedEntry.performed_at)
+        )
+        earned = list(result.scalars().all())
+
+        remaining = net_paid
+        pending: list[dict] = []
+        for entry in earned:
+            if remaining >= entry.amount:
+                remaining -= entry.amount
+                continue
+            # Partial cover: report the remainder so reception can charge it.
+            unpaid = entry.amount - max(Decimal("0"), remaining)
+            remaining = Decimal("0")
+            pending.append(
+                {
+                    "entry_id": str(entry.id),
+                    "treatment_id": str(entry.treatment_id),
+                    "session_id": (
+                        str(entry.source_session_id) if entry.source_session_id else None
+                    ),
+                    "description": entry.description,
+                    "amount": str(unpaid),
+                    "occurred_at": entry.performed_at.isoformat(),
+                }
+            )
+        return pending
+
 
 # --- Reports ----------------------------------------------------------
 

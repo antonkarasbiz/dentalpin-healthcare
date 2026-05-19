@@ -1275,6 +1275,13 @@ def generate_odontogram_data() -> dict:
 TREATMENT_PLAN_IDS = [UUID(f"fe00bc99-9c0b-4ef8-bb6d-6bb9bd380{i:03x}") for i in range(20)]
 PLAN_TREATMENT_IDS = [UUID(f"fa00bc99-9c0b-4ef8-bb6d-6bb9bd381{i:03x}") for i in range(200)]
 PLANNED_ITEM_IDS = [UUID(f"ff00bc99-9c0b-4ef8-bb6d-6bb9bd380{i:03x}") for i in range(200)]
+# Pre-allocated UUIDs for per-item sessions (up to 10 sessions per planned item).
+PLAN_ITEM_SESSION_IDS = [
+    UUID(f"f100bc99-9c0b-4ef8-bb6d-6bb9bd38{i:04x}") for i in range(2000)
+]
+PATIENT_EARNED_ENTRY_IDS = [
+    UUID(f"f200bc99-9c0b-4ef8-bb6d-6bb9bd38{i:04x}") for i in range(2000)
+]
 
 BUDGET_IDS = [UUID(f"aa00bc99-9c0b-4ef8-bb6d-6bb9bd380b{i:02x}") for i in range(10)]
 BUDGET_ITEM_IDS = [UUID(f"bb00bc99-9c0b-4ef8-bb6d-6bb9bd380c{i:02x}") for i in range(50)]
@@ -1732,27 +1739,35 @@ PATIENT_JOURNEYS = [
             "notes": None,
         },
     },
-    # Patient 11 — María Teresa / Patricia (pulpitis; no budget)
+    # Patient 11 — María Teresa / Patricia (corona multi-sesión en curso).
+    # Demo del flujo de cobro fraccionado: la corona MC se compone de dos
+    # sesiones ("Toma de medidas" 150€ + "Colocación" 250€). La primera ya
+    # se hizo hoy y nadie la ha cobrado todavía → la pestaña Pagos de la
+    # ficha mostrará "Pendiente de cobrar 150 €" con botón directo.
     {
         "patient_idx": 11,
         "plan": {
             "id_idx": 11,
             "status": "active",
-            "title": {"es": "Tratamiento de pulpitis", "en": "Pulpitis treatment"},
+            "title": {"es": "Corona en dos sesiones", "en": "Two-session crown"},
             "diagnosis_notes": {
-                "es": "Tratamiento de pulpitis con corona posterior.",
-                "en": "Pulpitis treatment with follow-up crown.",
+                "es": "Corona metal-cerámica en 36 — cobro fraccionado por sesión.",
+                "en": "Metal-ceramic crown on tooth 36 — billed per session.",
             },
             "items": [
-                {"catalog_code": "DX-VISIT", "is_global": True},
-                {"catalog_code": "ENDO-UNI", "tooth": 36, "is_global": False},
-                {"catalog_code": "REST-COMP", "tooth": 36, "is_global": False},
+                {"catalog_code": "DX-VISIT", "is_global": True, "completed": True},
+                {
+                    "catalog_code": "REST-CROWN-MC",
+                    "tooth": 36,
+                    "is_global": False,
+                    # Sesión 1 hecha y aún no cobrada; sesión 2 pendiente.
+                    "sessions_completed": 1,
+                },
             ],
         },
         "appointments": [
-            {"week": "current", "covers": [0], "status": "confirmed"},
+            {"week": "past", "covers": [0], "status": "completed"},
             {"week": "future", "covers": [1], "status": "scheduled"},
-            {"week": "future", "covers": [2], "status": "scheduled"},
         ],
     },
     # Patient 12 — José Luis / Richard (anticoagulated; overdue invoice)
@@ -1866,13 +1881,19 @@ def generate_treatment_plans_data(catalog_items_map: dict[str, dict]) -> dict:
 
     Args:
         catalog_items_map: internal_code -> {id, default_price, vat_type_id, vat_rate,
-                           odontogram_treatment_type}.
+                           odontogram_treatment_type, sessions[]}.
 
     Returns:
         dict with:
           plans: list of TreatmentPlan dicts (budget_id=None; wired by seed_demo.py)
           plan_treatments: list of backing Treatment dicts
           items: list of PlannedTreatmentItem dicts
+          item_sessions: list of PlannedTreatmentItemSession dicts (snapshot
+              of catalog session template; one row per session of every
+              multi-session item).
+          earned_entries: list of PatientEarnedEntry dicts (one per
+              completed session). Drives the "Pendiente de cobrar" panel
+              on the patient ficha when net_paid < total_earned.
           plan_details: {plan_id: {
               "patient_id", "plan_number", "status", "assigned_professional_id",
               "items": [{"idx", "plan_item_id", "treatment_id", "catalog_code",
@@ -1883,9 +1904,13 @@ def generate_treatment_plans_data(catalog_items_map: dict[str, dict]) -> dict:
     plans = []
     planned_items = []
     plan_treatments = []
+    item_sessions: list[dict] = []
+    earned_entries: list[dict] = []
     plan_details: dict = {}
 
     plan_item_idx = 0
+    session_uuid_idx = 0
+    earned_uuid_idx = 0
 
     for scenario_idx, journey in enumerate(PATIENT_JOURNEYS):
         plan_scenario = journey["plan"]
@@ -1996,6 +2021,77 @@ def generate_treatment_plans_data(catalog_items_map: dict[str, dict]) -> dict:
                 }
             )
 
+            # Sessions: snapshot the catalog template (if any) into one
+            # PlannedTreatmentItemSession per session. ``sessions_completed``
+            # in the scenario overrides the count of completed sessions,
+            # enabling partial-progress demos (first session done, rest
+            # pending → "Pendiente de cobrar" surfaces on the Pagos tab).
+            catalog_sessions = catalog_item.get("sessions") or []
+            if not catalog_sessions:
+                fallback_amount = catalog_item.get("default_price") or Decimal("0")
+                snapshot_sessions = [
+                    {"sequence": 1, "label": None, "amount": fallback_amount}
+                ]
+            else:
+                snapshot_sessions = [
+                    {
+                        "sequence": cs["sequence"],
+                        "label": (cs.get("labels") or {}).get("es")
+                        or (cs.get("labels") or {}).get("en"),
+                        "amount": cs["default_price"],
+                    }
+                    for cs in catalog_sessions
+                ]
+
+            override = item_scenario.get("sessions_completed")
+            if is_completed and override is None:
+                completed_count = len(snapshot_sessions)
+            elif override is not None:
+                completed_count = max(0, min(int(override), len(snapshot_sessions)))
+            else:
+                completed_count = 0
+
+            for snap in snapshot_sessions:
+                session_uuid = PLAN_ITEM_SESSION_IDS[session_uuid_idx]
+                session_uuid_idx += 1
+                session_completed = snap["sequence"] <= completed_count
+                session_completed_at = (
+                    datetime.now() - timedelta(days=10 - snap["sequence"])
+                    if session_completed
+                    else None
+                )
+                item_sessions.append(
+                    {
+                        "id": session_uuid,
+                        "plan_item_id": planned_item_id,
+                        "sequence": snap["sequence"],
+                        "label": snap["label"],
+                        "amount": snap["amount"],
+                        "status": "completed" if session_completed else "pending",
+                        "completed_at": session_completed_at,
+                        "completed_by": assigned_professional_id if session_completed else None,
+                        "notes": None,
+                    }
+                )
+
+                if session_completed:
+                    earned_entries.append(
+                        {
+                            "id": PATIENT_EARNED_ENTRY_IDS[earned_uuid_idx],
+                            "clinic_id": CLINIC_ID,
+                            "patient_id": patient["id"],
+                            "treatment_id": treatment_id,
+                            "catalog_item_id": catalog_item["id"],
+                            "source_session_id": session_uuid,
+                            "description": snap["label"],
+                            "amount": snap["amount"],
+                            "performed_at": session_completed_at,
+                            "professional_id": assigned_professional_id,
+                            "source_event": "treatment_plan.item_session_completed",
+                        }
+                    )
+                    earned_uuid_idx += 1
+
             details_items.append(
                 {
                     "idx": len(details_items),
@@ -2025,6 +2121,8 @@ def generate_treatment_plans_data(catalog_items_map: dict[str, dict]) -> dict:
         "plans": plans,
         "plan_treatments": plan_treatments,
         "items": planned_items,
+        "item_sessions": item_sessions,
+        "earned_entries": earned_entries,
         "plan_details": plan_details,
     }
 

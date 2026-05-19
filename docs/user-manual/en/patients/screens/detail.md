@@ -59,6 +59,20 @@ that other modules contribute to.
 4. To restore, run an SQL update on the `status` column — there is no
    in-app un-archive flow yet.
 
+## Payments tab — "Pending to charge"
+
+The **Administration → Payments** tab shows the patient ledger
+(total paid, debt, on-account balance) and, when there is real debt,
+a **Pending to charge** card at the top.
+
+- The card lists the recently completed sessions that net payments
+  haven't covered yet (FIFO).
+- Total equals `clinic_receivable = earned − net_paid`.
+- The **Collect X €** button opens the payment modal with the amount
+  pre-filled; reception just picks the method and confirms.
+- After the payment is recorded, the card disappears (or shrinks)
+  depending on how much was collected.
+
 ## "Do not contact"
 
 The `do_not_contact` flag is the operational opt-out. When enabled:

@@ -622,6 +622,14 @@
       "noItems": "No treatments in the plan",
       "markComplete": "Mark as completed",
       "removeItem": "Remove from plan",
+      "sessions": {
+        "progress": "{done}/{total} sessions",
+        "markDone": "Mark session done",
+        "cancel": "Cancel session",
+        "markedDone": "Session marked done",
+        "cancelled": "Session cancelled",
+        "untitled": "Session {n}"
+      },
       "unknownTreatment": "Treatment",
       "odontogram": "Odontogram",
       "pending": "pending",
@@ -1319,6 +1327,15 @@
       "title": "Prices by surface count",
       "help": "Define the price for 1–5 surfaces. When surfaces are picked on a tooth, the matching tier is used. Missing tiers fall back to the nearest lower populated tier.",
       "tier": "{n} surf."
+    },
+    "sessions": {
+      "title": "Sessions (fractional billing)",
+      "help": "Define the named steps over which this treatment is delivered and billed (e.g. crown: 'Impressions' + 'Placement'). The sum must equal the base price.",
+      "label": "Label",
+      "labelPlaceholder": "e.g. Impressions",
+      "price": "Amount",
+      "add": "Add session",
+      "sumStatus": "Sum {sum} € · Total {total} €"
     },
     "categoryCreated": "Category created",
     "categoryUpdated": "Category updated",

@@ -17,6 +17,16 @@ import type { PatientExtended, PatientLedger, PatientLedgerEntry, PaymentMethod 
 import type { TotalLine } from '~~/app/components/shared/EntityTotalsCard.vue'
 import type { SemanticRole } from '~~/app/config/severity'
 import { PERMISSIONS } from '~~/app/config/permissions'
+import PendingChargesCard from './payments/PendingChargesCard.vue'
+
+interface PendingCharge {
+  entry_id: string
+  treatment_id: string
+  session_id: string | null
+  description: string | null
+  amount: string
+  occurred_at: string
+}
 
 interface PatientPaymentsCtx {
   patient: PatientExtended | null
@@ -28,14 +38,16 @@ const props = defineProps<{ ctx: PatientPaymentsCtx }>()
 const { t, locale } = useI18n()
 const { can } = usePermissions()
 const { format: formatCurrency } = useCurrency()
-const { fetchPatientLedger } = usePayments()
+const { fetchPatientLedger, fetchPendingCharges } = usePayments()
 
 const ledger = ref<PatientLedger | null>(null)
+const pendingCharges = ref<PendingCharge[]>([])
 const isLoading = ref(false)
 const loadError = ref(false)
 const showCobrar = ref(false)
 const showRefund = ref(false)
 const refundTarget = ref<{ id: string, amount: number, method: PaymentMethod } | null>(null)
+const prefilledCobrarAmount = ref<number | null>(null)
 
 const canCollect = computed(() => can(PERMISSIONS.payments.recordWrite))
 const canRefund = computed(() => can(PERMISSIONS.payments.recordRefund))
@@ -43,8 +55,13 @@ const canRefund = computed(() => can(PERMISSIONS.payments.recordRefund))
 const totalPaid = computed(() => Number(ledger.value?.total_paid ?? 0))
 const debt = computed(() => Number(ledger.value?.clinic_receivable ?? 0))
 const credit = computed(() => Number(ledger.value?.patient_credit ?? 0))
-const onAccount = computed(() => Number(ledger.value?.on_account_balance ?? 0))
 const totalEarned = computed(() => Number(ledger.value?.total_earned ?? 0))
+
+const patientFullName = computed(() => {
+  const p = props.ctx.patient
+  if (!p) return ''
+  return [p.first_name, p.last_name].filter(Boolean).join(' ').trim()
+})
 
 // Newest first. Backend returns chronological asc.
 const timeline = computed<PatientLedgerEntry[]>(() => {
@@ -75,9 +92,14 @@ const totalLines = computed<TotalLine[]>(() => [
   },
   {
     key: 'onAccount',
+    // "A cuenta" surfaces the *net* available credit (patient_credit =
+    // max(0, paid − earned)), not the gross on_account_balance which
+    // accumulates raw allocations without subtracting earned treatments
+    // already covered by them via FIFO. Reception cares about "how much
+    // is the patient really sitting on", not the bookkeeping figure.
     label: t('payments.patientPanel.kpis.onAccount'),
-    value: onAccount.value,
-    role: onAccount.value > 0 ? 'info' : 'neutral'
+    value: credit.value,
+    role: credit.value > 0 ? 'info' : 'neutral'
   }
 ])
 
@@ -147,8 +169,12 @@ async function refresh() {
   isLoading.value = true
   loadError.value = false
   try {
-    const data = await fetchPatientLedger(props.ctx.patientId)
+    const [data, pending] = await Promise.all([
+      fetchPatientLedger(props.ctx.patientId),
+      fetchPendingCharges(props.ctx.patientId)
+    ])
     ledger.value = data
+    pendingCharges.value = pending
     loadError.value = data === null
   } finally {
     isLoading.value = false
@@ -159,6 +185,12 @@ onMounted(refresh)
 watch(() => props.ctx.patientId, refresh)
 
 function openCobrar() {
+  prefilledCobrarAmount.value = null
+  showCobrar.value = true
+}
+
+function openCobrarPending(amount: number) {
+  prefilledCobrarAmount.value = amount
   showCobrar.value = true
 }
 
@@ -204,6 +236,15 @@ function handleRefunded() {
 
 <template>
   <div class="space-y-4 pb-20 lg:pb-0">
+    <!-- Pendiente de cobrar — surfaces completed-but-uncharged sessions
+         so reception can collect when the patient leaves the box. -->
+    <PendingChargesCard
+      v-if="!isLoading && pendingCharges.length > 0"
+      :charges="pendingCharges"
+      :can-collect="canCollect"
+      @collect="openCobrarPending"
+    />
+
     <!-- Status banner (debt or credit). Hidden when settled. -->
     <EntityCriticalBanner
       v-if="banner && !isLoading"
@@ -408,6 +449,9 @@ function handleRefunded() {
     <PaymentCreateModal
       v-model:open="showCobrar"
       :default-patient-id="ctx.patientId"
+      :default-patient-name="patientFullName"
+      :default-amount="prefilledCobrarAmount ?? undefined"
+      :suggested-amount="debt > 0 ? debt : undefined"
       @created="handlePaymentCreated"
     />
 

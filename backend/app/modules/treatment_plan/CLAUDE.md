@@ -65,7 +65,8 @@ the `clinical_notes` module since issue #60.
 | `treatment_plan.reactivated` | closed → draft | Subscriber: `patient_timeline`. |
 | `treatment_plan.treatment_added` | item added | snapshot payload (catalog_item_id, tooth, surfaces, unit_price, budget_id). Subscriber: `budget`. |
 | `treatment_plan.treatment_removed` | item removed | payload includes `budget_id`. Subscriber: `budget`. |
-| `treatment_plan.treatment_completed` | item marked done | consumed by `patient_timeline`, `recalls`. Payload includes `treatment_category_key` (snapshot, may be null) so subscribers can map a completed treatment to a follow-up policy without importing catalog or treatment_plan models (issue #62). |
+| `treatment_plan.treatment_completed` | item marked done | consumed by `patient_timeline`, `recalls`. Payload includes `treatment_category_key` (snapshot, may be null) so subscribers can map a completed treatment to a follow-up policy without importing catalog or treatment_plan models (issue #62). Earned-ledger generation **moved out** of this event since the multi-session feature — see `item_session_completed` below. |
+| `treatment_plan.item_session_completed` | one session of a multi-session item marked done | payload: `{plan_id, item_id, session_id, sequence, label, amount, treatment_id, patient_id, completed_by, occurred_at}`. Consumed by `payments` (earned entry, idempotent on `(treatment_id, session_id)`). Fires for every completed session — single-session items publish it once on completion. |
 | `treatment_plan.budget_sync_requested` | manual resync | snapshot payload includes full `items[]`. Subscriber: `budget`. |
 | `treatment_plan.item_completed_without_note` | completion check | consumed by `patient_timeline` |
 
@@ -106,6 +107,13 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
 - **Item completion has two paths**: the user marks an item complete
   here, or the odontogram fires `odontogram.treatment.performed`. Both
   must converge to the same state — keep them idempotent.
+- **Sessions are the source of earned signal.** Every plan item now
+  owns ≥1 `PlannedTreatmentItemSession` (backfilled by `tp_0006`).
+  Per-session completion fires `item_session_completed`; the item
+  finalizes (and `treatment_completed` fires) only when every session
+  is in a terminal state and at least one is `completed`. Editing a
+  completed session is refused — its amount is the snapshot that
+  payments already booked.
 - **Completion still emits an audit event.** `treatment_plan.item_completed_without_note`
   fires whenever an item is completed; the timeline reconciles it with a
   follow-up `clinical_notes.treatment_created` event when the client

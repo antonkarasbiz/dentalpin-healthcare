@@ -63,18 +63,33 @@
     "new": {
       "title": "Registrar cobro",
       "patient": "Paciente",
+      "patientPlaceholder": "Buscar paciente...",
+      "unknownPatient": "Paciente desconocido",
       "amount": "Importe",
+      "suggestedHint": "Pendiente de cobrar: {amount}",
+      "useSuggested": "usar este importe",
       "method": "Método",
-      "date": "Fecha del cobro",
+      "moreMethods": "Más opciones",
+      "date": "Fecha",
+      "today": "Hoy",
+      "advanced": "Opciones avanzadas",
       "reference": "Referencia",
+      "referencePlaceholder": "Nº autorización tarjeta, identificador transferencia...",
       "notes": "Notas",
       "allocations": "Distribución",
+      "allocationsHint": "Divide el cobro entre presupuestos o déjalo a cuenta del paciente.",
       "addAllocation": "Añadir asignación",
       "allocationToBudget": "A presupuesto",
       "allocationOnAccount": "A cuenta",
+      "sumLabel": "Suma:",
+      "sumMismatch": "no coincide con el importe",
       "submit": "Registrar",
+      "submitWithAmount": "Cobrar {amount}",
       "cancel": "Cancelar",
-      "errSum": "La suma de asignaciones debe coincidir con el importe"
+      "errPatient": "Selecciona un paciente",
+      "errAmount": "Introduce un importe mayor que 0",
+      "errSum": "La suma de asignaciones debe coincidir con el importe",
+      "errUnknown": "No se pudo registrar el cobro. Intenta de nuevo."
     },
     "methods": {
       "cash": "Efectivo",
@@ -145,6 +160,13 @@
       "noteExcessToOnAccount": "quedan a cuenta del paciente.",
       "noteBudgetSettled": "El presupuesto ya está cobrado.",
       "noteToOnAccount": "se ingresarán a cuenta del paciente."
+    },
+    "pendingCharges": {
+      "title": "Pendiente de cobrar",
+      "count": "{n} sesiones",
+      "more": "+ {n} más",
+      "collect": "Cobrar {amount}",
+      "unnamedSession": "Sesión sin etiqueta"
     },
     "patientPanel": {
       "title": "Estado de cuenta",

@@ -21,6 +21,7 @@ Routes mounted at `/api/v1/payments/`.
 | `/{id}/refunds` | GET | `payments.record.read` |
 | `/{id}/refunds` | POST | `payments.record.refund` |
 | `/patients/{patient_id}/ledger` | GET | `payments.record.read` |
+| `/patients/{patient_id}/pending-charges` | GET | `payments.record.read` |
 | `/budgets/{budget_id}/allocations` | GET | `payments.record.read` |
 | `/reports/summary` | GET | `payments.reports.read` |
 | `/reports/trends` | GET | `payments.reports.read` |
@@ -53,8 +54,8 @@ change required.
 
 | Event | Handler | Effect |
 |---|---|---|
-| `odontogram.treatment.performed` | `on_treatment_performed` | Upsert `PatientEarnedEntry` |
-| `treatment_plan.treatment_completed` | `on_plan_item_completed` | Upsert `PatientEarnedEntry` (idempotent vs odontogram) |
+| `odontogram.treatment.performed` | `on_treatment_performed` | Upsert `PatientEarnedEntry` (single-session row, `source_session_id=NULL`) |
+| `treatment_plan.item_session_completed` | `on_session_completed` | Upsert per-session `PatientEarnedEntry` keyed on `(treatment_id, source_session_id)`. Replaces the legacy `treatment_plan.treatment_completed` subscription since the multi-session feature — see ADR/changelog. |
 
 Both handlers require `unit_price`/`price_snapshot` in the payload. If
 the publisher omits it, the entry is skipped with a warning — see
@@ -66,7 +67,7 @@ gotchas below.
 |---|---|---|
 | `budget.detail.sidebar` | `BudgetPaymentsCard` (cobrado / pendiente / allocations + "Cobrar" CTA) | `payments.record.read` |
 | `reports.categories` | `PaymentsReportEntry` (card on `/reports` linking to `/reports/payments`) | `payments.reports.read` |
-| `patient.detail.administracion.payments` | `PatientPaymentsPanel` (patient ledger inside the Administración tab — KPIs + timeline + refund row menu) | `payments.record.read` |
+| `patient.detail.administracion.payments` | `PatientPaymentsPanel` (patient ledger inside the Administración tab — KPIs + timeline + refund row menu + "Pendiente de cobrar" card) | `payments.record.read` |
 
 Registered in `frontend/plugins/slots.client.ts`. Cards receive `ctx`
 from the host page (`{ budget }`, `{ patient, patientId }`) and never

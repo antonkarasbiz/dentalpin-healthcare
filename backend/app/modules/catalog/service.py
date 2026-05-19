@@ -1,12 +1,53 @@
 """Catalog module service layer - business logic."""
 
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
-from .models import TreatmentCatalogItem, TreatmentCategory, TreatmentOdontogramMapping, VatType
+from .models import (
+    CatalogItemSession,
+    TreatmentCatalogItem,
+    TreatmentCategory,
+    TreatmentOdontogramMapping,
+    VatType,
+)
+
+# Rounding tolerance when comparing session sum vs. item total.
+SESSION_SUM_TOLERANCE = Decimal("0.01")
+
+
+class SessionTemplateError(ValueError):
+    """Raised when a session template fails validation (sum mismatch, etc.)."""
+
+
+def validate_session_template(
+    item_total: Decimal | None,
+    sessions: list[dict] | None,
+) -> None:
+    """Validate that session amounts sum to the item's total.
+
+    ``sessions`` is a list of dicts with at least a ``default_price`` (or
+    ``amount``) key. When the list is empty or None this is a no-op
+    (single-session item). When ``item_total`` is None and sessions are
+    provided we raise — sessions require a known total to validate
+    against.
+    """
+
+    if not sessions:
+        return
+    if item_total is None:
+        raise SessionTemplateError(
+            "Cannot define sessions when the item has no default_price"
+        )
+    key = "default_price" if "default_price" in sessions[0] else "amount"
+    total = sum((Decimal(str(s[key])) for s in sessions), Decimal("0"))
+    if abs(total - Decimal(str(item_total))) > SESSION_SUM_TOLERANCE:
+        raise SessionTemplateError(
+            f"Sum of session prices ({total}) must equal item total ({item_total})"
+        )
 
 # Default VAT types to seed for new clinics
 DEFAULT_VAT_TYPES = [
@@ -337,6 +378,7 @@ class CatalogService:
                 joinedload(TreatmentCatalogItem.category),
                 joinedload(TreatmentCatalogItem.odontogram_mapping),
                 joinedload(TreatmentCatalogItem.vat_type_rel),
+                selectinload(TreatmentCatalogItem.sessions),
             )
             .order_by(
                 TreatmentCatalogItem.category_id,
@@ -369,6 +411,7 @@ class CatalogService:
                 joinedload(TreatmentCatalogItem.category),
                 joinedload(TreatmentCatalogItem.odontogram_mapping),
                 joinedload(TreatmentCatalogItem.vat_type_rel),
+                selectinload(TreatmentCatalogItem.sessions),
             )
         )
         return result.unique().scalar_one_or_none()
@@ -391,6 +434,7 @@ class CatalogService:
                 joinedload(TreatmentCatalogItem.category),
                 joinedload(TreatmentCatalogItem.odontogram_mapping),
                 joinedload(TreatmentCatalogItem.vat_type_rel),
+                selectinload(TreatmentCatalogItem.sessions),
             )
         )
         return result.unique().scalar_one_or_none()
@@ -402,8 +446,12 @@ class CatalogService:
         data: dict,
     ) -> TreatmentCatalogItem:
         """Create a new catalog item."""
-        # Extract odontogram mapping if present
+        # Extract relations to handle separately
         odontogram_data = data.pop("odontogram_mapping", None)
+        sessions_data = data.pop("sessions", None)
+
+        # Validate session template against the item total
+        validate_session_template(data.get("default_price"), sessions_data)
 
         # If no vat_type_id provided, use clinic default
         if not data.get("vat_type_id"):
@@ -415,7 +463,6 @@ class CatalogService:
         db.add(item)
         await db.flush()
 
-        # Create odontogram mapping if provided
         if odontogram_data:
             mapping = TreatmentOdontogramMapping(
                 clinic_id=clinic_id,
@@ -423,8 +470,19 @@ class CatalogService:
                 **odontogram_data,
             )
             db.add(mapping)
-            await db.flush()
 
+        if sessions_data:
+            for idx, session_data in enumerate(sessions_data, start=1):
+                db.add(
+                    CatalogItemSession(
+                        catalog_item_id=item.id,
+                        sequence=session_data.get("sequence") or idx,
+                        labels=session_data.get("labels") or {},
+                        default_price=Decimal(str(session_data["default_price"])),
+                    )
+                )
+
+        await db.flush()
         return item
 
     @staticmethod
@@ -434,16 +492,24 @@ class CatalogService:
         item: TreatmentCatalogItem,
         data: dict,
     ) -> TreatmentCatalogItem:
-        """Update a catalog item."""
-        # Handle odontogram mapping separately
-        odontogram_data = data.pop("odontogram_mapping", None)
+        """Update a catalog item.
 
-        # Update main item fields
+        ``sessions`` semantics: omitted key = leave template untouched;
+        present key (list or empty list) = replace template atomically.
+        """
+        odontogram_data = data.pop("odontogram_mapping", None)
+        sessions_data = data.pop("sessions", "__not_provided__")
+
+        # Determine effective total for sessions validation
+        new_total = data.get("default_price")
+        effective_total = new_total if new_total is not None else item.default_price
+        if sessions_data != "__not_provided__":
+            validate_session_template(effective_total, sessions_data)
+
         for key, value in data.items():
             if value is not None:
                 setattr(item, key, value)
 
-        # Update or create odontogram mapping
         if odontogram_data:
             if item.odontogram_mapping:
                 for key, value in odontogram_data.items():
@@ -455,6 +521,21 @@ class CatalogService:
                     **odontogram_data,
                 )
                 db.add(mapping)
+
+        if sessions_data != "__not_provided__":
+            # Clear via relationship so `delete-orphan` cascade removes
+            # the old rows during flush; raw DELETE would leave the
+            # ORM session's collection cache stale.
+            item.sessions.clear()
+            await db.flush()
+            for idx, session_data in enumerate(sessions_data or [], start=1):
+                item.sessions.append(
+                    CatalogItemSession(
+                        sequence=session_data.get("sequence") or idx,
+                        labels=session_data.get("labels") or {},
+                        default_price=Decimal(str(session_data["default_price"])),
+                    )
+                )
 
         await db.flush()
         return item

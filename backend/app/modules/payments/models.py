@@ -210,6 +210,16 @@ class PatientEarnedEntry(Base, TimestampMixin):
 
     treatment_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True))  # no FK on purpose
     catalog_item_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), default=None)
+    # When set, this entry is one session of a multi-session treatment.
+    # Idempotency key becomes (treatment_id, source_session_id); leaving
+    # NULL preserves the single-session legacy behaviour.
+    source_session_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), default=None, index=True
+    )
+    # Optional human-readable label captured from the session (e.g.
+    # "Toma de medidas"). Snapshotted so the timeline can render
+    # without re-querying treatment_plan.
+    description: Mapped[str | None] = mapped_column(String(160), default=None)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     performed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     professional_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), default=None)
@@ -220,7 +230,9 @@ class PatientEarnedEntry(Base, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint("amount >= 0", name="ck_earned_amount_nonneg"),
-        UniqueConstraint("treatment_id", name="uq_earned_treatment"),
+        UniqueConstraint(
+            "treatment_id", "source_session_id", name="uq_earned_treatment_session"
+        ),
         Index("idx_earned_clinic_patient", "clinic_id", "patient_id"),
         Index("idx_earned_clinic_performed", "clinic_id", "performed_at"),
     )

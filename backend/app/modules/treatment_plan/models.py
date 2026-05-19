@@ -6,6 +6,7 @@ remain in the database, but ownership of the schema/migrations moved.
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -159,6 +161,11 @@ class PlannedTreatmentItem(Base, TimestampMixin):
     assigned_professional: Mapped["User | None"] = relationship(
         foreign_keys=[assigned_professional_id]
     )
+    sessions: Mapped[list["PlannedTreatmentItemSession"]] = relationship(
+        back_populates="plan_item",
+        cascade="all, delete-orphan",
+        order_by="PlannedTreatmentItemSession.sequence",
+    )
 
     __table_args__ = (
         UniqueConstraint("treatment_id", name="uq_planned_item_treatment"),
@@ -170,4 +177,42 @@ class PlannedTreatmentItem(Base, TimestampMixin):
             "treatment_plan_id",
             "assigned_professional_id",
         ),
+    )
+
+
+class PlannedTreatmentItemSession(Base, TimestampMixin):
+    """One billable / executable step of a ``PlannedTreatmentItem``.
+
+    Snapshotted from ``CatalogItemSession`` at plan-add time. After
+    creation the session is independent — editing the catalog template
+    does not retro-affect existing plan instances. Once a session is
+    marked ``completed`` its label and amount are immutable.
+    """
+
+    __tablename__ = "planned_treatment_item_sessions"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    plan_item_id: Mapped[UUID] = mapped_column(
+        ForeignKey("planned_treatment_items.id", ondelete="CASCADE"), index=True
+    )
+
+    sequence: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(120))
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending"
+    )  # pending|completed|cancelled
+
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    # Relationships
+    plan_item: Mapped["PlannedTreatmentItem"] = relationship(back_populates="sessions")
+    completer: Mapped["User | None"] = relationship(foreign_keys=[completed_by])
+
+    __table_args__ = (
+        UniqueConstraint("plan_item_id", "sequence", name="uq_plan_item_session_sequence"),
+        Index("idx_pti_session_plan_item", "plan_item_id"),
+        Index("ix_pti_session_plan_item_status", "plan_item_id", "status"),
     )

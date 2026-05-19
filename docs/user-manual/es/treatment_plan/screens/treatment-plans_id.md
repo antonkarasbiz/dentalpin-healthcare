@@ -97,6 +97,22 @@ ejecutados y se cierra o reactiva.
 3. Para anotar una nota clínica en ese momento, usa el botón de
    *Añadir nota* (lo aporta `clinical_notes`).
 
+## Tratamientos en varias sesiones
+
+Algunos tratamientos del catálogo (p.ej. corona, endodoncia) tienen
+una **plantilla de sesiones** con nombre e importe por paso. Al
+añadirlos al plan se crea automáticamente una sesión por cada paso.
+
+- El item muestra un chip **X/Y sesiones** con el progreso.
+- Bajo el item aparece la lista de sesiones (icono ✓ por completada,
+  círculo punteado por pendiente).
+- Pulsa el check de cada sesión para marcarla realizada — publica
+  `treatment_plan.item_session_completed` y `payments` registra una
+  entrada de "trabajo realizado" por ese importe.
+- El item se finaliza automáticamente al completar la última sesión
+  pendiente (entonces se ejecuta el flujo legacy de cierre).
+- Cancela una sesión si no llegó a hacerse: no genera cobro.
+
 ## Cambiar el doctor del plan
 
 > Requiere `treatment_plan.plans.write`.

@@ -60,6 +60,21 @@ acciones al que se enganchan módulos hermanos.
 4. Para restaurar, ejecuta un `UPDATE` SQL sobre la columna `status` —
    no hay flujo en la app para des-archivar todavía.
 
+## Pestaña Pagos — "Pendiente de cobrar"
+
+La pestaña **Administración → Pagos** muestra el ledger del paciente
+(total pagado, deuda, saldo a cuenta) y, cuando hay deuda real, una
+tarjeta de **Pendiente de cobrar** al principio.
+
+- La tarjeta lista las sesiones recién completadas que aún no están
+  cubiertas por los pagos del paciente (FIFO).
+- El total del paciente se calcula como `clinic_receivable =
+  earned − net_paid`.
+- El botón **Cobrar X €** abre el modal de cobro con el importe ya
+  rellenado; recepción solo elige el método y confirma.
+- Tras el cobro, la tarjeta desaparece o reduce su importe según
+  cuánto se cobró.
+
 ## "No contactar"
 
 El flag `do_not_contact` es la opción de exclusión operativa. Cuando

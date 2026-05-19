@@ -138,6 +138,26 @@ export function usePayments() {
     }
   }
 
+  interface PendingCharge {
+    entry_id: string
+    treatment_id: string
+    session_id: string | null
+    description: string | null
+    amount: string
+    occurred_at: string
+  }
+
+  async function fetchPendingCharges(patientId: string): Promise<PendingCharge[]> {
+    try {
+      const resp = await api.get<ApiResponse<PendingCharge[]>>(
+        `/api/v1/payments/patients/${patientId}/pending-charges`
+      )
+      return resp.data
+    } catch {
+      return []
+    }
+  }
+
   async function fetchBudgetAllocations(budgetId: string): Promise<PaymentAllocation[]> {
     try {
       const resp = await api.get<ApiResponse<PaymentAllocation[]>>(`/api/v1/payments/budgets/${budgetId}/allocations`)
@@ -223,6 +243,7 @@ export function usePayments() {
     refund,
     listRefunds,
     fetchPatientLedger,
+    fetchPendingCharges,
     fetchBudgetAllocations,
     fetchBudgetSummaries,
     fetchPatientDebtSummaries,

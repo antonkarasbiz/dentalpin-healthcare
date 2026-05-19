@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- feat(sessions): new ``CatalogItemSession`` entity defines named,
+  priced steps for treatments billed in stages (e.g. crown: "Toma de
+  medidas" 200€ + "Colocación" 600€). Sum of session prices must
+  equal the item ``default_price`` (422 on mismatch). Updates replace
+  the template atomically. Migration ``cat_0003`` adds the table.
+  Frontend admin ``CatalogItemModal`` gets a "Sesiones" section with
+  editor + sum-validation chip.
 - perf(list): ``CatalogService.list_items`` now counts directly via
   ``COUNT(TreatmentCatalogItem.id)`` instead of materialising the
   joined data query as a subquery.

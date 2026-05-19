@@ -63,18 +63,33 @@
     "new": {
       "title": "Record payment",
       "patient": "Patient",
+      "patientPlaceholder": "Search patient...",
+      "unknownPatient": "Unknown patient",
       "amount": "Amount",
+      "suggestedHint": "Pending to charge: {amount}",
+      "useSuggested": "use this amount",
       "method": "Method",
-      "date": "Payment date",
+      "moreMethods": "More options",
+      "date": "Date",
+      "today": "Today",
+      "advanced": "Advanced options",
       "reference": "Reference",
+      "referencePlaceholder": "Card auth #, transfer reference...",
       "notes": "Notes",
       "allocations": "Allocation",
+      "allocationsHint": "Split this payment across budgets or leave it on patient credit.",
       "addAllocation": "Add allocation",
       "allocationToBudget": "To budget",
       "allocationOnAccount": "On account",
+      "sumLabel": "Sum:",
+      "sumMismatch": "does not match the amount",
       "submit": "Record",
+      "submitWithAmount": "Charge {amount}",
       "cancel": "Cancel",
-      "errSum": "Allocation sum must equal the amount"
+      "errPatient": "Select a patient",
+      "errAmount": "Enter an amount greater than 0",
+      "errSum": "Allocation sum must equal the amount",
+      "errUnknown": "Could not record the payment. Try again."
     },
     "methods": {
       "cash": "Cash",
@@ -145,6 +160,13 @@
       "noteExcessToOnAccount": "to patient on-account credit.",
       "noteBudgetSettled": "Budget is already paid in full.",
       "noteToOnAccount": "go to patient on-account credit."
+    },
+    "pendingCharges": {
+      "title": "Pending to charge",
+      "count": "{n} sessions",
+      "more": "+ {n} more",
+      "collect": "Collect {amount}",
+      "unnamedSession": "Untitled session"
     },
     "patientPanel": {
       "title": "Patient ledger",

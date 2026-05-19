@@ -30,6 +30,13 @@ None.
 
 ## Gotchas
 
+- **Session template** (``CatalogItemSession``) is optional per item;
+  when present, the sum of ``default_price`` across sessions must
+  equal the item's ``default_price`` (tolerance ±0.01). PUT
+  ``/items/{id}`` with ``sessions`` (list, even empty) replaces the
+  template atomically via ORM ``item.sessions.clear()`` + re-append;
+  omitting the key preserves the existing template. Consumers
+  (treatment_plan) snapshot this template at plan-add time.
 - **VAT types are versioned** — when changing a VAT rate, create a new
   version rather than mutating in place. Historical invoices must
   reproduce their original VAT.

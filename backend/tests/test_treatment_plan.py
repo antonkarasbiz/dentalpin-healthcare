@@ -941,3 +941,294 @@ async def test_change_doctor_rejected_on_completed_item(
         json={"assigned_professional_id": doctor_b},
     )
     assert r.status_code == 400, r.text
+
+
+# ---------------------------------------------------------------------------
+# Multi-session billing
+# ---------------------------------------------------------------------------
+
+
+async def _seed_catalog_crown_with_sessions(
+    db_session: AsyncSession, clinic_id
+) -> str:
+    """Seed a catalog item with a 2-session template (200€ + 600€ = 800€)."""
+    from app.modules.catalog.models import CatalogItemSession
+
+    vat = VatType(
+        clinic_id=clinic_id, names={"es": "Exento"}, rate=0.0, is_default=True
+    )
+    db_session.add(vat)
+    await db_session.flush()
+    cat = TreatmentCategory(
+        clinic_id=clinic_id, key="restMS", names={"es": "R"}, is_system=True
+    )
+    db_session.add(cat)
+    await db_session.flush()
+    crown = TreatmentCatalogItem(
+        clinic_id=clinic_id,
+        category_id=cat.id,
+        internal_code="CROWN-MS",
+        names={"es": "Corona multi-sesión"},
+        default_price=Decimal("800.00"),
+        pricing_strategy="flat",
+        treatment_scope="tooth",
+        vat_type_id=vat.id,
+    )
+    db_session.add(crown)
+    await db_session.flush()
+    db_session.add(
+        TreatmentOdontogramMapping(
+            clinic_id=clinic_id,
+            catalog_item_id=crown.id,
+            odontogram_treatment_type="crown",
+            clinical_category="restauradora",
+            visualization_rules=[],
+            visualization_config={},
+        )
+    )
+    db_session.add_all(
+        [
+            CatalogItemSession(
+                catalog_item_id=crown.id,
+                sequence=1,
+                labels={"es": "Toma de medidas"},
+                default_price=Decimal("200.00"),
+            ),
+            CatalogItemSession(
+                catalog_item_id=crown.id,
+                sequence=2,
+                labels={"es": "Colocación"},
+                default_price=Decimal("600.00"),
+            ),
+        ]
+    )
+    await db_session.commit()
+    return str(crown.id)
+
+
+@pytest.fixture
+async def setup_multi_session(
+    db_session: AsyncSession, auth_headers: dict[str, str], client: AsyncClient
+) -> dict:
+    ctx = await _ensure_clinic_and_patient(db_session, client, auth_headers)
+    ctx["crown_ms_id"] = await _seed_catalog_crown_with_sessions(
+        db_session, ctx["clinic_id"]
+    )
+    return ctx
+
+
+async def _add_multi_session_item(
+    client: AsyncClient, auth_headers: dict, ctx: dict
+) -> tuple[str, str, list[dict]]:
+    """Create a plan + a treatment from the MS catalog item, add it. Returns (plan_id, item_id, sessions)."""
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": ctx["patient_id"], "title": "MS"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_resp = await client.post(
+        f"/api/v1/odontogram/patients/{ctx['patient_id']}/treatments",
+        headers=auth_headers,
+        json={
+            "catalog_item_id": ctx["crown_ms_id"],
+            "tooth_numbers": [16],
+            "status": "planned",
+        },
+    )
+    treatment_id = treatment_resp.json()["data"]["id"]
+    add = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    assert add.status_code == 201, add.text
+    item = add.json()["data"]
+    return plan_id, item["id"], item["sessions"]
+
+
+@pytest.mark.asyncio
+async def test_add_item_snapshots_catalog_sessions(
+    client: AsyncClient, auth_headers: dict, setup_multi_session: dict
+):
+    """Catalog template with 2 sessions creates 2 plan item sessions."""
+    _, _, sessions = await _add_multi_session_item(
+        client, auth_headers, setup_multi_session
+    )
+    assert len(sessions) == 2
+    assert [s["sequence"] for s in sessions] == [1, 2]
+    assert sessions[0]["label"] == "Toma de medidas"
+    assert float(sessions[0]["amount"]) == 200.00
+    assert sessions[1]["label"] == "Colocación"
+    assert float(sessions[1]["amount"]) == 600.00
+    assert all(s["status"] == "pending" for s in sessions)
+
+
+@pytest.mark.asyncio
+async def test_add_item_without_catalog_template_creates_single_session(
+    client: AsyncClient, auth_headers: dict, setup: dict
+):
+    """Item from a catalog item without sessions falls back to one session."""
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": setup["patient_id"]},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_id = await _create_treatment(client, auth_headers, setup)
+    add = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    sessions = add.json()["data"]["sessions"]
+    assert len(sessions) == 1
+    assert float(sessions[0]["amount"]) == 500.00
+
+
+@pytest.mark.asyncio
+async def test_complete_first_session_does_not_finalize_item(
+    client: AsyncClient, auth_headers: dict, setup_multi_session: dict
+):
+    """Completing 1/2 sessions leaves item pending and emits the session event only."""
+    from app.core.events import event_bus
+
+    events: list[dict] = []
+
+    async def _capture(payload: dict) -> None:
+        events.append(payload)
+
+    event_bus.subscribe("treatment_plan.item_session_completed", _capture)
+    event_bus.subscribe("treatment_plan.treatment_completed", _capture)
+    try:
+        plan_id, item_id, sessions = await _add_multi_session_item(
+            client, auth_headers, setup_multi_session
+        )
+        r = await client.patch(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/sessions/{sessions[0]['id']}/complete",
+            headers=auth_headers,
+            json={},
+        )
+        assert r.status_code == 200, r.text
+        data = r.json()["data"]
+        assert data["status"] == "pending"
+        completed = [s for s in data["sessions"] if s["status"] == "completed"]
+        assert len(completed) == 1
+        # Session-completed event fired; treatment_completed must NOT have fired yet.
+        session_events = [e for e in events if "session_id" in e]
+        treatment_events = [e for e in events if "treatment_category_key" in e]
+        assert len(session_events) == 1
+        assert session_events[0]["amount"] == "200.00"
+        assert treatment_events == []
+    finally:
+        event_bus._handlers.pop("treatment_plan.item_session_completed", None)  # noqa: SLF001
+        event_bus._handlers.pop("treatment_plan.treatment_completed", None)  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_complete_last_session_finalizes_item(
+    client: AsyncClient, auth_headers: dict, setup_multi_session: dict
+):
+    """Completing the final pending session flips the item to completed and fires treatment_completed."""
+    from app.core.events import event_bus
+
+    events: list[dict] = []
+
+    async def _capture(payload: dict) -> None:
+        events.append(payload)
+
+    event_bus.subscribe("treatment_plan.treatment_completed", _capture)
+    try:
+        plan_id, item_id, sessions = await _add_multi_session_item(
+            client, auth_headers, setup_multi_session
+        )
+        for s in sessions:
+            r = await client.patch(
+                f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/sessions/{s['id']}/complete",
+                headers=auth_headers,
+                json={},
+            )
+            assert r.status_code == 200, r.text
+        item = r.json()["data"]
+        assert item["status"] == "completed"
+        assert len(events) == 1  # treatment_completed fires exactly once
+    finally:
+        event_bus._handlers.pop("treatment_plan.treatment_completed", None)  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_cancel_session_blocks_earned(
+    client: AsyncClient, auth_headers: dict, setup_multi_session: dict
+):
+    """Cancelled sessions do not fire the session_completed event."""
+    from app.core.events import event_bus
+
+    session_events: list[dict] = []
+
+    async def _capture(payload: dict) -> None:
+        session_events.append(payload)
+
+    event_bus.subscribe("treatment_plan.item_session_completed", _capture)
+    try:
+        plan_id, item_id, sessions = await _add_multi_session_item(
+            client, auth_headers, setup_multi_session
+        )
+        # Cancel the 2nd session, complete the 1st
+        cancel = await client.patch(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/sessions/{sessions[1]['id']}/cancel",
+            headers=auth_headers,
+            json={},
+        )
+        assert cancel.status_code == 200, cancel.text
+        complete = await client.patch(
+            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/sessions/{sessions[0]['id']}/complete",
+            headers=auth_headers,
+            json={},
+        )
+        item = complete.json()["data"]
+        # Item finalizes since all sessions are terminal and one is completed
+        assert item["status"] == "completed"
+        # Only the completed session fired an earned event; cancelled didn't
+        assert len(session_events) == 1
+    finally:
+        event_bus._handlers.pop("treatment_plan.item_session_completed", None)  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_legacy_complete_endpoint_advances_next_session(
+    client: AsyncClient, auth_headers: dict, setup_multi_session: dict
+):
+    """Legacy PATCH /items/{id}/complete completes the next pending session."""
+    plan_id, item_id, sessions = await _add_multi_session_item(
+        client, auth_headers, setup_multi_session
+    )
+    r = await client.patch(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/complete",
+        headers=auth_headers,
+        json={},
+    )
+    assert r.status_code == 200, r.text
+    item = r.json()["data"]
+    assert item["status"] == "pending"
+    assert sum(1 for s in item["sessions"] if s["status"] == "completed") == 1
+
+
+@pytest.mark.asyncio
+async def test_edit_completed_session_rejected(
+    client: AsyncClient, auth_headers: dict, setup_multi_session: dict
+):
+    """Edits on completed sessions are refused (400)."""
+    plan_id, item_id, sessions = await _add_multi_session_item(
+        client, auth_headers, setup_multi_session
+    )
+    await client.patch(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/sessions/{sessions[0]['id']}/complete",
+        headers=auth_headers,
+        json={},
+    )
+    r = await client.put(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items/{item_id}/sessions/{sessions[0]['id']}",
+        headers=auth_headers,
+        json={"label": "Cambio", "amount": 250.00},
+    )
+    assert r.status_code == 400

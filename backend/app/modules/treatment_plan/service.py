@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select, update
@@ -16,7 +17,7 @@ from app.core.events.types import EventType
 from app.modules.odontogram.models import Treatment
 from app.modules.patients.models import Patient
 
-from .models import PlannedTreatmentItem, TreatmentPlan
+from .models import PlannedTreatmentItem, PlannedTreatmentItemSession, TreatmentPlan
 
 
 async def _validate_professional_in_clinic(
@@ -57,6 +58,79 @@ def _treatment_loader() -> selectinload:
         selectinload(Treatment.teeth),
         selectinload(Treatment.catalog_item).selectinload(TreatmentCatalogItem.category),
     )
+
+
+def _item_with_sessions_loader() -> list:
+    """Eager-load both treatment chain and sessions for a plan item."""
+    return [
+        _treatment_loader(),
+        selectinload(PlannedTreatmentItem.sessions),
+    ]
+
+
+def _snapshot_sessions_from_catalog(
+    item: PlannedTreatmentItem,
+    treatment: Treatment,
+) -> list[PlannedTreatmentItemSession]:
+    """Build the session rows for a newly added plan item.
+
+    Pulls the template from ``catalog_item.sessions`` when present;
+    otherwise emits a single session worth ``treatment.price_snapshot``.
+    When ``price_snapshot`` differs from the catalog's ``default_price``
+    (e.g. per_tooth strategy multiplying the unit price), session amounts
+    are scaled proportionally so the per-session weights survive.
+    Returned rows are appended to ``item.sessions`` by the caller.
+    """
+    catalog_item = getattr(treatment, "catalog_item", None)
+    catalog_sessions = getattr(catalog_item, "sessions", None) if catalog_item else None
+    treatment_total = (
+        Decimal(str(treatment.price_snapshot))
+        if treatment.price_snapshot is not None
+        else Decimal("0")
+    )
+
+    if not catalog_sessions:
+        return [
+            PlannedTreatmentItemSession(
+                sequence=1,
+                label=None,
+                amount=treatment_total,
+                status="pending",
+            )
+        ]
+
+    catalog_total = sum(
+        (Decimal(str(s.default_price)) for s in catalog_sessions),
+        Decimal("0"),
+    )
+    rows: list[PlannedTreatmentItemSession] = []
+    if catalog_total > 0 and treatment_total > 0 and catalog_total != treatment_total:
+        # Scale per-session amounts to the actual treatment total.
+        scale = treatment_total / catalog_total
+        scaled = [
+            (Decimal(str(s.default_price)) * scale).quantize(Decimal("0.01"))
+            for s in catalog_sessions
+        ]
+        # Adjust last session to absorb rounding drift so Σ matches exactly.
+        delta = treatment_total - sum(scaled, Decimal("0"))
+        scaled[-1] = scaled[-1] + delta
+        amounts = scaled
+    else:
+        amounts = [Decimal(str(s.default_price)) for s in catalog_sessions]
+
+    for idx, (cs, amount) in enumerate(zip(catalog_sessions, amounts, strict=True), start=1):
+        label = None
+        if cs.labels:
+            label = cs.labels.get("es") or cs.labels.get("en") or next(iter(cs.labels.values()))
+        rows.append(
+            PlannedTreatmentItemSession(
+                sequence=idx,
+                label=label,
+                amount=amount,
+                status="pending",
+            )
+        )
+    return rows
 
 
 # Allowed status transitions for ``TreatmentPlan``. See ADR 0006 and
@@ -183,6 +257,7 @@ class TreatmentPlanService:
                     selectinload(Treatment.teeth),
                     selectinload(Treatment.catalog_item),
                 ),
+                selectinload(TreatmentPlan.items).selectinload(PlannedTreatmentItem.sessions),
             )
             .order_by(TreatmentPlan.created_at.desc())
             .offset(offset)
@@ -216,6 +291,7 @@ class TreatmentPlanService:
                 selectinload(TreatmentPlan.items)
                 .selectinload(PlannedTreatmentItem.treatment)
                 .selectinload(Treatment.catalog_item),
+                selectinload(TreatmentPlan.items).selectinload(PlannedTreatmentItem.sessions),
             )
         )
         return result.scalar_one_or_none()
@@ -492,12 +568,30 @@ class TreatmentPlanService:
         db.add(item)
         await db.flush()
 
+        # Pre-load the catalog template before snapshotting sessions.
+        from app.modules.catalog.models import TreatmentCatalogItem
+
+        treatment_full = await db.execute(
+            select(Treatment)
+            .options(
+                selectinload(Treatment.teeth),
+                selectinload(Treatment.catalog_item).selectinload(TreatmentCatalogItem.sessions),
+            )
+            .where(Treatment.id == treatment_id)
+        )
+        treatment_loaded = treatment_full.scalar_one()
+        for session_row in _snapshot_sessions_from_catalog(item, treatment_loaded):
+            session_row.plan_item_id = item.id
+            db.add(session_row)
+        await db.flush()
+
         # Re-fetch with eager-loaded treatment.teeth / .catalog_item for the response.
         reloaded = await db.execute(
             select(PlannedTreatmentItem)
             .options(
                 selectinload(PlannedTreatmentItem.treatment).selectinload(Treatment.teeth),
                 selectinload(PlannedTreatmentItem.treatment).selectinload(Treatment.catalog_item),
+                selectinload(PlannedTreatmentItem.sessions),
             )
             .where(PlannedTreatmentItem.id == item.id)
         )
@@ -566,9 +660,7 @@ class TreatmentPlanService:
                 PlannedTreatmentItem.treatment_plan_id == plan_id,
                 PlannedTreatmentItem.clinic_id == clinic_id,
             )
-            .options(
-                _treatment_loader(),
-            )
+            .options(*_item_with_sessions_loader())
         )
         item = result.scalar_one_or_none()
         if not item:
@@ -724,24 +816,9 @@ class TreatmentPlanService:
         return True
 
     @staticmethod
-    async def complete_item(
-        db: AsyncSession,
-        clinic_id: UUID,
-        plan_id: UUID,
-        item_id: UUID,
-        user_id: UUID,
-        completed_without_appointment: bool = True,
-        notes: str | None = None,
+    async def _load_item_with_sessions(
+        db: AsyncSession, clinic_id: UUID, plan_id: UUID, item_id: UUID
     ) -> PlannedTreatmentItem | None:
-        """Mark a plan item as completed and perform the underlying Treatment.
-
-        Clinical-note capture lives in the ``clinical_notes`` module: the
-        client POSTs the note after this call. We still emit
-        ``item_completed_without_note`` (deferred audit) here when the
-        timeline subscriber needs a hint that the completion happened —
-        the ``patient_timeline`` handler matches by item_id and stays
-        idempotent if a note arrives later in the same flow.
-        """
         result = await db.execute(
             select(PlannedTreatmentItem)
             .where(
@@ -749,25 +826,113 @@ class TreatmentPlanService:
                 PlannedTreatmentItem.treatment_plan_id == plan_id,
                 PlannedTreatmentItem.clinic_id == clinic_id,
             )
-            .options(
-                _treatment_loader(),
-            )
+            .options(*_item_with_sessions_loader())
         )
-        item = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def complete_session(
+        db: AsyncSession,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item_id: UUID,
+        session_id: UUID,
+        user_id: UUID,
+        completed_without_appointment: bool = False,
+        notes: str | None = None,
+    ) -> PlannedTreatmentItem | None:
+        """Mark one session of a plan item as completed.
+
+        Publishes ``treatment_plan.item_session_completed`` (consumed by
+        payments → earned ledger). When this is the last non-pending
+        session, the parent item is finalized: status flips to
+        ``completed``, the Treatment is performed, and the existing
+        ``treatment_plan.treatment_completed`` audit/recall path runs.
+        """
+        item = await TreatmentPlanService._load_item_with_sessions(
+            db, clinic_id, plan_id, item_id
+        )
         if not item:
             return None
 
-        if item.status == "completed":
-            return item
+        session = next((s for s in item.sessions if s.id == session_id), None)
+        if not session:
+            raise ValueError("Session not found")
+        if session.status != "pending":
+            raise ValueError("Session is not pending")
 
+        session.status = "completed"
+        session.completed_at = datetime.now(UTC)
+        session.completed_by = user_id
+        if notes:
+            session.notes = notes
+
+        await db.flush()
+
+        patient_id_str: str | None = None
+        if item.treatment:
+            patient_id_str = str(item.treatment.patient_id)
+
+        await event_bus.publish(
+            EventType.TREATMENT_PLAN_ITEM_SESSION_COMPLETED,
+            {
+                "clinic_id": str(clinic_id),
+                "plan_id": str(plan_id),
+                "item_id": str(item_id),
+                "session_id": str(session.id),
+                "sequence": session.sequence,
+                "label": session.label,
+                "amount": str(session.amount),
+                "treatment_id": str(item.treatment_id),
+                "patient_id": patient_id_str,
+                "completed_by": str(user_id),
+                "occurred_at": session.completed_at.isoformat(),
+            },
+        )
+
+        # Item finalizes when every session is in a terminal state and at
+        # least one was actually completed (otherwise an all-cancelled
+        # set would silently mark the item done).
+        terminal_states = {"completed", "cancelled"}
+        all_terminal = all(s.status in terminal_states for s in item.sessions)
+        any_completed = any(s.status == "completed" for s in item.sessions)
+        if all_terminal and any_completed and item.status != "completed":
+            await TreatmentPlanService._finalize_item(
+                db,
+                clinic_id=clinic_id,
+                plan_id=plan_id,
+                item=item,
+                user_id=user_id,
+                completed_without_appointment=completed_without_appointment,
+                notes=notes,
+            )
+
+        return item
+
+    @staticmethod
+    async def _finalize_item(
+        db: AsyncSession,
+        *,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item: PlannedTreatmentItem,
+        user_id: UUID,
+        completed_without_appointment: bool,
+        notes: str | None,
+    ) -> None:
+        """Flip the item to completed and run the legacy completion path.
+
+        Performs the Treatment, publishes ``treatment_completed`` (recalls /
+        odontogram) and the audit hint. Does NOT publish earned events —
+        those flow per-session via ``item_session_completed``.
+        """
         item.status = "completed"
         item.completed_at = datetime.now(UTC)
         item.completed_by = user_id
         item.completed_without_appointment = completed_without_appointment
-        if notes:
+        if notes and not item.notes:
             item.notes = notes
 
-        # Propagate to the Treatment so the odontogram reflects performed state.
         from app.modules.odontogram.service import TreatmentService
 
         await TreatmentService.perform(
@@ -793,7 +958,7 @@ class TreatmentPlanService:
             "treatment_plan.treatment_completed",
             {
                 "plan_id": str(plan_id),
-                "item_id": str(item_id),
+                "item_id": str(item.id),
                 "treatment_id": str(item.treatment_id),
                 "clinic_id": str(clinic_id),
                 "patient_id": patient_id_str,
@@ -804,16 +969,13 @@ class TreatmentPlanService:
             },
         )
 
-        # Audit hint for patient_timeline. The clinical_notes module emits
-        # its own ``clinical_notes.treatment_created`` event when (and if)
-        # the client posts a follow-up note; the timeline reconciles both.
         await event_bus.publish(
             EventType.TREATMENT_PLAN_ITEM_COMPLETED_WITHOUT_NOTE,
             {
                 "clinic_id": str(clinic_id),
                 "patient_id": patient_id_str,
                 "plan_id": str(plan_id),
-                "plan_item_id": str(item_id),
+                "plan_item_id": str(item.id),
                 "user_id": str(user_id),
                 "item_name": item_name,
                 "occurred_at": item.completed_at.isoformat() if item.completed_at else None,
@@ -821,6 +983,176 @@ class TreatmentPlanService:
         )
 
         await TreatmentPlanService._check_and_complete_plan(db, clinic_id, plan_id)
+
+    @staticmethod
+    async def complete_item(
+        db: AsyncSession,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item_id: UUID,
+        user_id: UUID,
+        completed_without_appointment: bool = True,
+        notes: str | None = None,
+    ) -> PlannedTreatmentItem | None:
+        """Back-compat shim: complete the next pending session of an item.
+
+        Items always have ≥1 session post-migration (tp_0006 backfill).
+        For single-session items this behaves like the legacy flow. For
+        multi-session items it advances one session per call — callers
+        targeting a specific session should use ``complete_session``.
+        """
+        item = await TreatmentPlanService._load_item_with_sessions(
+            db, clinic_id, plan_id, item_id
+        )
+        if not item:
+            return None
+        if item.status == "completed":
+            return item
+
+        next_session = next(
+            (s for s in sorted(item.sessions, key=lambda x: x.sequence) if s.status == "pending"),
+            None,
+        )
+        if next_session is None:
+            raise ValueError("No pending sessions to complete")
+
+        return await TreatmentPlanService.complete_session(
+            db,
+            clinic_id=clinic_id,
+            plan_id=plan_id,
+            item_id=item_id,
+            session_id=next_session.id,
+            user_id=user_id,
+            completed_without_appointment=completed_without_appointment,
+            notes=notes,
+        )
+
+    @staticmethod
+    async def cancel_session(
+        db: AsyncSession,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item_id: UUID,
+        session_id: UUID,
+        user_id: UUID,
+        notes: str | None = None,
+    ) -> PlannedTreatmentItem | None:
+        """Mark a pending session as cancelled (no earned entry generated)."""
+        item = await TreatmentPlanService._load_item_with_sessions(
+            db, clinic_id, plan_id, item_id
+        )
+        if not item:
+            return None
+        session = next((s for s in item.sessions if s.id == session_id), None)
+        if not session:
+            raise ValueError("Session not found")
+        if session.status != "pending":
+            raise ValueError("Only pending sessions can be cancelled")
+
+        session.status = "cancelled"
+        session.completed_at = datetime.now(UTC)
+        session.completed_by = user_id
+        if notes:
+            session.notes = notes
+        await db.flush()
+
+        # Finalize if cancellation leaves the item with no pending work and
+        # at least one completed session.
+        terminal_states = {"completed", "cancelled"}
+        all_terminal = all(s.status in terminal_states for s in item.sessions)
+        any_completed = any(s.status == "completed" for s in item.sessions)
+        if all_terminal and any_completed and item.status != "completed":
+            await TreatmentPlanService._finalize_item(
+                db,
+                clinic_id=clinic_id,
+                plan_id=plan_id,
+                item=item,
+                user_id=user_id,
+                completed_without_appointment=False,
+                notes=None,
+            )
+        return item
+
+    @staticmethod
+    async def update_session(
+        db: AsyncSession,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item_id: UUID,
+        session_id: UUID,
+        data: dict,
+    ) -> PlannedTreatmentItem | None:
+        """Edit a pending session's label/amount/notes."""
+        item = await TreatmentPlanService._load_item_with_sessions(
+            db, clinic_id, plan_id, item_id
+        )
+        if not item:
+            return None
+        session = next((s for s in item.sessions if s.id == session_id), None)
+        if not session:
+            raise ValueError("Session not found")
+        if session.status != "pending":
+            raise ValueError("Cannot edit a non-pending session")
+
+        if "label" in data:
+            session.label = data["label"]
+        if "amount" in data and data["amount"] is not None:
+            session.amount = Decimal(str(data["amount"]))
+        if "notes" in data:
+            session.notes = data["notes"]
+        return item
+
+    @staticmethod
+    async def add_session_manual(
+        db: AsyncSession,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item_id: UUID,
+        data: dict,
+    ) -> PlannedTreatmentItem | None:
+        """Append a new session row at the next sequence number."""
+        item = await TreatmentPlanService._load_item_with_sessions(
+            db, clinic_id, plan_id, item_id
+        )
+        if not item:
+            return None
+        next_seq = (max((s.sequence for s in item.sessions), default=0)) + 1
+        amount = data.get("amount")
+        if amount is None:
+            raise ValueError("amount is required")
+        item.sessions.append(
+            PlannedTreatmentItemSession(
+                sequence=next_seq,
+                label=data.get("label"),
+                amount=Decimal(str(amount)),
+                status="pending",
+            )
+        )
+        return item
+
+    @staticmethod
+    async def delete_session(
+        db: AsyncSession,
+        clinic_id: UUID,
+        plan_id: UUID,
+        item_id: UUID,
+        session_id: UUID,
+    ) -> PlannedTreatmentItem | None:
+        """Remove a pending session. Refuses on completed/cancelled sessions."""
+        item = await TreatmentPlanService._load_item_with_sessions(
+            db, clinic_id, plan_id, item_id
+        )
+        if not item:
+            return None
+        session = next((s for s in item.sessions if s.id == session_id), None)
+        if not session:
+            raise ValueError("Session not found")
+        if session.status != "pending":
+            raise ValueError("Cannot delete a non-pending session")
+        if len([s for s in item.sessions if s.status == "pending"]) <= 1 and len(item.sessions) == 1:
+            raise ValueError("Cannot delete the only session of an item")
+        item.sessions.remove(session)
+        await db.flush()
         return item
 
     @staticmethod

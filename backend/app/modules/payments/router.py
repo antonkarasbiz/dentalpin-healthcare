@@ -232,6 +232,21 @@ async def patient_ledger(
 
 
 @router.get(
+    "/patients/{patient_id}/pending-charges",
+    response_model=ApiResponse[list[dict]],
+)
+async def patient_pending_charges(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("payments.record.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[list[dict]]:
+    """Earned entries not yet covered by net payments (FIFO virtual)."""
+    pending = await LedgerService.compute_pending_charges(db, ctx.clinic_id, patient_id)
+    return ApiResponse(data=pending)
+
+
+@router.get(
     "/budgets/{budget_id}/allocations",
     response_model=ApiResponse[list[AllocationResponse]],
 )
