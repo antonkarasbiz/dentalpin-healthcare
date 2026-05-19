@@ -335,41 +335,64 @@ function collect() {
           class="w-full"
           :ui="{ content: 'overflow-visible' }"
         >
-          <!-- Resumen — smart-card grid + clinical-notes feed -->
+          <!-- Resumen — smart-card grid + clinical-notes feed.
+               The whole Resumen body is slot-driven; modules register
+               their cards via `.client.ts` plugins that only run after
+               hydration. Wrapping in <ClientOnly> keeps the SSR tree
+               aligned with the client tree (an identically-shaped
+               skeleton grid) so Vue doesn't hit hydration mismatches
+               that re-layout the page after refresh. -->
           <template #summary>
-            <div class="mt-4 space-y-4 overflow-visible">
-              <div
-                v-if="summaryCards.length === 0"
-                class="rounded-token-md border border-dashed border-default px-4 py-8 text-center text-muted"
-              >
-                {{ t('patientDetail.noSummaryCards', 'No hay módulos registrados en el resumen.') }}
-              </div>
-              <div
-                v-else
-                class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4"
-              >
-                <component
-                  :is="entry.component"
-                  v-for="entry in summaryCards"
-                  :key="entry.id"
-                  :ctx="{ patient }"
-                />
-              </div>
+            <ClientOnly>
+              <div class="mt-4 space-y-4 overflow-visible">
+                <div
+                  v-if="summaryCards.length === 0"
+                  class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4"
+                >
+                  <div
+                    class="md:col-span-2 xl:col-span-3 rounded-token-md border border-dashed border-default px-4 py-8 text-center text-muted"
+                  >
+                    {{ t('patientDetail.noSummaryCards', 'No hay módulos registrados en el resumen.') }}
+                  </div>
+                </div>
+                <div
+                  v-else
+                  class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4"
+                >
+                  <component
+                    :is="entry.component"
+                    v-for="entry in summaryCards"
+                    :key="entry.id"
+                    :ctx="{ patient }"
+                  />
+                </div>
 
-              <!-- Notes feed (registered by clinical_notes) -->
-              <section id="new-note">
+                <section id="new-note">
+                  <ModuleSlot
+                    name="patient.summary.feed"
+                    :ctx="{ patient }"
+                  />
+                </section>
+
                 <ModuleSlot
-                  name="patient.summary.feed"
+                  name="patient.detail.sidebar"
                   :ctx="{ patient }"
                 />
-              </section>
+              </div>
 
-              <!-- Legacy sidebar slot kept for community modules. -->
-              <ModuleSlot
-                name="patient.detail.sidebar"
-                :ctx="{ patient }"
-              />
-            </div>
+              <template #fallback>
+                <div class="mt-4 space-y-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4">
+                    <USkeleton
+                      v-for="i in 6"
+                      :key="i"
+                      class="h-36 w-full rounded-token-lg"
+                    />
+                  </div>
+                  <USkeleton class="h-40 w-full rounded-token-lg" />
+                </div>
+              </template>
+            </ClientOnly>
           </template>
 
           <!-- Datos tab content -->

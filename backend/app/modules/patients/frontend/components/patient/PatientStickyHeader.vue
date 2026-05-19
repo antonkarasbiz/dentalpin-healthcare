@@ -211,13 +211,18 @@ const actionItems = computed(() => [
         </div>
       </div>
 
-      <!-- Clinical alert chips (patients_clinical slot) — desktop only. -->
-      <div class="hidden xl:flex items-center gap-1.5 max-w-sm flex-wrap justify-end">
-        <ModuleSlot
-          name="patient.header.alerts"
-          :ctx="{ patient }"
-        />
-      </div>
+      <!-- Clinical alert chips (patients_clinical slot) — desktop only.
+           Slot is registered by a `.client.ts` plugin, so SSR sees an
+           empty slot and the client populates it. Wrap in <ClientOnly>
+           to keep both renderings aligned and avoid a hydration jump. -->
+      <ClientOnly>
+        <div class="hidden xl:flex items-center gap-1.5 max-w-sm flex-wrap justify-end">
+          <ModuleSlot
+            name="patient.header.alerts"
+            :ctx="{ patient }"
+          />
+        </div>
+      </ClientOnly>
 
       <!-- Edit + Acciones — always visible -->
       <UButton
@@ -246,13 +251,16 @@ const actionItems = computed(() => [
     </div>
 
     <!-- Alerts row — visible below xl, fits chips on a separate line.
-         Hidden when the slot has no providers via :empty:hidden. -->
-    <div class="xl:hidden mt-2 empty:hidden flex flex-wrap items-center gap-1.5">
-      <ModuleSlot
-        name="patient.header.alerts"
-        :ctx="{ patient }"
-      />
-    </div>
+         Hidden when the slot has no providers via :empty:hidden. Same
+         <ClientOnly> reasoning as the desktop slot above. -->
+    <ClientOnly>
+      <div class="xl:hidden mt-2 empty:hidden flex flex-wrap items-center gap-1.5">
+        <ModuleSlot
+          name="patient.header.alerts"
+          :ctx="{ patient }"
+        />
+      </div>
+    </ClientOnly>
   </header>
 </template>
 
