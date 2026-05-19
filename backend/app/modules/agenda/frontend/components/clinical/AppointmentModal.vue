@@ -6,6 +6,7 @@ import type {
   PlannedTreatmentItem,
   Surface
 } from '~~/app/types'
+import { PERMISSIONS } from '~~/app/config/permissions'
 import { formatLocalDate } from '../../utils/date'
 
 const props = defineProps<{
@@ -32,6 +33,7 @@ const toast = useToast()
 const auth = useAuth()
 const clinic = useClinic()
 const api = useApi()
+const { can } = usePermissions()
 const { isMobile } = useBreakpoint()
 const { createAppointment, updateAppointment, cancelAppointment } = useAppointments()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
@@ -249,8 +251,16 @@ watch(() => props.open, async (isOpen) => {
   lastOverlapWarningKey.value = ''
   initialOverlapIds.value = { professional: new Set(), cabinet: new Set() }
 
-  // Fetch professionals and notification settings when modal opens
-  await Promise.all([fetchProfessionals(), fetchSettings()])
+  // Fetch professionals always. Notification settings only if the user
+  // has permission to read them — receptionists don't, and unconditional
+  // fetching produced "Access denied" / "Error loading settings" toasts
+  // every time they opened the modal. When skipped, getAutoSendStatus
+  // falls back to its sensible default (auto-send on).
+  const tasks: Array<Promise<unknown>> = [fetchProfessionals()]
+  if (can(PERMISSIONS.notifications.settingsRead)) {
+    tasks.push(fetchSettings())
+  }
+  await Promise.all(tasks)
 
   if (props.appointment) {
     // Edit mode - populate from appointment
