@@ -53,6 +53,7 @@ const displayIcon = computed(() => {
 
 <template>
   <UButton
+    type="button"
     :color="isActive ? 'primary' : 'neutral'"
     :variant="isActive ? 'soft' : 'outline'"
     size="sm"
