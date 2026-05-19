@@ -25,7 +25,7 @@ const patientId = computed(() => props.ctx.patient.id)
 const { data: ledger, status } = await useAsyncData<PatientLedger | null>(
   () => `payments:summary-card:${patientId.value}`,
   () => fetchPatientLedger(patientId.value),
-  { watch: [patientId], default: () => null }
+  { watch: [patientId], default: () => null, server: false }
 )
 
 const debt = computed(() => Number(ledger.value?.clinic_receivable ?? 0))

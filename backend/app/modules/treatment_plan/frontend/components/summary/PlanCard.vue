@@ -34,7 +34,7 @@ const { data, status } = await useAsyncData(
       return { data: [], total: 0, page: 1, page_size: 20 }
     }
   },
-  { watch: [patientId] }
+  { watch: [patientId], server: false }
 )
 
 const activePlan = computed<TreatmentPlan | null>(() => {

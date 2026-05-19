@@ -39,7 +39,7 @@ const { data, status } = await useAsyncData(
       return { data: [], total: 0, page: 1, page_size: 50 }
     }
   },
-  { watch: [patientId] }
+  { watch: [patientId], server: false }
 )
 
 const total = computed(() => data.value?.total ?? 0)
