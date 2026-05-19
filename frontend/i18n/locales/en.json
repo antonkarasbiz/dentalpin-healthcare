@@ -1132,6 +1132,10 @@
     "noMatches": "No matches",
     "typeToSearch": "Type to search..."
   },
+  "density": {
+    "switchToCompact": "Compact view",
+    "switchToComfortable": "Comfortable view"
+  },
   "patientSelector": {
     "createOption": "Create patient \"{query}\"",
     "createOptionEmpty": "Create new patient",
