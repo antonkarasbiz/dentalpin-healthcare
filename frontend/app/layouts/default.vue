@@ -317,16 +317,19 @@ function isActive(to: string): boolean {
           @click="toggleSidebar"
         />
 
-        <!-- Clinic name -->
-        <div class="ml-3 sm:ml-4 flex items-center gap-2 min-w-0">
-          <UIcon
-            name="i-lucide-building-2"
-            class="w-4 h-4 text-subtle shrink-0"
-          />
-          <span class="text-ui text-muted truncate">
-            {{ clinic.clinicName.value || 'Clínica' }}
-          </span>
-        </div>
+        <!-- Clinic name — client-only to avoid SSR/CSR hydration text mismatch
+             ("Clínica" placeholder vs loaded clinic name). -->
+        <ClientOnly>
+          <div class="ml-3 sm:ml-4 flex items-center gap-2 min-w-0">
+            <UIcon
+              name="i-lucide-building-2"
+              class="w-4 h-4 text-subtle shrink-0"
+            />
+            <span class="text-ui text-muted truncate">
+              {{ clinic.clinicName.value || 'Clínica' }}
+            </span>
+          </div>
+        </ClientOnly>
 
         <div class="flex-1" />
 
