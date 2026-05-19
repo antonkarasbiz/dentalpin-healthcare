@@ -14,26 +14,46 @@ related_permissions:
 related_paths:
   - backend/app/modules/patients/router.py
   - backend/app/modules/patients/frontend/pages/patients/[id].vue
-last_verified_commit: 0e9a0ac
+last_verified_commit: 7ead18e
 ---
 
 # Patient detail
 
-The single-patient view. Combines identity, extended demographics,
-clinical-tab content provided by sibling modules, and an actions slot
-that other modules contribute to.
+Dashboard-style patient view. A persistent header carries identity,
+critical allergy chips and quick actions; below it sits a tab strip.
+The default **Summary** tab is a modular dashboard where each block
+is contributed by a different module (plans, agenda, payments,
+dental chart, medical history). Every block is also a deep link —
+one click reaches the detail.
 
 ## Layout
 
-- **Summary hero** — name, photo, birthday, contact, key flags
-  (`do_not_contact`, archived, etc.).
-- **Actions slot** — buttons contributed by sibling modules:
-  - **Recalls** → *Set recall*
-  - **Notifications** → *Send message*
-  - More appear automatically as new modules register slot content.
-- **Tabs** — clinical-tab content (notes, treatments, photos, plans,
-  budgets, etc.) supplied by other modules. Each tab respects its own
-  permission gates.
+- **Sticky header** — avatar, name, age, ID, contact, critical
+  allergy chips (allergy, pregnancy, anticoagulant…) and *Edit* +
+  *Actions ▾* buttons (Appointment, Collect, Note, Archive). Stays
+  visible while scrolling and across tabs.
+- **Summary (dashboard)** — smart-cards contributed by each owning
+  module via the `patient.summary.cards` slot:
+  - **Active plan** *(treatment_plan)* — title, progress bar, n/m
+    treatments. Click → plan detail.
+  - **Next appointment** *(agenda)* — day/time/professional.
+    Click → appointment.
+  - **Balance** *(payments)* — debt / on-account / paid. Click →
+    Administration → Payments.
+  - **Diagnoses** *(odontogram)* — untreated findings count.
+    Click → dental chart in diagnosis mode.
+  - **Medical history** *(patients_clinical)* — allergies, systemic
+    diseases, medication. Click → edit history.
+  - **Quick actions** *(patients)* — Appointment, Budget, Document
+    and the `patient.summary.actions` slot for sibling modules
+    (recalls *Set recall*, notifications, etc.).
+- **Tabs** — Info, Clinical, Administration, Gallery, History. In
+  Clinical and Administration the sub-nav is a pill-bar exposing all
+  modes upfront (Diagnosis · Plans · Appointments · History /
+  Budgets · Billing · Payments · Documents).
+- **Mobile** — header condenses, cards stack to a single column and
+  a sticky bottom bar surfaces the three core actions
+  (Appointment · Collect · Note).
 
 ## Editing identity
 

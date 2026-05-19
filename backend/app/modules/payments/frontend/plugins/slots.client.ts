@@ -45,6 +45,18 @@ export default defineNuxtPlugin(() => {
     order: 10
   })
 
+  // Patient Resumen — balance smart-card. Same slot contract pattern as
+  // the panel above; the patients host page exposes the slot name and
+  // renders <ModuleSlot> only.
+  registerSlot('patient.summary.cards', {
+    id: 'payments.patient.summary.cards.balance',
+    component: defineAsyncComponent(
+      () => import('../components/summary/BalanceCard.vue')
+    ),
+    permission: 'payments.record.read',
+    order: 30
+  })
+
   // /patients list — per-row debt badge. Host (`patients`) renders
   // <ModuleSlot name="patients.list.row.financial" :ctx="{ patient_id, summary }" />.
   registerSlot('patients.list.row.financial', {

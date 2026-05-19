@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- feat(ux): redesigned patient detail as a dashboard-first IA. The
+  Resumen tab is now a grid of slot-driven smart cards (Plan, Próxima
+  cita, Saldo, Diagnósticos, Historial médico, Acciones rápidas) plus
+  the clinical-notes feed. A persistent ``PatientStickyHeader``
+  replaces the dense left rail and stays visible across every tab.
+  Mobile gets a ``PatientBottomActionBar`` with the three most-used
+  actions (cita, cobrar, nota). Saves one click to Plan, Cobros,
+  Próxima cita and Odontograma.
+- feat(slots): exposes two new slot contracts: ``patient.summary.cards``
+  (grid entries on Resumen) and ``patient.header.alerts`` (chips in the
+  sticky header). The existing ``patient.summary.actions`` slot is
+  preserved and now renders both in the sticky header and in the
+  Quick-Actions card. Each smart card lives in (and is registered by)
+  its owning module — ``patients`` keeps ``depends = []``.
+- refactor: dropped ``PatientSummaryHero.vue`` and the legacy
+  ``ActivePlanWidget`` / ``NextAppointmentWidget`` props pipeline. The
+  page no longer reaches into agenda or treatment_plan APIs to compute
+  widgets; each module fetches its own data inside its card.
+- chore(shared): ``SegmentedControl`` accepts ``badge`` /
+  ``badgeColor`` per option and a ``fullWidth`` mode so the
+  Clínica/Administración sub-nav can surface contextual counts.
 - refactor(perms): migrate the hardcoded ``can('payments.record.read')`` gate on the patients list to ``PERMISSIONS.payments.recordRead``.
 - fix(isolation): drop the cross-module ORM coupling to ``agenda`` and
   ``patient_timeline``. ``Patient`` no longer declares

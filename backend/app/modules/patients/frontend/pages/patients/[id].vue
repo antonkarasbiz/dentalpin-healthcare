@@ -1,5 +1,21 @@
 <script setup lang="ts">
-import type { PatientExtended, Appointment, TreatmentPlan, PaginatedResponse, ApiResponse } from '~~/app/types'
+/**
+ * Patient detail — dashboard-first IA.
+ *
+ * The page hosts a persistent sticky header + a UTabs strip. Resumen is
+ * a dashboard of smart-cards: each card lives in (and is registered by)
+ * its owning module via the ``patient.summary.cards`` slot. The page
+ * only fetches data from its own module (``/api/v1/patients/{id}/extended``);
+ * cross-module data (appointments, plans, ledger, allergies, etc.) is
+ * fetched by the modules that own it inside their slot components.
+ *
+ * Cross-module data that the page used to fetch (emergency contact,
+ * legal guardian, alerts, appointments, plans) now reaches the page
+ * only through ``PatientExtended.active_alerts`` / the
+ * patients_clinical slots — the page no longer reaches into other
+ * modules' APIs directly.
+ */
+import type { PatientExtended, ApiResponse } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
 
 const { t } = useI18n()
@@ -8,6 +24,7 @@ const router = useRouter()
 const api = useApi()
 const toast = useToast()
 const { can } = usePermissions()
+const { resolve } = useModuleSlots()
 
 const patientId = route.params.id as string
 const patientIdRef = computed(() => patientId)
@@ -16,10 +33,13 @@ const patientIdRef = computed(() => patientId)
 const returnTo = computed(() => route.query.returnTo as string | undefined)
 const openBillingEdit = computed(() => route.query.tab === 'billing')
 
-// Fetch patient identity + clinical rows in parallel. Emergency contact,
-// legal guardian and alerts live in the patients_clinical module
-// (B.4), but we stitch them back onto the `PatientExtended` object so
-// the rest of the page can consume them unchanged.
+// Fetch patient identity from the patients module. The Resumen smart-
+// cards each fetch their own module's data via slot registration; the
+// page no longer mediates that traffic. The Datos tab still consumes
+// patients_clinical data through the legacy stitching below (emergency
+// contact, legal guardian, alerts) — that surface will move to
+// patients_clinical-owned cards in a follow-up; the goal of this PR is
+// to land the new IA without regressing Datos.
 const { data: patient, status, refresh } = await useAsyncData(
   `patient:${patientId}`,
   async () => {
@@ -58,71 +78,15 @@ const { data: patient, status, refresh } = await useAsyncData(
   }
 )
 
-// Fetch patient appointments
-const { data: appointmentsData, status: appointmentsStatus } = await useAsyncData(
-  `patient:${patientId}:appointments`,
-  async () => {
-    try {
-      return await api.get<PaginatedResponse<Appointment>>(
-        `/api/v1/agenda/appointments?patient_id=${patientId}`
-      )
-    } catch {
-      return { data: [], total: 0, page: 1, page_size: 20 }
-    }
-  }
-)
-
-const appointments = computed(() => appointmentsData.value?.data || [])
-
-// Next upcoming appointment (for sidebar widget)
-const nextAppointment = computed(() => {
-  const now = new Date()
-  const upcoming = appointments.value
-    .filter(apt => new Date(apt.start_time) > now && apt.status !== 'cancelled')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-  return upcoming[0] || null
-})
-
-// Most recent completed appointment (for visit summary card)
-const lastVisit = computed(() => {
-  const completed = appointments.value
-    .filter(apt => apt.status === 'completed')
-    .sort((a, b) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime())
-  return completed[0] || null
-})
-
-// Fetch patient treatment plans (for sidebar widget)
-const { data: plansData, status: plansStatus } = await useAsyncData(
-  `patient:${patientId}:plans`,
-  async () => {
-    if (!can(PERMISSIONS.treatmentPlans.read)) {
-      return { data: [], total: 0, page: 1, page_size: 20 }
-    }
-    try {
-      return await api.get<PaginatedResponse<TreatmentPlan>>(
-        `/api/v1/treatment_plan/treatment-plans?patient_id=${patientId}`
-      )
-    } catch {
-      return { data: [], total: 0, page: 1, page_size: 20 }
-    }
-  }
-)
-
-// Active plan (for sidebar widget)
-const activePlan = computed(() => {
-  const plans = plansData.value?.data || []
-  return plans.find(p => p.status === 'active') || null
-})
-
-// Medical history composable
+// Medical-history composable lives in patients_clinical but is shared
+// via auto-import. We only need it here to drive the section-edit modal
+// (medical history form). The Resumen surfaces the same data through a
+// patients_clinical-owned card.
 const { medicalHistory, isSaving: isSavingMedical, saveMedicalHistory } = useMedicalHistory(patientIdRef)
 
-// Tabs - computed to filter by permissions
-// Default tab is Summary (issue #60) — patient header + recent notes feed.
-// Info, Clinical, Administration and Timeline follow.
+// Tabs — Resumen is the landing.
 const activeTab = ref('summary')
 
-// Sync tab from query param. Falls back to summary on the patient landing.
 watch(
   () => route.query.tab,
   (tab) => {
@@ -136,27 +100,23 @@ watch(
 )
 
 const tabs = computed(() => {
-  const baseTabs: Array<{ value: string, label: string, icon: string, slot: string }> = []
+  const items: Array<{ value: string, label: string, icon: string, slot: string }> = [
+    {
+      value: 'summary',
+      label: t('patientDetail.tabs.summary'),
+      icon: 'i-lucide-layout-dashboard',
+      slot: 'summary'
+    },
+    {
+      value: 'info',
+      label: t('patientDetail.tabs.info'),
+      icon: 'i-lucide-user',
+      slot: 'info'
+    }
+  ]
 
-  // Summary tab — at-a-glance recent notes feed.
-  baseTabs.push({
-    value: 'summary',
-    label: t('patientDetail.tabs.summary'),
-    icon: 'i-lucide-layout-dashboard',
-    slot: 'summary'
-  })
-
-  // Info tab (Demographics + Medical history)
-  baseTabs.push({
-    value: 'info',
-    label: t('patientDetail.tabs.info'),
-    icon: 'i-lucide-user',
-    slot: 'info'
-  })
-
-  // Clinical tab (Odontogram + Treatment Plans)
   if (can(PERMISSIONS.odontogram.read) || can(PERMISSIONS.treatmentPlans.read)) {
-    baseTabs.push({
+    items.push({
       value: 'clinical',
       label: t('patientDetail.tabs.clinical'),
       icon: 'i-lucide-stethoscope',
@@ -164,9 +124,8 @@ const tabs = computed(() => {
     })
   }
 
-  // Administration tab (Budgets + Billing)
   if (can(PERMISSIONS.budget.read) || can(PERMISSIONS.billing.read)) {
-    baseTabs.push({
+    items.push({
       value: 'administration',
       label: t('patientDetail.tabs.administration'),
       icon: 'i-lucide-briefcase',
@@ -174,9 +133,8 @@ const tabs = computed(() => {
     })
   }
 
-  // Gallery tab — clinical photos / X-rays (issue #55).
   if (can(PERMISSIONS.documents.read)) {
-    baseTabs.push({
+    items.push({
       value: 'gallery',
       label: t('patientDetail.tabs.gallery', 'Galería'),
       icon: 'i-lucide-images',
@@ -184,19 +142,17 @@ const tabs = computed(() => {
     })
   }
 
-  // Timeline tab
-  baseTabs.push({
+  items.push({
     value: 'timeline',
     label: t('patientDetail.tabs.timeline'),
     icon: 'i-lucide-history',
     slot: 'timeline'
   })
 
-  return baseTabs
+  return items
 })
 
-// Check permissions
-const canEditOdontogram = computed(() => can(PERMISSIONS.odontogram.write))
+// Permissions used by Datos tab + edit modals.
 const canEditMedicalHistory = computed(() => can(PERMISSIONS.medicalHistory.write))
 const canEditPatient = computed(() => can(PERMISSIONS.patients.write))
 
@@ -222,8 +178,18 @@ watch(
   { immediate: true }
 )
 
+// Deep-link from the medical-history card: ?tab=info&edit=medical.
+watch(
+  () => route.query.edit,
+  (edit) => {
+    if (edit === 'medical' && patient.value && !editModalOpen.value) {
+      openSectionModal('medical')
+    }
+  },
+  { immediate: true }
+)
+
 async function handleSectionSave(_section: SectionType, _data: Record<string, unknown>) {
-  // Refresh patient data after save
   await refresh()
 }
 
@@ -233,6 +199,13 @@ async function handleMedicalSave() {
     editModalOpen.value = false
   }
 }
+
+// Resumen smart-cards come from the slot registry. We read the live
+// entries so we can show a sensible empty state when no module has
+// registered cards yet (e.g. fresh install).
+const summaryCards = computed(() =>
+  patient.value ? resolve('patient.summary.cards', { patient: patient.value }) : []
+)
 
 // Archive patient
 const isArchiveModalOpen = ref(false)
@@ -275,17 +248,45 @@ const isMinor = computed(() => {
   return years < 18
 })
 
+// Header action handlers — delegate to existing flows. New-appointment
+// and new-note land on dedicated pages we already have.
+function goBack() {
+  if (returnTo.value) {
+    router.push(returnTo.value)
+  } else {
+    router.push('/patients')
+  }
+}
+
+function openEditPatient() {
+  openSectionModal('demographics')
+}
+
+function newAppointment() {
+  router.push(`/appointments?patient_id=${patientId}&action=new`)
+}
+
+function newNote() {
+  // Clinical-notes module owns the composer; we deep-link into the
+  // Resumen feed where it lives. A future iteration may expose a
+  // dedicated slot for "open composer" — keep it as a simple route
+  // change for now.
+  router.push(`/patients/${patientId}?tab=summary#new-note`)
+}
+
+function collect() {
+  router.push(`/patients/${patientId}?tab=administration&adminMode=payments`)
+}
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="patient-detail space-y-4 pb-24 lg:pb-6">
     <!-- Loading state -->
     <div
       v-if="status === 'pending'"
       class="space-y-4"
     >
-      <USkeleton class="h-8 w-48" />
-      <USkeleton class="h-32 w-full" />
+      <USkeleton class="h-12 w-full" />
       <USkeleton class="h-96 w-full" />
     </div>
 
@@ -311,21 +312,17 @@ const isMinor = computed(() => {
         </UButton>
       </div>
 
-      <!-- Page header -->
-      <div class="flex items-center gap-3 mb-6">
-        <UButton
-          variant="ghost"
-          color="neutral"
-          icon="i-lucide-arrow-left"
-          :to="returnTo || '/patients'"
-          :aria-label="t('common.back', 'Volver')"
-        />
-        <h1 class="text-display text-default text-pretty">
-          {{ patient.first_name }} {{ patient.last_name }}
-        </h1>
-      </div>
+      <!-- Persistent header — stays visible across all tabs. -->
+      <PatientStickyHeader
+        :patient="patient"
+        @back="goBack"
+        @edit="openEditPatient"
+        @new-appointment="newAppointment"
+        @new-note="newNote"
+        @collect="collect"
+        @archive="isArchiveModalOpen = true"
+      />
 
-      <!-- Main content (full width — sidebar widgets now live inside the Resumen hero) -->
       <main class="w-full min-w-0">
         <UTabs
           v-model="activeTab"
@@ -334,30 +331,44 @@ const isMinor = computed(() => {
           class="w-full"
           :ui="{ content: 'overflow-visible' }"
         >
-          <!-- Summary tab content: left rail (snapshot) + main feed (notes) -->
+          <!-- Resumen — smart-card grid + clinical-notes feed -->
           <template #summary>
-            <div class="mt-4 flex flex-col lg:flex-row gap-4 lg:gap-6 overflow-visible">
-              <aside class="lg:w-72 lg:shrink-0">
-                <div class="lg:sticky lg:top-4">
-                  <PatientSummaryHero
-                    :patient="patient"
-                    :active-plan="activePlan"
-                    :next-appointment="nextAppointment"
-                    :loading-plan="plansStatus === 'pending'"
-                    :loading-appointment="appointmentsStatus === 'pending'"
-                  />
-                </div>
-              </aside>
-              <div class="flex-1 min-w-0">
+            <div class="mt-4 space-y-4 overflow-visible">
+              <div
+                v-if="summaryCards.length === 0"
+                class="rounded-token-md border border-dashed border-default px-4 py-8 text-center text-muted"
+              >
+                {{ t('patientDetail.noSummaryCards', 'No hay módulos registrados en el resumen.') }}
+              </div>
+              <div
+                v-else
+                class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4"
+              >
+                <component
+                  :is="entry.component"
+                  v-for="entry in summaryCards"
+                  :key="entry.id"
+                  :ctx="{ patient }"
+                />
+              </div>
+
+              <!-- Notes feed (registered by clinical_notes) -->
+              <section id="new-note">
                 <ModuleSlot
                   name="patient.summary.feed"
                   :ctx="{ patient }"
                 />
-              </div>
+              </section>
+
+              <!-- Legacy sidebar slot kept for community modules. -->
+              <ModuleSlot
+                name="patient.detail.sidebar"
+                :ctx="{ patient }"
+              />
             </div>
           </template>
 
-          <!-- Info tab content -->
+          <!-- Datos tab content -->
           <template #info>
             <div class="mt-4 space-y-3 lg:space-y-4 overflow-visible">
               <MedicalSnapshotCard
@@ -366,11 +377,6 @@ const isMinor = computed(() => {
                 :can-edit="canEditMedicalHistory"
                 @edit="openSectionModal('medical')"
                 @complete-history="openSectionModal('medical')"
-              />
-
-              <VisitSummaryCard
-                :last-visit="lastVisit"
-                :next-appointment="nextAppointment"
               />
 
               <PersonalInfoCard
@@ -422,7 +428,7 @@ const isMinor = computed(() => {
             <div class="mt-4">
               <ClinicalTab
                 :patient-id="patientId"
-                :readonly="!canEditOdontogram"
+                :readonly="!can(PERMISSIONS.odontogram.write)"
               />
             </div>
           </template>
@@ -452,6 +458,14 @@ const isMinor = computed(() => {
           </template>
         </UTabs>
       </main>
+
+      <!-- Mobile bottom action bar -->
+      <PatientBottomActionBar
+        :patient="patient"
+        @new-appointment="newAppointment"
+        @collect="collect"
+        @new-note="newNote"
+      />
     </template>
 
     <!-- Section Edit Modal -->

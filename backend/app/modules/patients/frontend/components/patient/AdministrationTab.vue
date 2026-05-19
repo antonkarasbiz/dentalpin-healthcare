@@ -131,8 +131,11 @@ const { format: formatCurrency } = useCurrency()
 
 <template>
   <div class="administration-tab space-y-4">
-    <!-- Mode Toggle -->
-    <AdministrationModeToggle v-model="currentMode" />
+    <!-- Mode pill-bar -->
+    <AdministrationModeToggle
+      v-model="currentMode"
+      :badges="{ budgets: budgetsTotal || undefined }"
+    />
 
     <!-- Budgets Mode -->
     <div v-if="currentMode === 'budgets' && can(PERMISSIONS.budget.read)">

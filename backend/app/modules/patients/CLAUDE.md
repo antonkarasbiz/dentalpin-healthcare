@@ -57,10 +57,21 @@ None.
   `Patient.do_not_contact == False` in addition to the
   `Patient.status != "archived"` filter when building call/outreach
   lists.
-- **Slot `patient.summary.actions`** — extension point exposed on
-  `PatientSummaryHero` for sibling modules to contribute action
-  buttons (e.g. recalls "Set recall"). Stable contract — sibling
-  modules depend on it via the slot registry, not via imports.
+- **Patient-detail slots** — three stable contracts exposed by this
+  module so siblings can plug into the patient file without imports:
+  - `patient.summary.cards` — entries in the Resumen grid. Ctx
+    `{ patient }`. Order convention: 10 plan, 20 next appointment,
+    30 balance, 40 diagnoses, 50 medical history, 60 quick actions.
+  - `patient.header.alerts` — clinical chips inside
+    ``PatientStickyHeader``. Ctx `{ patient }`. Owner: ``patients_clinical``.
+  - `patient.summary.actions` — module-contributed action buttons
+    (recalls "Set recall", etc.). Rendered in both the sticky header
+    and the Quick-Actions card. Ctx `{ patient }`. Kept under its
+    legacy name so existing registrations keep working.
+  - `patient.detail.administracion.payments` — owned by ``payments``,
+    drives the Cobros sub-mode in the Administración tab.
+  - `patient.detail.sidebar` — deprecated, kept registered for
+    community modules. Renders as a section at the bottom of Resumen.
 
 ## Related ADRs
 

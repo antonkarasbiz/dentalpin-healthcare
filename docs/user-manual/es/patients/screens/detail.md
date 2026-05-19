@@ -14,26 +14,44 @@ related_permissions:
 related_paths:
   - backend/app/modules/patients/router.py
   - backend/app/modules/patients/frontend/pages/patients/[id].vue
-last_verified_commit: 0e9a0ac
+last_verified_commit: 7ead18e
 ---
 
 # Ficha del paciente
 
-Vista completa de un único paciente. Combina identidad, demografía
-extendida, contenido clínico que aportan otros módulos y un slot de
-acciones al que se enganchan módulos hermanos.
+Vista de panel del paciente. Una cabecera persistente que muestra
+identidad, alergias críticas y acciones rápidas, y debajo un conjunto
+de pestañas. La pestaña por defecto **Resumen** es un dashboard
+modular donde cada bloque lo aporta un módulo distinto (planes,
+agenda, cobros, odontograma, historial médico). Los bloques son
+también deep-links — un click llega al detalle.
 
 ## Diseño
 
-- **Cabecera resumen** — nombre, foto, cumpleaños, contacto y avisos
-  clave (`do_not_contact`, archivado, etc.).
-- **Slot de acciones** — botones aportados por módulos hermanos:
-  - **Recalls** → *Programar recall*
-  - **Notificaciones** → *Enviar mensaje*
-  - Aparecen automáticamente conforme se registran nuevos módulos.
-- **Pestañas** — contenido clínico (notas, tratamientos, fotos,
-  planes, presupuestos…) suministrado por otros módulos. Cada pestaña
-  respeta sus propios permisos.
+- **Cabecera sticky** — avatar, nombre, edad, DNI, contacto, chips de
+  alergias críticas (alergia, embarazo, anticoagulante…) y botones
+  *Editar* + *Acciones ▾* (Cita, Cobrar, Nota, Archivar).
+  Permanece visible al hacer scroll y entre pestañas.
+- **Resumen (dashboard)** — grid de smart-cards aportadas por cada
+  módulo dueño vía el slot `patient.summary.cards`:
+  - **Plan activo** *(treatment_plan)* — nombre, progreso, n/m
+    tratamientos. Click → detalle del plan.
+  - **Próxima cita** *(agenda)* — día/hora/profesional. Click → cita.
+  - **Saldo** *(payments)* — debe / a cuenta / cobrado. Click →
+    Administración → Cobros.
+  - **Diagnósticos** *(odontogram)* — hallazgos sin tratar. Click →
+    odontograma en modo diagnóstico.
+  - **Historial médico** *(patients_clinical)* — alergias,
+    enfermedades sistémicas, medicación. Click → editar historial.
+  - **Acciones rápidas** *(patients)* — Cita, Presupuesto, Documento
+    y el slot `patient.summary.actions` para módulos hermanos
+    (recalls *Set recall*, notificaciones, etc.).
+- **Pestañas** — Datos, Clínica, Administración, Galería, Histórico.
+  En Clínica y Administración el sub-nav es un pill-bar con todos los
+  modos visibles desde el primer momento (Diagnóstico · Planes ·
+  Citas · Histórico / Presupuestos · Facturación · Cobros · Documentos).
+- **Mobile** — la cabecera se condensa, las cards se apilan a una
+  columna y aparece una barra inferior fija (Cita · Cobrar · Nota).
 
 ## Editar identidad
 

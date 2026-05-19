@@ -29,4 +29,16 @@ export default defineNuxtPlugin(() => {
     order: 10,
     permission: 'agenda.appointments.read'
   })
+
+  // Patient Resumen — next-appointment smart card. Slot owned by the
+  // patients module; agenda registers the component without any
+  // cross-module import on either side.
+  registerSlot('patient.summary.cards', {
+    id: 'agenda.patient.summary.cards.nextAppointment',
+    component: defineAsyncComponent(
+      () => import('../components/summary/NextAppointmentCard.vue')
+    ),
+    order: 20,
+    permission: 'agenda.appointments.read'
+  })
 })

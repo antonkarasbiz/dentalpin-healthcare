@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * AdministrationModeToggle — segmented control over administration tab modes.
+ * AdministrationModeToggle — full-width pill-bar over administration
+ * tab modes with contextual badges (budgets count, debt amount).
  *
  * The `payments` mode is contributed by the `payments` module via the
  * `patient.detail.administracion.payments` slot. The pill only appears
@@ -13,8 +14,24 @@ import { useModuleSlots } from '~~/app/composables/useModuleSlots'
 
 export type AdministrationMode = 'budgets' | 'billing' | 'payments' | 'documents'
 
-defineProps<{
+interface ModeBadges {
+  budgets?: string | number
+  billing?: string | number
+  payments?: string | number
+  documents?: string | number
+}
+
+interface ModeBadgeColors {
+  budgets?: 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info'
+  billing?: 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info'
+  payments?: 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info'
+  documents?: 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info'
+}
+
+const props = defineProps<{
   modelValue: AdministrationMode
+  badges?: ModeBadges
+  badgeColors?: ModeBadgeColors
 }>()
 
 const emit = defineEmits<{
@@ -30,13 +47,37 @@ const paymentsAvailable = computed(() =>
 
 const options = computed(() => {
   const base = [
-    { value: 'budgets', label: t('patientDetail.tabs.budgets'), icon: 'i-lucide-file-text' },
-    { value: 'billing', label: t('patientDetail.tabs.billing'), icon: 'i-lucide-receipt' }
+    {
+      value: 'budgets',
+      label: t('patientDetail.tabs.budgets'),
+      icon: 'i-lucide-file-text',
+      badge: props.badges?.budgets,
+      badgeColor: props.badgeColors?.budgets ?? 'neutral'
+    },
+    {
+      value: 'billing',
+      label: t('patientDetail.tabs.billing'),
+      icon: 'i-lucide-receipt',
+      badge: props.badges?.billing,
+      badgeColor: props.badgeColors?.billing ?? 'neutral'
+    }
   ]
   if (paymentsAvailable.value) {
-    base.push({ value: 'payments', label: t('patientDetail.tabs.payments'), icon: 'i-lucide-wallet' })
+    base.push({
+      value: 'payments',
+      label: t('patientDetail.tabs.payments'),
+      icon: 'i-lucide-wallet',
+      badge: props.badges?.payments,
+      badgeColor: props.badgeColors?.payments ?? 'neutral'
+    })
   }
-  base.push({ value: 'documents', label: t('patientDetail.tabs.documents'), icon: 'i-lucide-files' })
+  base.push({
+    value: 'documents',
+    label: t('patientDetail.tabs.documents'),
+    icon: 'i-lucide-files',
+    badge: props.badges?.documents,
+    badgeColor: props.badgeColors?.documents ?? 'neutral'
+  })
   return base
 })
 </script>
@@ -45,6 +86,7 @@ const options = computed(() => {
   <SegmentedControl
     :model-value="modelValue"
     :options="options"
+    full-width
     @update:model-value="(v) => emit('update:modelValue', v as AdministrationMode)"
   />
 </template>
