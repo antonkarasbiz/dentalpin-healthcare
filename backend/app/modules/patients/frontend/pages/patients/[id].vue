@@ -263,7 +263,9 @@ function openEditPatient() {
 }
 
 function newAppointment() {
-  router.push(`/appointments?patient_id=${patientId}&action=new`)
+  // Agenda page reads `patient_id` to seed the patient picker and
+  // `new=1` to auto-open the create modal on mount.
+  router.push(`/appointments?patient_id=${patientId}&new=1`)
 }
 
 function newNote() {

@@ -68,7 +68,12 @@ const isToday = computed(() => {
 })
 
 const href = computed(() => {
-  if (!upcoming.value) return '/appointments'
+  if (!upcoming.value) {
+    // Empty state — open the agenda with the create modal already
+    // primed for this patient. The agenda page reads `patient_id` to
+    // seed `initialPatientId` and `new=1` to auto-open the modal.
+    return `/appointments?patient_id=${patientId.value}&new=1`
+  }
   const date = upcoming.value.start_time.split('T')[0]
   return `/appointments?highlight=${upcoming.value.id}&date=${date}`
 })
