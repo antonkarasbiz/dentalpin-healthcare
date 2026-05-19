@@ -4,6 +4,11 @@
       "payments": "Payments",
       "reports": "Payment reports"
     },
+    "balance": {
+      "debt": "Owes",
+      "credit": "On account",
+      "paid": "Total paid"
+    },
     "list": {
       "title": "Payments",
       "subtitle": "Patient payments, budget anticipos and on-account credit.",

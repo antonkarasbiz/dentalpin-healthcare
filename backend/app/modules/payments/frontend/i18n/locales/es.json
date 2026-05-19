@@ -4,6 +4,11 @@
       "payments": "Cobros",
       "reports": "Informe de pagos"
     },
+    "balance": {
+      "debt": "Debe",
+      "credit": "A cuenta",
+      "paid": "Total cobrado"
+    },
     "list": {
       "title": "Cobros",
       "subtitle": "Pagos del paciente, anticipos sobre presupuesto y a cuenta.",
