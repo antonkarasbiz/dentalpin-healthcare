@@ -3,22 +3,18 @@
  * PatientStickyHeader — persistent patient context bar.
  *
  * Renders at the top of the patient-detail page above the UTabs strip
- * and stays in view as the user scrolls into deep tabs (Clinical →
- * Plans → detail, Administración → Cobros, etc.). Replaces the legacy
- * dense left rail that lived inside the Resumen tab.
+ * and stays in view as the user scrolls into deep tabs. Two visual
+ * lanes:
  *
- * Cross-module contributions plug in via two slots:
+ * - Identity lane (left): avatar · name + status · age · ID · contact
+ *   actions (phone + email as icon buttons with tooltip).
+ * - Signals lane (right): clinical alert chips from
+ *   ``patient.header.alerts`` + Edit and Acciones buttons.
  *
- *   - ``patient.header.alerts``  — clinical chips (allergy, pregnancy,
- *                                  anticoagulant) provided by the
- *                                  ``patients_clinical`` module.
- *   - ``patient.summary.actions`` — module-contributed action buttons
- *                                   (recalls "Set recall", etc.). Kept
- *                                   under the legacy slot name to avoid
- *                                   breaking sibling modules.
- *
- * The host (``patients``) never imports any sibling module — it only
- * exposes the slot names.
+ * The legacy ``patient.summary.actions`` slot (recalls "Set recall",
+ * etc.) is no longer rendered in the header. It overflowed the bar
+ * and competed with identity. Those module actions now live where
+ * they belong — inside the Quick-Actions card on the Resumen grid.
  */
 
 import type { PatientExtended } from '~~/app/types'
@@ -58,7 +54,20 @@ const age = computed(() => {
   return years
 })
 
+const genderLabel = computed(() => {
+  const g = props.patient.gender
+  if (!g) return null
+  const map: Record<string, string> = {
+    male: t('patients.gender.male'),
+    female: t('patients.gender.female'),
+    other: t('patients.gender.other'),
+    prefer_not_say: t('patients.gender.preferNotSay')
+  }
+  return map[g] ?? null
+})
+
 const statusColor = computed(() => props.patient.status === 'active' ? 'success' : 'neutral')
+const isArchived = computed(() => props.patient.status === 'archived')
 
 const actionItems = computed(() => [
   {
@@ -90,16 +99,17 @@ const actionItems = computed(() => [
 
 <template>
   <header
-    class="patient-sticky-header sticky top-0 z-30 -mx-4 sm:mx-0 bg-surface/85 backdrop-blur border-b border-default px-4 sm:px-0 sm:pl-1 sm:pr-2 py-2"
+    class="patient-sticky-header sticky top-0 z-30 -mx-4 sm:mx-0 bg-surface/90 backdrop-blur border-b border-default px-4 sm:px-3 py-2.5"
     aria-label="Cabecera del paciente"
   >
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 sm:gap-4">
       <UButton
         variant="ghost"
         color="neutral"
         size="sm"
         icon="i-lucide-arrow-left"
         :aria-label="t('common.back', 'Volver')"
+        class="shrink-0"
         @click="emit('back')"
       />
 
@@ -107,94 +117,109 @@ const actionItems = computed(() => [
         v-if="patient.photo_url"
         :src="patient.photo_url"
         :alt="fullName"
-        size="md"
-        class="shrink-0"
+        size="lg"
+        class="shrink-0 ring-2 ring-[var(--color-border-subtle)]"
       />
       <UAvatar
         v-else
         :text="initials"
-        size="md"
-        class="shrink-0"
+        size="lg"
+        class="shrink-0 ring-2 ring-[var(--color-border-subtle)]"
+        :ui="{ text: 'font-semibold' }"
       />
 
-      <!-- Identity -->
-      <div class="min-w-0 flex-1">
-        <div class="flex items-baseline gap-2 flex-wrap min-w-0">
-          <h1 class="text-h1 text-default truncate">
+      <!-- Identity column -->
+      <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+        <!-- Name + status -->
+        <div class="flex items-center gap-2 min-w-0">
+          <h1 class="text-h1 text-default font-semibold truncate">
             {{ fullName }}
           </h1>
           <UBadge
-            :color="statusColor"
+            v-if="isArchived"
+            color="neutral"
             size="xs"
             variant="subtle"
+            class="shrink-0"
           >
-            {{ patient.status === 'active' ? t('patients.status.active') : t('patients.status.archived') }}
+            {{ t('patients.status.archived') }}
           </UBadge>
+          <span
+            v-else
+            class="status-dot shrink-0"
+            :aria-label="t('patients.status.active')"
+          />
         </div>
 
-        <div class="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-caption text-muted">
+        <!-- Metadata strip — age · gender · DNI · contact icons -->
+        <div class="flex items-center gap-x-2.5 gap-y-1 flex-wrap text-caption text-muted">
           <span
             v-if="age != null"
-            class="inline-flex items-center gap-1 tnum"
+            class="tnum"
           >
-            <UIcon
-              name="i-lucide-cake"
-              class="w-3.5 h-3.5"
-            />
             {{ age }} {{ t('patients.years') }}
           </span>
           <span
-            v-if="patient.national_id"
-            class="inline-flex items-center gap-1 tnum"
+            v-if="genderLabel"
+            class="text-subtle"
           >
+            ·  {{ genderLabel }}
+          </span>
+          <span
+            v-if="patient.national_id"
+            class="tnum text-subtle inline-flex items-center gap-1"
+          >
+            <span aria-hidden="true">·</span>
             <UIcon
               name="i-lucide-id-card"
               class="w-3.5 h-3.5"
             />
-            {{ patient.national_id_type?.toUpperCase() }} {{ patient.national_id }}
+            <span>{{ patient.national_id_type?.toUpperCase() }} {{ patient.national_id }}</span>
           </span>
-          <a
+
+          <!-- Contact icons — click to call/mail. No full string in the bar. -->
+          <UTooltip
             v-if="patient.phone"
-            :href="`tel:${patient.phone}`"
-            class="inline-flex items-center gap-1 tnum text-primary-accent hover:underline"
+            :text="patient.phone"
           >
-            <UIcon
-              name="i-lucide-phone"
-              class="w-3.5 h-3.5"
-            />
-            {{ patient.phone }}
-          </a>
-          <a
+            <a
+              :href="`tel:${patient.phone}`"
+              class="inline-flex items-center justify-center w-7 h-7 rounded-token-sm text-primary-accent hover:bg-surface-muted transition-colors"
+              :aria-label="`${t('patients.phone', 'Phone')}: ${patient.phone}`"
+            >
+              <UIcon
+                name="i-lucide-phone"
+                class="w-4 h-4"
+              />
+            </a>
+          </UTooltip>
+          <UTooltip
             v-if="patient.email"
-            :href="`mailto:${patient.email}`"
-            class="hidden md:inline-flex items-center gap-1 text-primary-accent hover:underline truncate max-w-[18rem]"
+            :text="patient.email"
           >
-            <UIcon
-              name="i-lucide-mail"
-              class="w-3.5 h-3.5 shrink-0"
-            />
-            <span class="truncate">{{ patient.email }}</span>
-          </a>
+            <a
+              :href="`mailto:${patient.email}`"
+              class="inline-flex items-center justify-center w-7 h-7 rounded-token-sm text-primary-accent hover:bg-surface-muted transition-colors"
+              :aria-label="`${t('patients.email', 'Email')}: ${patient.email}`"
+            >
+              <UIcon
+                name="i-lucide-mail"
+                class="w-4 h-4"
+              />
+            </a>
+          </UTooltip>
         </div>
       </div>
 
-      <!-- Slot: clinical alerts chips (provided by patients_clinical) -->
-      <div class="hidden lg:flex items-center gap-1.5 max-w-md overflow-x-auto">
+      <!-- Clinical alert chips (patients_clinical slot) — desktop only. -->
+      <div class="hidden xl:flex items-center gap-1.5 max-w-sm flex-wrap justify-end">
         <ModuleSlot
           name="patient.header.alerts"
           :ctx="{ patient }"
         />
       </div>
 
-      <!-- Module actions slot (recalls 'Set recall', etc.) -->
-      <div class="hidden md:flex items-center gap-1.5">
-        <ModuleSlot
-          name="patient.summary.actions"
-          :ctx="{ patient }"
-        />
-      </div>
-
-      <!-- Edit + Acciones -->
+      <!-- Edit + Acciones — always visible -->
       <UButton
         variant="outline"
         color="neutral"
@@ -220,8 +245,9 @@ const actionItems = computed(() => [
       </UDropdownMenu>
     </div>
 
-    <!-- Mobile-only alerts row (chips wrap below identity when present) -->
-    <div class="lg:hidden mt-1.5 empty:hidden flex flex-wrap items-center gap-1.5">
+    <!-- Alerts row — visible below xl, fits chips on a separate line.
+         Hidden when the slot has no providers via :empty:hidden. -->
+    <div class="xl:hidden mt-2 empty:hidden flex flex-wrap items-center gap-1.5">
       <ModuleSlot
         name="patient.header.alerts"
         :ctx="{ patient }"
@@ -229,3 +255,13 @@ const actionItems = computed(() => [
     </div>
   </header>
 </template>
+
+<style scoped>
+.status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--color-success-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-accent) 18%, transparent);
+}
+</style>
