@@ -1368,7 +1368,15 @@
     "selectOdontogramType": "Select type...",
     "selectClinicalCategory": "Select category...",
     "expandAll": "Expand all",
-    "collapseAll": "Collapse all"
+    "collapseAll": "Collapse all",
+    "unnamed": "Untitled",
+    "activeHint": "Available for budgets and plans",
+    "tabs": {
+      "general": "General",
+      "pricing": "Pricing",
+      "scheduling": "Scheduling",
+      "clinical": "Clinical"
+    }
   },
   "placeholders": {
     "selectRole": "Select role..."

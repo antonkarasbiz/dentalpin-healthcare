@@ -1390,7 +1390,15 @@
     "selectOdontogramType": "Seleccionar tipo...",
     "selectClinicalCategory": "Seleccionar categoría...",
     "expandAll": "Expandir todo",
-    "collapseAll": "Colapsar todo"
+    "collapseAll": "Colapsar todo",
+    "unnamed": "Sin nombre",
+    "activeHint": "Disponible para presupuestos y planes",
+    "tabs": {
+      "general": "General",
+      "pricing": "Precio",
+      "scheduling": "Agenda",
+      "clinical": "Clínico"
+    }
   },
   "placeholders": {
     "selectRole": "Seleccionar rol..."

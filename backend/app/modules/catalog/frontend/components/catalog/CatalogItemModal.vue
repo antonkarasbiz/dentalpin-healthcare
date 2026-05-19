@@ -26,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const catalog = useCatalog()
 
 // VAT Types
 const {
@@ -34,18 +35,31 @@ const {
   fetchVatTypes
 } = useVatTypes()
 
-// Fetch VAT types on mount
 onMounted(() => {
   fetchVatTypes()
 })
 
-// Determine if we're in create or edit mode
 const isCreateMode = computed(() => !props.item)
+const isSystem = computed(() => !isCreateMode.value && props.item?.is_system)
+
+// Tabs
+type TabId = 'general' | 'pricing' | 'scheduling' | 'clinical'
+const activeTab = ref<TabId>('general')
+const tabs = computed(() => [
+  { id: 'general' as TabId, label: t('catalog.tabs.general'), icon: 'i-lucide-info' },
+  { id: 'pricing' as TabId, label: t('catalog.tabs.pricing'), icon: 'i-lucide-euro' },
+  { id: 'scheduling' as TabId, label: t('catalog.tabs.scheduling'), icon: 'i-lucide-clock' },
+  { id: 'clinical' as TabId, label: t('catalog.tabs.clinical'), icon: 'i-lucide-stethoscope' }
+])
+
+// Reset to first tab when modal opens
+watch(open, (v) => {
+  if (v) activeTab.value = 'general'
+})
 
 // Form state
 const formData = ref<TreatmentCatalogItemUpdate>({})
 
-// Computed for single name field (stores in current locale)
 const itemName = computed({
   get: () => formData.value.names?.[locale.value] || '',
   set: (value: string) => {
@@ -56,11 +70,11 @@ const itemName = computed({
   }
 })
 
-// Odontogram mapping state
+// Odontogram mapping
 const odontogramType = ref<string | undefined>(undefined)
 const clinicalCategory = ref<string | undefined>(undefined)
 
-// Session template state (multi-session billing)
+// Sessions
 interface SessionRow {
   sequence?: number
   label: string
@@ -94,12 +108,17 @@ const sessionsSumMatches = computed(() => {
   return Math.abs(sessionsSum.value - total) <= 0.01
 })
 
-// Watch for item changes to populate form
+const sessionsProgress = computed(() => {
+  const total = Number(formData.value.default_price) || 0
+  if (total <= 0) return 0
+  return Math.min(100, Math.max(0, (sessionsSum.value / total) * 100))
+})
+
+// Populate form
 watch(
   () => props.item,
   (newItem) => {
     if (newItem) {
-      // Edit mode: populate with existing item
       formData.value = {
         internal_code: newItem.internal_code,
         category_id: newItem.category_id,
@@ -119,7 +138,6 @@ watch(
         material_notes: newItem.material_notes,
         is_active: newItem.is_active
       }
-      // Load existing odontogram mapping
       if (newItem.odontogram_mapping) {
         odontogramType.value = newItem.odontogram_mapping.odontogram_treatment_type
         clinicalCategory.value = newItem.odontogram_mapping.clinical_category
@@ -127,7 +145,6 @@ watch(
         odontogramType.value = undefined
         clinicalCategory.value = undefined
       }
-      // Load existing session template
       if (newItem.sessions && newItem.sessions.length > 0) {
         sessionsEnabled.value = true
         sessions.value = newItem.sessions
@@ -143,7 +160,6 @@ watch(
         sessions.value = []
       }
     } else {
-      // Create mode: set default values, use default VAT type
       formData.value = {
         internal_code: '',
         category_id: props.categories[0]?.id,
@@ -170,7 +186,6 @@ watch(
   { immediate: true }
 )
 
-// Clear sessions whenever the toggle is turned off
 watch(sessionsEnabled, (enabled) => {
   if (!enabled) {
     sessions.value = []
@@ -179,29 +194,25 @@ watch(sessionsEnabled, (enabled) => {
   }
 })
 
-// Treatment scope options — aligned with Treatment.scope.
-const scopeOptions = [
-  { value: 'tooth', label: t('catalog.scopeTypes.tooth') },
-  { value: 'multi_tooth', label: t('catalog.scopeTypes.multi_tooth') },
-  { value: 'global_mouth', label: t('catalog.scopeTypes.global_mouth') },
-  { value: 'global_arch', label: t('catalog.scopeTypes.global_arch') }
-]
+// Scope options with icons
+const scopeOptionsVisual = computed(() => [
+  { value: 'tooth', label: t('catalog.scopeTypes.tooth'), icon: 'i-lucide-circle-dot' },
+  { value: 'multi_tooth', label: t('catalog.scopeTypes.multi_tooth'), icon: 'i-lucide-grip' },
+  { value: 'global_arch', label: t('catalog.scopeTypes.global_arch'), icon: 'i-lucide-rectangle-horizontal' },
+  { value: 'global_mouth', label: t('catalog.scopeTypes.global_mouth'), icon: 'i-lucide-scan-face' }
+])
 
-// Pricing strategy options
-const strategyOptions = computed(() => [
-  { value: 'flat', label: t('catalog.pricingStrategy.flat') },
-  { value: 'per_tooth', label: t('catalog.pricingStrategy.per_tooth') },
-  { value: 'per_surface', label: t('catalog.pricingStrategy.per_surface') },
-  { value: 'per_role', label: t('catalog.pricingStrategy.per_role') }
+// Pricing strategy with icons
+const strategyOptionsVisual = computed(() => [
+  { value: 'flat', label: t('catalog.pricingStrategy.flat'), icon: 'i-lucide-equal' },
+  { value: 'per_tooth', label: t('catalog.pricingStrategy.per_tooth'), icon: 'i-lucide-x' },
+  { value: 'per_surface', label: t('catalog.pricingStrategy.per_surface'), icon: 'i-lucide-layers' },
+  { value: 'per_role', label: t('catalog.pricingStrategy.per_role'), icon: 'i-lucide-link-2' }
 ])
 
 const SURFACE_TIERS = ['1', '2', '3', '4', '5'] as const
-
-// True when the tier-pricing editor should render.
 const showSurfacePrices = computed(() => formData.value.pricing_strategy === 'per_surface')
 
-// When strategy switches to per_surface, seed all tiers with default_price so the
-// user sees a starting matrix they can tweak. Switching away clears the map.
 watch(
   () => formData.value.pricing_strategy,
   (strategy) => {
@@ -209,11 +220,7 @@ watch(
       if (!formData.value.surface_prices) {
         const base = Number(formData.value.default_price) || 0
         formData.value.surface_prices = {
-          1: base,
-          2: base,
-          3: base,
-          4: base,
-          5: base
+          1: base, 2: base, 3: base, 4: base, 5: base
         } as unknown as Record<string, number>
       }
     } else {
@@ -235,7 +242,9 @@ function setTierPrice(tier: string, value: number | string | undefined) {
   formData.value.surface_prices[tier] = Number.isFinite(n) ? n : 0
 }
 
-// Category options for select
+// Duration presets
+const DURATION_PRESETS = [15, 30, 45, 60, 90] as const
+
 const categoryOptions = computed(() =>
   props.categories.map(c => ({
     value: c.id,
@@ -243,7 +252,6 @@ const categoryOptions = computed(() =>
   }))
 )
 
-// Odontogram treatment type options
 const odontogramTypeOptions = computed(() => [
   { value: undefined, label: t('catalog.noOdontogramMapping') },
   ...ALL_TREATMENT_TYPES.map(type => ({
@@ -252,7 +260,6 @@ const odontogramTypeOptions = computed(() => [
   }))
 ])
 
-// Clinical category options (for TreatmentBar grouping)
 const clinicalCategoryOptions = computed(() =>
   TREATMENT_CATEGORIES.map(c => ({
     value: c.key,
@@ -260,22 +267,16 @@ const clinicalCategoryOptions = computed(() =>
   }))
 )
 
-// Auto-select clinical category based on odontogram type
 watch(odontogramType, (newType) => {
   if (newType) {
-    // Find the category that contains this treatment
     const category = TREATMENT_CATEGORIES.find(c => c.treatments.includes(newType))
     if (category) {
       clinicalCategory.value = category.key
     }
-    // Also update treatment characteristics based on type.
-    // `treatment_scope` stays `tooth` by default — multi_tooth/globals are an explicit
-    // admin choice. Only the `requires_surfaces` flag is inferred automatically.
     formData.value.requires_surfaces = isSurfaceTreatment(newType)
   }
 })
 
-// Helper to get visualization rules for a treatment type
 function getVisualizationRules(treatmentType: string): string[] {
   const rules: string[] = []
   for (const [rule, treatments] of Object.entries(VISUALIZATION_RULES)) {
@@ -286,7 +287,6 @@ function getVisualizationRules(treatmentType: string): string[] {
   return rules
 }
 
-// Form validation
 const isValid = computed(() => {
   if (!formData.value.internal_code || !itemName.value || !formData.value.category_id) {
     return false
@@ -299,10 +299,21 @@ const isValid = computed(() => {
   return true
 })
 
+// Per-tab validation badge (red dot if invalid field on tab)
+const generalHasError = computed(() =>
+  !formData.value.internal_code || !itemName.value || !formData.value.category_id
+)
+const pricingHasError = computed(() =>
+  sessionsEnabled.value && (
+    sessions.value.length === 0 ||
+    sessions.value.some(s => !s.label || s.default_price < 0) ||
+    !sessionsSumMatches.value
+  )
+)
+
 function handleSubmit() {
   if (!isValid.value) return
 
-  // Clean up undefined values
   const cleanData: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(formData.value)) {
     if (value !== undefined) {
@@ -310,7 +321,6 @@ function handleSubmit() {
     }
   }
 
-  // Add odontogram mapping if type is selected
   if (odontogramType.value && clinicalCategory.value) {
     cleanData.odontogram_mapping = {
       odontogram_treatment_type: odontogramType.value,
@@ -320,7 +330,6 @@ function handleSubmit() {
     }
   }
 
-  // Session template: emit list (server replaces atomically) or empty list to clear
   cleanData.sessions = sessionsEnabled.value ? sessionsToPayload() : []
 
   if (isCreateMode.value) {
@@ -336,70 +345,186 @@ function handleClose() {
 </script>
 
 <template>
-  <UModal v-model:open="open">
+  <UModal
+    v-model:open="open"
+    :ui="{ content: '!max-w-3xl' }"
+  >
     <template #content>
-      <div class="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <!-- Header -->
-        <div class="flex items-center gap-2 p-4 border-b border-default  shrink-0">
-          <UIcon
-            :name="isCreateMode ? 'i-lucide-plus' : 'i-lucide-edit'"
-            class="w-5 h-5 text-primary-accent"
-          />
-          <h3 class="font-semibold text-default dark:text-white">
-            {{ isCreateMode ? t('catalog.newItem') : t('catalog.editItem') }}
-          </h3>
+      <div class="bg-surface rounded-lg w-full max-h-[92vh] flex flex-col">
+        <!-- Header: identity preview + tabs -->
+        <div class="border-b border-default shrink-0">
+          <div class="flex items-start justify-between gap-4 px-5 pt-4 pb-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <UIcon
+                  :name="isCreateMode ? 'i-lucide-plus-circle' : 'i-lucide-edit-3'"
+                  class="w-4 h-4 text-primary-accent"
+                />
+                <span class="text-xs uppercase tracking-wide font-semibold text-muted">
+                  {{ isCreateMode ? t('catalog.newItem') : t('catalog.editItem') }}
+                </span>
+              </div>
+              <h3 class="font-semibold text-lg text-default dark:text-white truncate">
+                {{ itemName || t('catalog.unnamed') }}
+              </h3>
+              <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span class="font-mono text-xs text-muted px-2 py-0.5 rounded bg-surface-muted">
+                  {{ formData.internal_code || '—' }}
+                </span>
+                <UBadge
+                  variant="subtle"
+                  color="primary"
+                  size="xs"
+                >
+                  {{ catalog.formatPrice(formData.default_price ?? 0) }}
+                </UBadge>
+                <UBadge
+                  v-if="formData.default_duration_minutes"
+                  variant="subtle"
+                  color="neutral"
+                  size="xs"
+                >
+                  {{ formData.default_duration_minutes }} min
+                </UBadge>
+                <UBadge
+                  v-if="!formData.is_active"
+                  variant="subtle"
+                  color="error"
+                  size="xs"
+                >
+                  {{ t('common.inactive') }}
+                </UBadge>
+                <UBadge
+                  v-if="item?.is_system"
+                  variant="subtle"
+                  color="info"
+                  size="xs"
+                >
+                  {{ t('catalog.system') }}
+                </UBadge>
+              </div>
+            </div>
+            <UButton
+              variant="ghost"
+              color="neutral"
+              icon="i-lucide-x"
+              size="sm"
+              @click="handleClose"
+            />
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex gap-0 px-5 overflow-x-auto">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              type="button"
+              class="px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 relative"
+              :class="activeTab === tab.id
+                ? 'border-primary-accent text-default dark:text-white'
+                : 'border-transparent text-muted hover:text-default'"
+              @click="activeTab = tab.id"
+            >
+              <UIcon
+                :name="tab.icon"
+                class="w-4 h-4"
+              />
+              {{ tab.label }}
+              <span
+                v-if="(tab.id === 'general' && generalHasError) || (tab.id === 'pricing' && pricingHasError)"
+                class="w-1.5 h-1.5 rounded-full bg-danger-accent absolute top-2 right-1"
+              />
+            </button>
+          </div>
         </div>
 
         <!-- Scrollable content -->
-        <div class="overflow-y-auto flex-1 p-4">
+        <div class="overflow-y-auto flex-1 p-5">
           <form
             id="catalog-edit-form"
-            class="space-y-6"
             @submit.prevent="handleSubmit"
           >
-            <!-- Basic info -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <UFormField :label="t('catalog.code')">
+            <!-- ============= GENERAL ============= -->
+            <div
+              v-show="activeTab === 'general'"
+              class="space-y-5"
+            >
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <UFormField
+                  :label="t('catalog.code')"
+                  class="md:col-span-1"
+                >
+                  <UInput
+                    v-model="formData.internal_code"
+                    :disabled="isSystem"
+                    placeholder="TX-001"
+                    required
+                  />
+                </UFormField>
+
+                <UFormField
+                  :label="t('catalog.category')"
+                  class="md:col-span-2"
+                >
+                  <USelect
+                    v-model="formData.category_id"
+                    :items="categoryOptions"
+                    value-key="value"
+                    label-key="label"
+                    :placeholder="t('catalog.selectCategory')"
+                    :disabled="isSystem"
+                  />
+                </UFormField>
+              </div>
+
+              <UFormField :label="t('catalog.name')">
                 <UInput
-                  v-model="formData.internal_code"
-                  :disabled="!isCreateMode && item?.is_system"
+                  v-model="itemName"
                   required
                 />
               </UFormField>
 
-              <UFormField :label="t('catalog.category')">
-                <USelect
-                  v-model="formData.category_id"
-                  :items="categoryOptions"
-                  value-key="value"
-                  label-key="label"
-                  :placeholder="t('catalog.selectCategory')"
-                  :disabled="!isCreateMode && item?.is_system"
+              <UFormField :label="t('catalog.materialNotes')">
+                <UTextarea
+                  v-model="formData.material_notes"
+                  rows="2"
+                  :placeholder="t('catalog.materialNotesPlaceholder')"
                 />
               </UFormField>
+
+              <div class="flex items-center justify-between p-3 rounded-lg border border-default bg-surface-muted/30">
+                <div>
+                  <div class="font-medium text-sm text-default dark:text-white">
+                    {{ t('catalog.active') }}
+                  </div>
+                  <p class="text-xs text-muted mt-0.5">
+                    {{ t('catalog.activeHint') }}
+                  </p>
+                </div>
+                <USwitch
+                  v-model="formData.is_active"
+                  :disabled="isSystem"
+                />
+              </div>
             </div>
 
-            <!-- Name -->
-            <UFormField :label="t('catalog.name')">
-              <UInput
-                v-model="itemName"
-                required
-              />
-            </UFormField>
-
-            <!-- Pricing -->
-            <div class="border-t border-default  pt-4">
-              <h4 class="font-medium text-default dark:text-white mb-4">
-                {{ t('catalog.pricing') }}
-              </h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- ============= PRICING ============= -->
+            <div
+              v-show="activeTab === 'pricing'"
+              class="space-y-5"
+            >
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <UFormField :label="t('catalog.defaultPrice')">
                   <UInput
                     v-model.number="formData.default_price"
                     type="number"
                     step="0.01"
                     min="0"
-                  />
+                  >
+                    <template #trailing>
+                      <span class="text-muted text-sm">€</span>
+                    </template>
+                  </UInput>
                 </UFormField>
 
                 <UFormField :label="t('catalog.costPrice')">
@@ -408,35 +533,65 @@ function handleClose() {
                     type="number"
                     step="0.01"
                     min="0"
-                  />
+                  >
+                    <template #trailing>
+                      <span class="text-muted text-sm">€</span>
+                    </template>
+                  </UInput>
                 </UFormField>
-              </div>
 
-              <!-- Pricing strategy -->
-              <div class="mt-4">
-                <UFormField
-                  :label="t('catalog.pricingStrategy.label')"
-                  :help="t('catalog.pricingStrategy.help')"
-                >
+                <UFormField :label="t('catalog.vatType')">
                   <USelect
-                    v-model="formData.pricing_strategy"
-                    :items="strategyOptions"
+                    v-model="formData.vat_type_id"
+                    :items="vatTypeOptions"
                     value-key="value"
                     label-key="label"
-                    :disabled="!isCreateMode && item?.is_system"
+                    :placeholder="t('catalog.selectVatType')"
                   />
                 </UFormField>
               </div>
 
-              <!-- Surface price tiers (per_surface strategy) -->
+              <!-- Pricing strategy as visual cards -->
+              <div>
+                <label class="block text-sm font-medium text-default dark:text-white mb-2">
+                  {{ t('catalog.pricingStrategy.label') }}
+                </label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <button
+                    v-for="opt in strategyOptionsVisual"
+                    :key="opt.value"
+                    type="button"
+                    class="p-3 rounded-lg border-2 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                    :class="formData.pricing_strategy === opt.value
+                      ? 'border-primary-accent bg-primary-soft/30 shadow-sm'
+                      : 'border-default hover:border-muted bg-surface'"
+                    :disabled="isSystem"
+                    @click="formData.pricing_strategy = opt.value"
+                  >
+                    <UIcon
+                      :name="opt.icon"
+                      class="w-5 h-5 mb-1.5"
+                      :class="formData.pricing_strategy === opt.value ? 'text-primary-accent' : 'text-muted'"
+                    />
+                    <div class="text-xs font-medium leading-tight text-default dark:text-white">
+                      {{ opt.label }}
+                    </div>
+                  </button>
+                </div>
+                <p class="text-xs text-muted mt-2">
+                  {{ t('catalog.pricingStrategy.help') }}
+                </p>
+              </div>
+
+              <!-- Surface tiers -->
               <div
                 v-if="showSurfacePrices"
-                class="mt-4 rounded-token-md alert-surface-info p-4"
+                class="rounded-lg border border-default bg-surface-muted/30 p-4"
               >
-                <div class="flex items-center gap-2 mb-3">
+                <div class="flex items-center gap-2 mb-1">
                   <UIcon
                     name="i-lucide-layers"
-                    class="w-4 h-4 text-info-accent"
+                    class="w-4 h-4 text-primary-accent"
                   />
                   <h5 class="font-medium text-sm text-default dark:text-white">
                     {{ t('catalog.surfacePrices.title') }}
@@ -445,12 +600,11 @@ function handleClose() {
                 <p class="text-xs text-muted mb-3">
                   {{ t('catalog.surfacePrices.help') }}
                 </p>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                <div class="grid grid-cols-5 gap-2">
                   <UFormField
                     v-for="tier in SURFACE_TIERS"
                     :key="tier"
                     :label="t('catalog.surfacePrices.tier', { n: tier })"
-                    class="text-xs"
                   >
                     <UInput
                       :model-value="getTierPrice(tier)"
@@ -463,223 +617,272 @@ function handleClose() {
                   </UFormField>
                 </div>
               </div>
-            </div>
 
-            <!-- Sessions (multi-session billing) -->
-            <div class="border-t border-default pt-4">
-              <div class="flex items-center justify-between mb-2">
-                <h4 class="font-medium text-default dark:text-white">
-                  {{ t('catalog.sessions.title') }}
-                </h4>
-                <USwitch v-model="sessionsEnabled" />
-              </div>
-              <p class="text-xs text-muted mb-3">
-                {{ t('catalog.sessions.help') }}
-              </p>
-              <div v-if="sessionsEnabled" class="space-y-2">
-                <div
-                  v-for="(session, idx) in sessions"
-                  :key="idx"
-                  class="flex items-end gap-2"
-                >
-                  <div class="w-10 text-center text-sm text-muted pb-2.5">
-                    {{ idx + 1 }}
+              <!-- Sessions -->
+              <div class="rounded-lg border border-default overflow-hidden">
+                <div class="flex items-center justify-between p-3 bg-surface-muted/30">
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-sm text-default dark:text-white flex items-center gap-2">
+                      <UIcon
+                        name="i-lucide-calendar-clock"
+                        class="w-4 h-4 text-primary-accent"
+                      />
+                      {{ t('catalog.sessions.title') }}
+                    </div>
+                    <p class="text-xs text-muted mt-0.5">
+                      {{ t('catalog.sessions.help') }}
+                    </p>
                   </div>
-                  <UFormField
-                    :label="idx === 0 ? t('catalog.sessions.label') : undefined"
-                    class="flex-1"
-                  >
-                    <UInput
-                      v-model="session.label"
-                      :placeholder="t('catalog.sessions.labelPlaceholder')"
-                    />
-                  </UFormField>
-                  <UFormField
-                    :label="idx === 0 ? t('catalog.sessions.price') : undefined"
-                    class="w-32"
-                  >
-                    <UInput
-                      v-model.number="session.default_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                    />
-                  </UFormField>
-                  <UButton
-                    icon="i-lucide-trash-2"
-                    color="error"
-                    variant="ghost"
-                    size="sm"
-                    class="mb-1"
-                    @click="removeSession(idx)"
-                  />
+                  <USwitch v-model="sessionsEnabled" />
                 </div>
-                <div class="flex items-center justify-between pt-2">
-                  <UButton
-                    icon="i-lucide-plus"
-                    variant="ghost"
-                    size="sm"
-                    @click="addSession"
-                  >
-                    {{ t('catalog.sessions.add') }}
-                  </UButton>
-                  <UBadge
-                    :color="sessionsSumMatches ? 'success' : 'error'"
-                    variant="subtle"
-                  >
-                    {{
-                      t('catalog.sessions.sumStatus', {
-                        sum: sessionsSum.toFixed(2),
-                        total: (Number(formData.default_price) || 0).toFixed(2)
-                      })
-                    }}
-                  </UBadge>
+
+                <div
+                  v-if="sessionsEnabled"
+                  class="border-t border-default"
+                >
+                  <div class="p-3 space-y-2">
+                    <div
+                      v-for="(session, idx) in sessions"
+                      :key="idx"
+                      class="flex items-center gap-2"
+                    >
+                      <div class="w-7 h-7 rounded-full bg-primary-soft/40 text-primary-accent font-semibold text-xs flex items-center justify-center shrink-0">
+                        {{ idx + 1 }}
+                      </div>
+                      <UInput
+                        v-model="session.label"
+                        :placeholder="t('catalog.sessions.labelPlaceholder')"
+                        class="flex-1"
+                      />
+                      <UInput
+                        v-model.number="session.default_price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="w-28"
+                      >
+                        <template #trailing>
+                          <span class="text-muted text-xs">€</span>
+                        </template>
+                      </UInput>
+                      <UButton
+                        icon="i-lucide-trash-2"
+                        color="error"
+                        variant="ghost"
+                        size="sm"
+                        @click="removeSession(idx)"
+                      />
+                    </div>
+                    <UButton
+                      icon="i-lucide-plus"
+                      variant="soft"
+                      size="xs"
+                      block
+                      @click="addSession"
+                    >
+                      {{ t('catalog.sessions.add') }}
+                    </UButton>
+                  </div>
+
+                  <!-- Sum visualization -->
+                  <div class="px-3 pb-3 pt-1 border-t border-subtle">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                      <span class="text-muted">
+                        {{ sessionsSum.toFixed(2) }} € / {{ (Number(formData.default_price) || 0).toFixed(2) }} €
+                      </span>
+                      <span
+                        class="flex items-center gap-1 font-medium"
+                        :class="sessionsSumMatches ? 'text-success-accent' : 'text-danger-accent'"
+                      >
+                        <UIcon
+                          :name="sessionsSumMatches ? 'i-lucide-check-circle-2' : 'i-lucide-alert-circle'"
+                          class="w-3.5 h-3.5"
+                        />
+                        {{ sessionsProgress.toFixed(0) }}%
+                      </span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-surface-muted overflow-hidden">
+                      <div
+                        class="h-full transition-all duration-300"
+                        :class="sessionsSumMatches ? 'bg-success-accent' : 'bg-danger-accent'"
+                        :style="{ width: `${Math.min(100, sessionsProgress)}%` }"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Tax -->
-            <UFormField :label="t('catalog.vatType')">
-              <USelect
-                v-model="formData.vat_type_id"
-                :items="vatTypeOptions"
-                value-key="value"
-                label-key="label"
-                :placeholder="t('catalog.selectVatType')"
-              />
-            </UFormField>
-
-            <!-- Scheduling -->
-            <div class="border-t border-default  pt-4">
-              <h4 class="font-medium text-default dark:text-white mb-4">
-                {{ t('catalog.scheduling') }}
-              </h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <UFormField :label="t('catalog.duration')">
+            <!-- ============= SCHEDULING ============= -->
+            <div
+              v-show="activeTab === 'scheduling'"
+              class="space-y-5"
+            >
+              <UFormField :label="t('catalog.duration')">
+                <div class="flex items-center gap-3 flex-wrap">
                   <UInput
                     v-model.number="formData.default_duration_minutes"
                     type="number"
                     min="0"
                     max="480"
+                    class="w-32"
                   >
                     <template #trailing>
-                      min
+                      <span class="text-muted text-sm">min</span>
                     </template>
                   </UInput>
-                </UFormField>
+                  <div class="flex gap-1 flex-wrap">
+                    <UButton
+                      v-for="preset in DURATION_PRESETS"
+                      :key="preset"
+                      type="button"
+                      size="xs"
+                      :variant="formData.default_duration_minutes === preset ? 'solid' : 'soft'"
+                      :color="formData.default_duration_minutes === preset ? 'primary' : 'neutral'"
+                      @click="formData.default_duration_minutes = preset"
+                    >
+                      {{ preset }}m
+                    </UButton>
+                  </div>
+                </div>
+              </UFormField>
 
-                <div class="flex items-center gap-3 pt-6">
-                  <USwitch v-model="formData.requires_appointment" />
-                  <span class="text-sm text-muted">
+              <div class="flex items-center justify-between p-3 rounded-lg border border-default bg-surface-muted/30">
+                <div class="flex items-center gap-2">
+                  <UIcon
+                    name="i-lucide-calendar-check"
+                    class="w-4 h-4 text-muted"
+                  />
+                  <span class="text-sm font-medium text-default dark:text-white">
                     {{ t('catalog.requiresAppointment') }}
                   </span>
                 </div>
+                <USwitch v-model="formData.requires_appointment" />
               </div>
             </div>
 
-            <!-- Treatment characteristics -->
-            <div class="border-t border-default  pt-4">
-              <h4 class="font-medium text-default dark:text-white mb-4">
-                {{ t('catalog.characteristics') }}
-              </h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <UFormField :label="t('catalog.scope')">
-                  <USelect
-                    v-model="formData.treatment_scope"
-                    :items="scopeOptions"
-                    value-key="value"
-                    label-key="label"
-                    :placeholder="t('catalog.selectScope')"
-                    :disabled="!isCreateMode && item?.is_system"
-                  />
-                </UFormField>
-
-                <div class="space-y-3 pt-6">
-                  <div class="flex items-center gap-3">
-                    <USwitch
-                      v-model="formData.is_diagnostic"
-                      :disabled="!isCreateMode && item?.is_system"
+            <!-- ============= CLINICAL ============= -->
+            <div
+              v-show="activeTab === 'clinical'"
+              class="space-y-5"
+            >
+              <!-- Scope as visual cards -->
+              <div>
+                <label class="block text-sm font-medium text-default dark:text-white mb-2">
+                  {{ t('catalog.scope') }}
+                </label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <button
+                    v-for="opt in scopeOptionsVisual"
+                    :key="opt.value"
+                    type="button"
+                    class="p-3 rounded-lg border-2 transition-all text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    :class="formData.treatment_scope === opt.value
+                      ? 'border-primary-accent bg-primary-soft/30 shadow-sm'
+                      : 'border-default hover:border-muted bg-surface'"
+                    :disabled="isSystem"
+                    @click="formData.treatment_scope = opt.value"
+                  >
+                    <UIcon
+                      :name="opt.icon"
+                      class="w-5 h-5 mx-auto mb-1"
+                      :class="formData.treatment_scope === opt.value ? 'text-primary-accent' : 'text-muted'"
                     />
-                    <span class="text-sm text-muted">
+                    <div class="text-xs font-medium text-default dark:text-white">
+                      {{ opt.label }}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Characteristic toggles -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div class="flex items-center justify-between p-3 rounded-lg border border-default bg-surface-muted/30">
+                  <div class="flex items-center gap-2">
+                    <UIcon
+                      name="i-lucide-microscope"
+                      class="w-4 h-4 text-muted"
+                    />
+                    <span class="text-sm font-medium text-default dark:text-white">
                       {{ t('catalog.isDiagnostic') }}
                     </span>
                   </div>
-
-                  <div class="flex items-center gap-3">
-                    <USwitch
-                      v-model="formData.requires_surfaces"
-                      :disabled="!isCreateMode && item?.is_system"
+                  <USwitch
+                    v-model="formData.is_diagnostic"
+                    :disabled="isSystem"
+                  />
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-lg border border-default bg-surface-muted/30">
+                  <div class="flex items-center gap-2">
+                    <UIcon
+                      name="i-lucide-square-stack"
+                      class="w-4 h-4 text-muted"
                     />
-                    <span class="text-sm text-muted">
+                    <span class="text-sm font-medium text-default dark:text-white">
                       {{ t('catalog.requiresSurfaces') }}
                     </span>
                   </div>
+                  <USwitch
+                    v-model="formData.requires_surfaces"
+                    :disabled="isSystem"
+                  />
                 </div>
               </div>
-            </div>
 
-            <!-- Odontogram mapping -->
-            <div class="border-t border-default  pt-4">
-              <h4 class="font-medium text-default dark:text-white mb-4">
-                {{ t('catalog.odontogramMapping') }}
-              </h4>
-              <p class="text-caption text-subtle  mb-4">
-                {{ t('catalog.odontogramMappingDescription') }}
-              </p>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <UFormField :label="t('catalog.odontogramType')">
-                  <USelect
-                    v-model="odontogramType"
-                    :items="odontogramTypeOptions"
-                    value-key="value"
-                    label-key="label"
-                    :placeholder="t('catalog.selectOdontogramType')"
+              <!-- Odontogram mapping -->
+              <div class="rounded-lg border border-default overflow-hidden">
+                <div class="flex items-center gap-2 p-3 bg-surface-muted/30 border-b border-default">
+                  <UIcon
+                    name="i-lucide-grid-3x3"
+                    class="w-4 h-4 text-primary-accent"
                   />
-                </UFormField>
-
-                <UFormField :label="t('catalog.clinicalCategory')">
-                  <USelect
-                    v-model="clinicalCategory"
-                    :items="clinicalCategoryOptions"
-                    value-key="value"
-                    label-key="label"
-                    :placeholder="t('catalog.selectClinicalCategory')"
-                    :disabled="!odontogramType"
-                  />
-                </UFormField>
+                  <span class="font-medium text-sm text-default dark:text-white">
+                    {{ t('catalog.odontogramMapping') }}
+                  </span>
+                </div>
+                <div class="p-4 space-y-3">
+                  <p class="text-xs text-muted">
+                    {{ t('catalog.odontogramMappingDescription') }}
+                  </p>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <UFormField :label="t('catalog.odontogramType')">
+                      <USelect
+                        v-model="odontogramType"
+                        :items="odontogramTypeOptions"
+                        value-key="value"
+                        label-key="label"
+                        :placeholder="t('catalog.selectOdontogramType')"
+                      />
+                    </UFormField>
+                    <UFormField :label="t('catalog.clinicalCategory')">
+                      <USelect
+                        v-model="clinicalCategory"
+                        :items="clinicalCategoryOptions"
+                        value-key="value"
+                        label-key="label"
+                        :placeholder="t('catalog.selectClinicalCategory')"
+                        :disabled="!odontogramType"
+                      />
+                    </UFormField>
+                  </div>
+                  <p
+                    v-if="odontogramType"
+                    class="text-xs text-info-accent flex items-start gap-1.5"
+                  >
+                    <UIcon
+                      name="i-lucide-info"
+                      class="w-3.5 h-3.5 mt-0.5 shrink-0"
+                    />
+                    {{ t('catalog.odontogramMappingHint') }}
+                  </p>
+                </div>
               </div>
-              <p
-                v-if="odontogramType"
-                class="text-caption text-subtle  mt-2"
-              >
-                {{ t('catalog.odontogramMappingHint') }}
-              </p>
-            </div>
-
-            <!-- Material notes -->
-            <UFormField :label="t('catalog.materialNotes')">
-              <UTextarea
-                v-model="formData.material_notes"
-                rows="2"
-                :placeholder="t('catalog.materialNotesPlaceholder')"
-              />
-            </UFormField>
-
-            <!-- Status -->
-            <div class="flex items-center gap-3 border-t border-default  pt-4">
-              <USwitch
-                v-model="formData.is_active"
-                :disabled="!isCreateMode && item?.is_system"
-              />
-              <span class="text-sm text-muted">
-                {{ t('catalog.active') }}
-              </span>
             </div>
           </form>
         </div>
 
         <!-- Footer -->
-        <div class="flex justify-end gap-2 p-4 border-t border-default  shrink-0">
+        <div class="flex items-center justify-end gap-2 p-4 border-t border-default shrink-0">
           <UButton
             variant="ghost"
             @click="handleClose"
@@ -689,6 +892,7 @@ function handleClose() {
           <UButton
             :loading="loading"
             :disabled="!isValid"
+            icon="i-lucide-check"
             @click="handleSubmit"
           >
             {{ t('common.save') }}
