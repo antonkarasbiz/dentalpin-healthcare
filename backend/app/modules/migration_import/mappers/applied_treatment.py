@@ -30,7 +30,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.odontogram.models import Treatment
+from app.modules.odontogram.models import ToothRecord, Treatment, TreatmentTooth
 from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPlan
 from app.modules.treatment_plan.service import TreatmentPlanService
 
@@ -47,6 +47,10 @@ class AppliedTreatmentMapper:
         self._plan_cache: dict[tuple[UUID, UUID], UUID] = {}
         # plan_id -> next sequence_order to assign. Avoids a SELECT per item.
         self._next_sequence: dict[UUID, int] = {}
+        # (clinic_id, patient_id, tooth_number) -> tooth_record_id. Lazy
+        # creation of per-tooth state so TreatmentTooth has a valid FK
+        # without us scanning the full odontogram up-front.
+        self._tooth_cache: dict[tuple[UUID, UUID, int], UUID] = {}
 
     async def apply(
         self,
@@ -114,6 +118,25 @@ class AppliedTreatmentMapper:
         ctx.db.add(treatment)
         await ctx.db.flush()
 
+        # 1b) TreatmentTooth children — populate from the decoded teeth
+        # the dental-bridge transformer emits (PiezasAdu + PiezasLec
+        # bit-mask decode). Surfaces remain ``None`` until the
+        # ``ZonasPieza`` encoding is field-validated.
+        teeth = payload.get("teeth") or []
+        for tooth_number in teeth:
+            tooth_record_id = await self._tooth_record_id(
+                ctx, patient_id=patient_id, tooth_number=int(tooth_number)
+            )
+            ctx.db.add(
+                TreatmentTooth(
+                    treatment_id=treatment.id,
+                    tooth_record_id=tooth_record_id,
+                    tooth_number=int(tooth_number),
+                )
+            )
+        if teeth:
+            await ctx.db.flush()
+
         # 2) PlannedTreatmentItem — links the plan to the Treatment.
         sequence = self._next_sequence.get(plan_id, 0) + 1
         self._next_sequence[plan_id] = sequence
@@ -139,6 +162,45 @@ class AppliedTreatmentMapper:
             dentalpin_id=item.id,
         )
         return item.id
+
+    async def _tooth_record_id(
+        self, ctx: MapperContext, *, patient_id: UUID, tooth_number: int
+    ) -> UUID:
+        """Resolve (or lazily create) the ``ToothRecord`` for a patient/tooth pair.
+
+        Re-runs are safe — an existing row is reused. New rows land
+        with ``general_condition='healthy'`` and an empty ``surfaces``
+        map; subsequent clinical activity in DentalPin overlays state
+        on top.
+        """
+        key = (ctx.clinic_id, patient_id, tooth_number)
+        if key in self._tooth_cache:
+            return self._tooth_cache[key]
+
+        result = await ctx.db.execute(
+            select(ToothRecord.id).where(
+                ToothRecord.clinic_id == ctx.clinic_id,
+                ToothRecord.patient_id == patient_id,
+                ToothRecord.tooth_number == tooth_number,
+            )
+        )
+        tooth_id = result.scalar_one_or_none()
+        if tooth_id is None:
+            tooth_type = "permanent" if 11 <= tooth_number <= 48 else "deciduous"
+            record = ToothRecord(
+                clinic_id=ctx.clinic_id,
+                patient_id=patient_id,
+                tooth_number=tooth_number,
+                tooth_type=tooth_type,
+                general_condition="healthy",
+                surfaces={},
+            )
+            ctx.db.add(record)
+            await ctx.db.flush()
+            tooth_id = record.id
+
+        self._tooth_cache[key] = tooth_id
+        return tooth_id
 
     async def _get_or_create_plan(
         self,

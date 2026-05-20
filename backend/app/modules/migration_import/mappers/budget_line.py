@@ -100,14 +100,29 @@ class BudgetLineMapper:
             discount_type = None
             discount_value = None
 
+        # DPMF lines may resolve to several teeth (e.g. bridges). DentalPin's
+        # BudgetItem.tooth_number is scalar, so we record the first decoded
+        # FDI here and surface the full list in ``notes`` so the operator
+        # can split the line afterwards if needed.
+        teeth = payload.get("teeth") or []
+        tooth_number = int(teeth[0]) if teeth else None
+        extra_teeth_note = (
+            f"Dientes adicionales en origen: {', '.join(str(t) for t in teeth[1:])}."
+            if len(teeth) > 1
+            else None
+        )
+        base_notes = payload.get("notes")
+        combined_notes = "\n".join(n for n in (base_notes, extra_teeth_note) if n)
+
         data: dict[str, Any] = {
             "catalog_item_id": catalog_item_id,
             "unit_price": unit_price,
             "quantity": quantity,
             "discount_type": discount_type,
             "discount_value": discount_value,
+            "tooth_number": tooth_number,
             "display_order": payload.get("order_within_budget") or 0,
-            "notes": payload.get("notes"),
+            "notes": combined_notes or None,
         }
         data = {k: v for k, v in data.items() if v is not None}
 

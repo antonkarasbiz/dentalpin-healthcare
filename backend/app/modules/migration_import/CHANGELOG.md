@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- feat(applied_treatment): create per-tooth ``TreatmentTooth`` rows
+  from the new ``payload["teeth"]`` field that dental-bridge emits
+  (FDI numbers decoded from Gesdén's ``PiezasAdu`` / ``PiezasLec``
+  bit-masks). ``ToothRecord`` rows are lazily created per ``(clinic,
+  patient, tooth_number)`` so subsequent treatments on the same tooth
+  reuse the same record. Surfaces remain ``None`` until the source
+  ``ZonasPieza`` encoding is field-validated.
+- feat(budget_line): write the first decoded FDI tooth into
+  ``BudgetItem.tooth_number``; the remaining teeth (e.g. bridge
+  members) land in the line ``notes`` field so the operator can split
+  the budget line manually if their workflow expects a per-tooth row.
 - fix(payment): the historical Payment mapper was producing rows that
   violated three NOT NULL columns on ``payments.Payment``:
   ``currency`` (snapshot of ``Clinic.currency``), ``recorded_by`` (FK
