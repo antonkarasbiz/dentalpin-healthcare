@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- feat(applied_treatment): map Gesdén ``IdTipoOdg`` to DentalPin's
+  ``TreatmentType`` enum (implant / crown / bridge / extraction /
+  filling_composite / root_canal_full / veneer / sealant / band /
+  bracket / post / apicoectomy …) instead of hard-coding
+  ``"migrated"`` on every imported treatment. The UI now surfaces
+  real labels; the catalog item name follows via the existing
+  ``catalog_item_id`` link.
+- feat(applied_treatment): skip non-clinical Gesdén timeline entries
+  (Anotación, Nota Económica, Primera Visita, Higiene, Panorámicas,
+  Teleradio, Fluorización, Genérico, tooth-state codes). They aren't
+  tooth treatments and were polluting the migrated plan with empty
+  line items. A ``applied_treatment.non_clinical_entry`` warning
+  records each skip; the canonical row still lands in
+  ``RawEntity`` for audit.
+- feat(applied_treatment): group migrated plans by source budget
+  (one plan per ``Migrado — <budget_number>``) when
+  ``budget_line_uuid`` resolves; fall back to per-year buckets
+  ("Migrado — 2017") when the source carries no budget link, so a
+  patient with twenty years of history no longer ends up with a
+  single 131-item mega-plan. The ``TreatmentPlan.budget_id`` link is
+  also set so the budget detail sidebar reflects the migration.
+- fix(applied_treatment): bypass ``TreatmentPlanService.create``
+  because its ``count(*)``-based ``plan_number`` generator collides
+  any time historic plans leave gaps in the sequence (and the
+  per-budget split creates many plans per patient in one session).
+  Use deterministic synthetic numbers (``MIG-<budget_number>`` or
+  ``MIG-<patient_short>-<year>``) — unique by construction, idempotent
+  on re-run.
 - feat(applied_treatment): create per-tooth ``TreatmentTooth`` rows
   from the new ``payload["teeth"]`` field that dental-bridge emits
   (FDI numbers decoded from Gesdén's ``PiezasAdu`` / ``PiezasLec``
