@@ -92,7 +92,7 @@ const isEmpty = computed(() =>
             :key="a.id"
             class="truncate"
           >
-            · {{ a.allergen }}
+            · {{ a.name }}
             <span
               v-if="a.severity"
               class="text-subtle"
@@ -110,7 +110,7 @@ const isEmpty = computed(() =>
           class="w-3.5 h-3.5 mt-0.5 text-subtle shrink-0"
         />
         <div class="text-muted truncate">
-          {{ topDiseases.map(d => d.disease_name).join(', ') }}
+          {{ topDiseases.map(d => d.name).join(', ') }}
           <span
             v-if="diseaseCount > topDiseases.length"
             class="text-subtle"
