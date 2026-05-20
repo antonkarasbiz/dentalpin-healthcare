@@ -57,6 +57,7 @@ class MigrationImportModule(BaseModule):
         "depends": [
             "patients",
             "patients_clinical",
+            "clinical_notes",
             "agenda",
             "schedules",
             "catalog",

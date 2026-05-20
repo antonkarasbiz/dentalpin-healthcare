@@ -34,6 +34,11 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.modules.clinical_notes.models import (
+    NOTE_OWNER_PATIENT,
+    NOTE_TYPE_ADMINISTRATIVE,
+    ClinicalNote,
+)
 from app.modules.patients.models import Patient
 from app.modules.patients_clinical.models import (
     Allergy,
@@ -261,13 +266,24 @@ class PatientAlertMapper:
         result: AlertClassification,
         source_id: str,
     ) -> UUID | None:
-        await _warn(
-            ctx,
-            source_id,
-            "patient_alert.administrative",
-            f"Alerta administrativa omitida del historial clínico: {result.raw_text[:100]}",
+        # Administrative leftovers (``ABONA POCO A POCO``,
+        # ``ENVIAR FACTURA CADA MES``, ``DTO 20%``…) are reception
+        # context, not clinical data — they belong on the
+        # polymorphic ``clinical_notes`` store with the
+        # ``administrative`` discriminator. The UI surfaces them in
+        # the reception-friendly notes panel without polluting the
+        # clinical history tab.
+        note = ClinicalNote(
+            clinic_id=ctx.clinic_id,
+            note_type=NOTE_TYPE_ADMINISTRATIVE,
+            owner_type=NOTE_OWNER_PATIENT,
+            owner_id=patient_id,
+            body=f"[Migrado de Gesdén] {result.raw_text}",
+            author_id=ctx.created_by,
         )
-        return None
+        ctx.db.add(note)
+        await ctx.db.flush()
+        return note.id
 
     async def _handle_general(
         self,
@@ -334,6 +350,7 @@ _TARGET_TABLE = {
     "lactating": "patients_clinical_medical_context",
     "anticoagulant": "patients_clinical_medication",
     "bruxism": "patients_clinical_medical_context",
+    "administrative": "clinical_notes",
     "general": "patients",
 }
 

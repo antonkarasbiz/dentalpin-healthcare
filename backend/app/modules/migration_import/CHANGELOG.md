@@ -34,9 +34,13 @@
                           Clopidogrel / Xarelto / Eliquis / Heparina /
                           Warfarina / Aldocumar)
   - ``bruxism``        → ``MedicalContext.bruxism``
-  - ``administrative`` → silently skipped with an info warning
-                          (``PRESU.``, ``DTO``, ``COBRAR``,
-                          ``ENVIAR FACTURA``, ``VIENE REFERIDO`` …)
+  - ``administrative`` → ``clinical_notes.ClinicalNote`` with
+                          ``note_type='administrative'`` attached to
+                          the patient (``PRESU.``, ``DTO``,
+                          ``COBRAR``, ``ENVIAR FACTURA``,
+                          ``VIENE REFERIDO`` …) — preserves the
+                          info in the reception-friendly notes panel
+                          instead of dropping it on the floor
   - ``general``        → falls back to ``Patient.notes`` so the
                           clinician sees the original text in
                           context
