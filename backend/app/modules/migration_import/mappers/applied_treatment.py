@@ -49,6 +49,26 @@ from .base import MapperContext
 # null in the source and stay as ``pending`` items.
 _REALISED_CODES: set[int] = {5, 6}
 
+# Threshold for the "notes longer than catalog name → likely
+# performed" heuristic. Field validation against ``SOURCE_DB`` shows
+# StaTto=3 averages 25 chars of notes (essentially just the catalog
+# entry name), while StaTto=5 averages 91 chars (catalog name +
+# clinical detail: implant lot, surfaces, dose, etc.). 40 chars sits
+# above the noise floor and still catches the bulk of legitimately
+# performed entries the clinic forgot to flag.
+_NOTES_LIKELY_PERFORMED_MIN_CHARS = 40
+
+# Heuristic age thresholds applied to ``FecIni`` for the
+# "data-hygiene rescue" pass on StaTto=3 entries:
+# - older than ``_OLD_TREATMENT_AGE_DAYS`` (5 years) → assume done
+#   regardless of notes. A treatment planned but never done that long
+#   ago is statistically negligible.
+# - older than ``_MID_TREATMENT_AGE_DAYS`` (2 years) AND with notes
+#   that exceed the catalog-name floor → assume done. The notes
+#   length acts as the second corroborating signal.
+_OLD_TREATMENT_AGE_DAYS = 365 * 5
+_MID_TREATMENT_AGE_DAYS = 365 * 2
+
 # Plan status to write for every migrated plan. Gesdén plans are by
 # definition already-accepted historical records — leaving them in
 # ``draft`` would force the operator to confirm each one manually
@@ -203,12 +223,63 @@ class AppliedTreatmentMapper:
                 f"se ha registrado como '{_FALLBACK_CLINICAL_TYPE}'.",
             )
 
-        # Status & timestamps.
+        # Status & timestamps. ``StaTto`` 5/6 and ``FecFin`` presence
+        # are the only formal Gesdén signals for "done", but this
+        # specific export's data hygiene is poor — implants planned
+        # 13 years ago that were obviously performed still sit at
+        # StaTto=3 because the clinic never updated the flag. Apply
+        # the corroborating heuristics decided in #ops:
+        #
+        #   1) StaTto ∈ {5, 6}                 → done (formal)
+        #   2) FecFin set                       → done (formal)
+        #   3) FecIni older than 5 years        → done (age alone)
+        #   4) FecIni older than 2 years AND
+        #      notes longer than the catalog
+        #      name floor (40 chars)            → done (age + clinical detail)
+        #
+        # Every heuristic-triggered hit emits an audit warning so the
+        # operator can spot-check the reclassification.
         status_code = _coerce_int(payload.get("status_code"))
-        is_realised = status_code in _REALISED_CODES
         start_dt = _parse_datetime(payload.get("start_date")) or datetime.now(UTC)
         end_dt = _parse_datetime(payload.get("end_date"))
         amount = _decimal_or_none(payload.get("amount"))
+
+        formal_done = status_code in _REALISED_CODES or end_dt is not None
+        is_realised = formal_done
+        if not is_realised:
+            notes_value = payload.get("notes") or ""
+            notes_chars = len(notes_value)
+            age_days = (datetime.now(UTC) - start_dt).days
+            if age_days >= _OLD_TREATMENT_AGE_DAYS:
+                is_realised = True
+                await _warn(
+                    ctx,
+                    source_id,
+                    "applied_treatment.completed_by_age",
+                    f"Tratamiento marcado como realizado por antigüedad "
+                    f"({age_days // 365} años desde FecIni); Gesdén lo "
+                    "deja en StaTto=3.",
+                )
+            elif (
+                age_days >= _MID_TREATMENT_AGE_DAYS
+                and notes_chars > _NOTES_LIKELY_PERFORMED_MIN_CHARS
+            ):
+                is_realised = True
+                await _warn(
+                    ctx,
+                    source_id,
+                    "applied_treatment.completed_by_notes",
+                    f"Tratamiento marcado como realizado por notas "
+                    f"clínicas ({notes_chars} chars) sobre tratamiento "
+                    f"antiguo ({age_days // 365} años); StaTto=3 en "
+                    "Gesdén.",
+                )
+
+        # When the heuristic says "done" but Gesdén has no end date,
+        # use FecIni as an approximation so DentalPin's reports have
+        # a date to anchor on.
+        if is_realised and end_dt is None and not formal_done:
+            end_dt = start_dt
 
         # Plan grouping: prefer the source budget link (one plan per
         # source presupuesto). When the source has no budget for this

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- feat(applied_treatment): rescue completion status for treatments
+  Gesdén left as ``StaTto=3`` despite being long done. In the live
+  export ~26 k clinical treatments sit at ``StaTto=3`` (planned)
+  with ``FecFin`` null — 87 % of them are 2+ years old and 55 % are
+  5+ years old, which is implausible for genuinely-unstarted work.
+  Investigation of the Gesdén schema found no reliable signal in
+  this clinic's data (DCitasTto + TtosMed_PagoCli are empty,
+  Pendiente is 0 for every row regardless of state, FechaValida /
+  IdColValida / NumDocUnico / SesRealiz are all null). The clinic
+  simply never updates ``StaTto`` after performing a treatment.
+  The mapper now applies a heuristic on top of the formal signals:
+  formal "done" (StaTto ∈ {5, 6} or FecFin set), plus
+  ``FecIni`` older than 5 years (age alone), plus ``FecIni`` older
+  than 2 years AND notes longer than the 40-char catalog-name floor
+  (age + clinical detail). Every heuristic hit emits an audit
+  warning (``completed_by_age`` / ``completed_by_notes``) so the
+  operator can spot-check the reclassification. Validated on the
+  una paciente de ejemplo record: 25 stale "planned" items
+  collapse to 5 (the recent 2024 entries and one 2021 short-note
+  case), with the other 20 promoted to completed.
 - fix(applied_treatment): migrated plans land in ``active`` instead of
   ``draft``. Gesdén plans are historical, post-acceptance records —
   leaving them in DentalPin's pre-confirmation state forced the
