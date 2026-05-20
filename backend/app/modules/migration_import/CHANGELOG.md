@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- fix(budget): rescue ``Budget.status`` from the
+  ``PresuTto.IdTtoMedOrig`` back-reference. Gesdén keeps a Presu↔TtosMed
+  double link (forward in ``TtosMed.IdPresuTto``, backward in
+  ``PresuTto.IdTtoMedOrig`` — exposed canonically as
+  ``budget_line.applied_treatment_uuid``). Clinics with poor hygiene
+  rarely fill ``Presu.FecAcepta`` even when the patient clearly
+  acted on the budget, so 88 % of the live export ends up with
+  Estado=0 (draft). The back-reference holds because every applied
+  treatment must point at its budget line to bill correctly —
+  ``BudgetLineMapper`` now promotes the parent budget from ``draft``
+  to ``accepted`` (one-way) the first time it sees a line with
+  ``applied_treatment_uuid`` set. Verified on una paciente de ejemplo: 8/18 budgets correctly accepted (the 2019-2024
+  ones backed by 661 applied treatments, totalling 14,090 €), 10/18
+  stay draft (the 2017 alternative quotes that never had work
+  done).
 - feat(mappers): new ``PatientAlertMapper`` materialises Gesdén
   ``AlertPac`` rows (free-text medical history) into structured
   ``patients_clinical`` records — historical empty "Historial médico"

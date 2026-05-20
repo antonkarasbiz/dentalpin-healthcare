@@ -136,6 +136,23 @@ class BudgetLineMapper:
         if budget is not None:
             await BudgetService._recalculate_totals(ctx.db, budget)
 
+            # Source-truth signal for "was this budget accepted?" — Gesdén
+            # stores the Presu↔TtosMed double link in
+            # ``PresuTto.IdTtoMedOrig``, which dental-bridge exposes as
+            # ``budget_line.applied_treatment_uuid``. If any line of a
+            # budget points at an applied treatment, the patient acted on
+            # the budget → it was accepted. Clinics with poor data
+            # hygiene leave ``FecAcepta`` null but this signal still
+            # fires because the clinical work happened. Promotion is
+            # one-way (draft → accepted); never demote a budget that the
+            # operator may have already updated manually.
+            if (
+                budget.status == "draft"
+                and payload.get("applied_treatment_uuid") not in (None, "")
+            ):
+                budget.status = "accepted"
+                budget.accepted_via = "manual"
+
         await ctx.resolver.set(
             entity_type="budget_line",
             canonical_uuid=canonical_uuid,
