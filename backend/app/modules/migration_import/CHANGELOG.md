@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- feat(applied_treatment): mirror ``TtosMed.Notas`` into the
+  ``clinical_notes`` module as ``note_type='treatment'`` rows owned by
+  the imported ``Treatment``. The mapper had been storing the body on
+  ``Treatment.notes`` only; the patient-detail clinical feed and the
+  diagnosis sidebar both read from the polymorphic ``clinical_notes``
+  table, so migrated patients showed an empty clinical history even
+  though ~99 % of Gesdén treatments carry narrative
+  (composite shade, implant lot, anaesthetic, outcome…).
+  ``created_at`` is anchored to the treatment's effective date so the
+  feed renders chronologically; ``author_id`` resolves to the
+  professional's User row (or the importer admin if unmapped).
 - fix(applied_treatment): set ``ToothRecord.general_condition`` for
   realised treatments that leave an observable artefact
   (extraction → missing, crown/bridge/veneer/post → crown,

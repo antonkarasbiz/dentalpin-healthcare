@@ -36,6 +36,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.modules.budget.models import Budget, BudgetItem
+from app.modules.clinical_notes.models import ClinicalNote
 from app.modules.odontogram.models import ToothRecord, Treatment, TreatmentTooth
 from app.modules.payments.models import PatientEarnedEntry
 from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPlan
@@ -447,6 +448,33 @@ class AppliedTreatmentMapper:
                     professional_id=professional_id,
                     source_event="migration_import",
                     description=(payload.get("notes") or "")[:160] or None,
+                )
+            )
+            await ctx.db.flush()
+
+        # 4) ClinicalNote — Gesdén stores per-treatment narrative
+        # (composite shade, implant lot, anaesthetic, surfaces,
+        # outcome…) in ``TtosMed.Notas``. We mirror it on
+        # ``Treatment.notes`` but the UI's clinical-notes feed reads
+        # from the polymorphic ``clinical_notes`` table, so a copy of
+        # the body needs to land there as a ``note_type='treatment'``
+        # row owned by the Treatment. Without this the timeline /
+        # sidebar look empty for migrated patients even though the
+        # original PMS had decades of clinical narrative.
+        note_body = (payload.get("notes") or "").strip()
+        if note_body:
+            note_at = end_dt or start_dt
+            ctx.db.add(
+                ClinicalNote(
+                    clinic_id=ctx.clinic_id,
+                    note_type="treatment",
+                    owner_type="treatment",
+                    owner_id=treatment.id,
+                    tooth_number=None,
+                    body=note_body,
+                    author_id=professional_id or ctx.created_by,
+                    created_at=note_at,
+                    updated_at=note_at,
                 )
             )
             await ctx.db.flush()
