@@ -2506,6 +2506,57 @@
     "subtitle": "Clinic analytics and statistics",
     "viewReports": "View reports",
     "noAccess": "You don't have access to any reports",
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Your clinic at a glance",
+      "period": "Period",
+      "snapshotBadge": "Today",
+      "snapshotTooltip": "Not affected by the date range",
+      "vsPrev": "vs. previous period",
+      "empty": {
+        "noData": "No data in this range"
+      },
+      "drilldown": {
+        "title": "Drill down",
+        "payments": "Payments"
+      },
+      "kpi": {
+        "cashCollected": "Cash collected",
+        "cashCollectedHint": "{count} payments",
+        "patientAdvance": "Patient credit",
+        "patientAdvanceHint": "Unallocated advances",
+        "production": "Production",
+        "productionHint": "{count} treatments",
+        "byMethod": "By payment method",
+        "methodCount": "{count} payments",
+        "total": "Total",
+        "newPatients": "New patients",
+        "newPatientsHint": "{rate}% of total appointments",
+        "appointmentFunnel": "No-show rate",
+        "funnelHint": "{completed}% completed",
+        "avgCollectedTicket": "Avg collected ticket",
+        "avgTicketHint": "Over {count} payments",
+        "aging": "Aging receivables"
+      },
+      "charts": {
+        "cashOverTime": "Collections over time",
+        "productionByDoctor": "Production by doctor",
+        "refunded": "Refunds"
+      },
+      "production": {
+        "unassigned": "Unassigned",
+        "others": "Others",
+        "treatmentCount": "{count} treatments"
+      },
+      "aging": {
+        "bucket0_30": "0-30 days",
+        "bucket31_60": "31-60 days",
+        "bucket61_90": "61-90 days",
+        "bucket90plus": "90+ days",
+        "empty": "No outstanding receivables",
+        "patientCount": "{count} patients"
+      }
+    },
     "billing": {
       "title": "Billing",
       "description": "Revenue, payments, VAT and overdue invoices",

@@ -1,83 +1,93 @@
 ---
 module: reports
-screen: list
+screen: dashboard
 route: /reports
 related_endpoints:
-  - GET /api/v1/reports/billing/by-payment-method
-  - GET /api/v1/reports/billing/by-professional
-  - GET /api/v1/reports/billing/gaps
-  - GET /api/v1/reports/billing/overdue
-  - GET /api/v1/reports/billing/summary
-  - GET /api/v1/reports/billing/vat-summary
-  - GET /api/v1/reports/budgets/by-professional
-  - GET /api/v1/reports/budgets/by-status
-  - GET /api/v1/reports/budgets/by-treatment
-  - GET /api/v1/reports/budgets/summary
-  - GET /api/v1/reports/scheduling/by-cabinet
-  - GET /api/v1/reports/scheduling/by-day-of-week
-  - GET /api/v1/reports/scheduling/by-professional
-  - GET /api/v1/reports/scheduling/duration-variance
+  - GET /api/v1/payments/reports/summary
+  - GET /api/v1/payments/reports/trends
+  - GET /api/v1/payments/reports/by-method
+  - GET /api/v1/payments/reports/by-professional
+  - GET /api/v1/payments/reports/aging-receivables
   - GET /api/v1/reports/scheduling/first-visits
   - GET /api/v1/reports/scheduling/funnel
-  - GET /api/v1/reports/scheduling/punctuality
-  - GET /api/v1/reports/scheduling/summary
-  - GET /api/v1/reports/scheduling/waiting-times
 related_permissions:
   - reports.billing.read
   - reports.budgets.read
   - reports.scheduling.read
+  - payments.reports.read
 related_paths:
   - backend/app/modules/reports/frontend/pages/reports/index.vue
-  - backend/app/modules/reports/router.py
-last_verified_commit: b1b82f5
+  - backend/app/modules/reports/frontend/composables/useDashboardSnapshot.ts
+  - backend/app/modules/reports/frontend/components/dashboard/
+last_verified_commit: bdfaa83
 ---
 
-# Dashboard de informes
+# Dashboard de la clínica
 
-Página de entrada al área de informes. Muestra una tarjeta por
-familia: facturación, presupuestos y agenda. Si tienes módulos
-adicionales con informes propios (p. ej. `payments`), aparecen como
-tarjetas extra contribuidas por el slot `reports.categories`.
+Punto de entrada al área de informes. Vista ejecutiva con los
+indicadores clave para dueño o gerente, todos filtrables por rango de
+fecha — salvo las métricas marcadas como *foto del momento*.
 
 ## De un vistazo
 
-- **Tres tarjetas nativas** — Facturación, Presupuestos y Agenda.
-  Cada una abre su propio dashboard con sus filtros y endpoints
-  específicos. Solo ves las tarjetas para las que tienes permiso.
-- **Tarjetas aportadas por otros módulos.** El slot
-  `reports.categories` permite que un módulo añada su informe. El
-  módulo de cobros añade *Informe de cobros* (visible con
-  `payments.reports.read`).
-- **Datos *on-demand*.** Reports no almacena agregados: cada vista
-  llama a sus endpoints y calcula al vuelo. Los rangos largos pueden
-  tardar más.
-- **Multi-tenancy.** Todo se filtra por clínica activa
-  automáticamente.
+- **Fila hero (4 tarjetas).** Caja cobrada, saldo a favor de
+  pacientes, producción total y desglose por forma de pago.
+- **Fila de gráficos.** Cobros en el periodo (con devoluciones
+  superpuestas) y producción por doctor.
+- **Fila operativa.** Pacientes nuevos, tasa de no-show y
+  ticket medio cobrado.
+- **Atención.** Cuentas por cobrar agrupadas por antigüedad (0-30 /
+  31-60 / 61-90 / 90+).
+- **Drilldown.** Tarjetas que enlazan al detalle de facturación,
+  presupuestos y agenda — preserva el flujo previo de navegación.
 
-## Navegación
+## Filtro de rango
 
-1. Identifica la familia de informe que necesitas.
-2. Pulsa la tarjeta para abrir su dashboard.
-3. Cada dashboard tiene sus propios filtros (rango, profesional,
-   estado…) y links de *drill-down* hacia el listado base.
+- Único filtro `Periodo` en la cabecera, *sticky* en scroll.
+- Por defecto, el rango es el mes en curso.
+- Presets disponibles: hoy, últimos 7, últimos 30, este mes, este
+  trimestre, este año.
+- El rango se persiste en la URL (`?from=…&to=…`) para que un
+  responsable pueda marcar un periodo como favorito.
+
+## Métricas *foto del momento*
+
+Dos tarjetas no cambian con el rango: muestran el estado actual de
+la clínica.
+
+- **Saldo a favor del paciente** — dinero adelantado por pacientes
+  que aún no se ha aplicado a presupuestos o facturas.
+- **Cuentas por cobrar** — distribución por antigüedad de la deuda
+  pendiente.
+
+Ambas llevan el badge `Hoy` para evitar lecturas erróneas.
 
 ## Permisos
 
-| Lo que ves / puedes hacer | Permiso |
-|---------------------------|---------|
-| Ver el dashboard | al menos uno de los permisos siguientes |
-| Tarjeta de facturación | `reports.billing.read` |
-| Tarjeta de presupuestos | `reports.budgets.read` |
-| Tarjeta de agenda | `reports.scheduling.read` |
-| Tarjeta de cobros (la aporta `payments`) | `payments.reports.read` |
+| Lo que ves | Permiso requerido |
+|------------|-------------------|
+| Caja cobrada, saldo a favor, producción, formas de pago, gráficos, ticket medio cobrado, cuentas por cobrar | `payments.reports.read` |
+| Pacientes nuevos, tasa de no-show | `reports.scheduling.read` |
+| Drilldown a Facturación | `reports.billing.read` |
+| Drilldown a Presupuestos | `reports.budgets.read` |
+| Drilldown a Agenda | `reports.scheduling.read` |
+
+Si el rol no tiene un permiso, la tarjeta no aparece y el grid se
+recompone sin huecos.
 
 ## Resolución de problemas
 
-- **No veo ninguna tarjeta.** Tu rol no tiene ninguno de los
-  permisos `reports.*` ni `payments.reports.read`. Pide a un admin
-  que te conceda al menos uno desde *Ajustes → Usuarios → Roles*.
-- **No veo la tarjeta de cobros.** El módulo `payments` no está
-  instalado o tu rol no tiene `payments.reports.read`.
-- **Una tarjeta abre vacía.** No hay datos para el rango por
-  defecto (últimos 90 días). Ajusta el filtro o comprueba que las
-  tablas origen contienen datos.
+- **No veo ninguna métrica.** Tu rol no tiene ninguno de los
+  permisos requeridos. Pide a un admin desde *Ajustes → Usuarios →
+  Roles*.
+- **Las tarjetas de pagos están vacías.** No hay cobros registrados
+  en el rango. Comprueba que el módulo de cobros esté en uso o
+  amplía el periodo.
+- **Producción a cero.** La producción se nutre de los tratamientos
+  finalizados (sesiones completadas o entradas del odontograma). Si
+  el equipo no marca el tratamiento como hecho, no aparece.
+- **Cifras no cuadran con la página de detalle.** El detalle de
+  facturación trabaja sobre facturas; el dashboard trabaja sobre
+  cobros. Son ejes distintos a propósito — la clínica puede dejar
+  fuera de factura cierto trabajo, así que comparar pagado con
+  facturado no aporta señal real.

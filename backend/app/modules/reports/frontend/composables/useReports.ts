@@ -147,6 +147,58 @@ export interface DayOfWeekStats {
   no_show_count: number
 }
 
+// Payments report types (mirror backend/app/modules/payments/schemas.py).
+export interface PaymentsSummaryReport {
+  period_start: string
+  period_end: string
+  currency: string
+  total_collected: string
+  total_refunded: string
+  net_collected: string
+  patient_credit_total: string
+  clinic_receivable_total: string
+  refund_ratio: number
+  payment_count: number
+  refund_count: number
+}
+
+export interface PaymentsMethodBreakdown {
+  method: string
+  total: string
+  count: number
+}
+
+export interface PaymentsProfessionalBreakdown {
+  professional_id: string | null
+  professional_name: string | null
+  total_earned: string
+  count: number
+}
+
+export interface PaymentsAgingBucket {
+  label: string
+  total: string
+  patient_count: number
+}
+
+export interface PaymentsAgingBuckets {
+  currency: string
+  buckets: PaymentsAgingBucket[]
+}
+
+export interface PaymentsTrendsPoint {
+  bucket_start: string
+  collected: string
+  refunded: string
+  net: string
+}
+
+export interface PaymentsTrends {
+  currency: string
+  granularity: 'day' | 'week' | 'month' | 'year'
+  points: PaymentsTrendsPoint[]
+}
+
 export function useReports() {
   const api = useApi()
   const { t } = useI18n()
@@ -459,6 +511,101 @@ export function useReports() {
   }
 
   // ============================================================================
+  // Payments Reports (consumed from the payments module's public endpoints).
+  // No service-level imports — only HTTP. Permissions enforced server-side
+  // via ``payments.reports.read``.
+  // ============================================================================
+
+  async function fetchPaymentsSummary(
+    dateFrom: string,
+    dateTo: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<PaymentsSummaryReport | null> {
+    try {
+      const response = await api.get<ApiResponse<PaymentsSummaryReport>>(
+        `/api/v1/payments/reports/summary?date_from=${dateFrom}&date_to=${dateTo}`,
+        { signal: options?.signal }
+      )
+      return response.data
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return null
+      console.error('Failed to fetch payments summary:', e)
+      return null
+    }
+  }
+
+  async function fetchPaymentsTrends(
+    dateFrom: string,
+    dateTo: string,
+    granularity: 'day' | 'week' | 'month' | 'year' = 'day',
+    options?: { signal?: AbortSignal }
+  ): Promise<PaymentsTrends | null> {
+    try {
+      const response = await api.get<ApiResponse<PaymentsTrends>>(
+        `/api/v1/payments/reports/trends?date_from=${dateFrom}&date_to=${dateTo}&granularity=${granularity}`,
+        { signal: options?.signal }
+      )
+      return response.data
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return null
+      console.error('Failed to fetch payments trends:', e)
+      return null
+    }
+  }
+
+  async function fetchPaymentsByMethod(
+    dateFrom: string,
+    dateTo: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<PaymentsMethodBreakdown[]> {
+    try {
+      const response = await api.get<ApiResponse<PaymentsMethodBreakdown[]>>(
+        `/api/v1/payments/reports/by-method?date_from=${dateFrom}&date_to=${dateTo}`,
+        { signal: options?.signal }
+      )
+      return response.data
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return []
+      console.error('Failed to fetch payments by method:', e)
+      return []
+    }
+  }
+
+  async function fetchPaymentsByProfessional(
+    dateFrom: string,
+    dateTo: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<PaymentsProfessionalBreakdown[]> {
+    try {
+      const response = await api.get<ApiResponse<PaymentsProfessionalBreakdown[]>>(
+        `/api/v1/payments/reports/by-professional?date_from=${dateFrom}&date_to=${dateTo}`,
+        { signal: options?.signal }
+      )
+      return response.data
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return []
+      console.error('Failed to fetch payments by professional:', e)
+      return []
+    }
+  }
+
+  async function fetchAgingReceivables(
+    options?: { signal?: AbortSignal }
+  ): Promise<PaymentsAgingBuckets | null> {
+    try {
+      const response = await api.get<ApiResponse<PaymentsAgingBuckets>>(
+        '/api/v1/payments/reports/aging-receivables',
+        { signal: options?.signal }
+      )
+      return response.data
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return null
+      console.error('Failed to fetch aging receivables:', e)
+      return null
+    }
+  }
+
+  // ============================================================================
   // Helpers
   // ============================================================================
 
@@ -541,6 +688,12 @@ export function useReports() {
     fetchPunctuality,
     fetchDurationVariance,
     fetchFunnel,
+    // Payments
+    fetchPaymentsSummary,
+    fetchPaymentsTrends,
+    fetchPaymentsByMethod,
+    fetchPaymentsByProfessional,
+    fetchAgingReceivables,
     // Helpers
     formatCurrency,
     getBudgetStatusLabel,

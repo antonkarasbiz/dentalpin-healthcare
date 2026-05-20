@@ -2442,6 +2442,57 @@
     "subtitle": "Análisis y estadísticas de la clínica",
     "viewReports": "Ver informes",
     "noAccess": "No tienes acceso a ningún informe",
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Tu clínica de un vistazo",
+      "period": "Periodo",
+      "snapshotBadge": "Hoy",
+      "snapshotTooltip": "No afectado por el rango de fechas",
+      "vsPrev": "vs. periodo anterior",
+      "empty": {
+        "noData": "Sin datos en este periodo"
+      },
+      "drilldown": {
+        "title": "Ver detalle",
+        "payments": "Cobros"
+      },
+      "kpi": {
+        "cashCollected": "Caja cobrada",
+        "cashCollectedHint": "{count} cobros",
+        "patientAdvance": "Saldo a favor",
+        "patientAdvanceHint": "Anticipos pendientes de aplicar",
+        "production": "Producción",
+        "productionHint": "{count} tratamientos",
+        "byMethod": "Por forma de pago",
+        "methodCount": "{count} cobros",
+        "total": "Total",
+        "newPatients": "Pacientes nuevos",
+        "newPatientsHint": "{rate}% del total de citas",
+        "appointmentFunnel": "Tasa de no-show",
+        "funnelHint": "{completed}% completadas",
+        "avgCollectedTicket": "Ticket medio cobrado",
+        "avgTicketHint": "Sobre {count} cobros",
+        "aging": "Cuentas por cobrar"
+      },
+      "charts": {
+        "cashOverTime": "Cobros en el periodo",
+        "productionByDoctor": "Producción por doctor",
+        "refunded": "Devoluciones"
+      },
+      "production": {
+        "unassigned": "Sin doctor asignado",
+        "others": "Otros",
+        "treatmentCount": "{count} tratamientos"
+      },
+      "aging": {
+        "bucket0_30": "0-30 días",
+        "bucket31_60": "31-60 días",
+        "bucket61_90": "61-90 días",
+        "bucket90plus": "Más de 90 días",
+        "empty": "No hay cuentas por cobrar",
+        "patientCount": "{count} pacientes"
+      }
+    },
     "billing": {
       "title": "Facturación",
       "description": "Ingresos, pagos, IVA y facturas vencidas",
