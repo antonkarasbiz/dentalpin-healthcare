@@ -42,8 +42,20 @@ from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPla
 from ..models import ImportWarning
 from .base import MapperContext
 
-# Gesdén status_code 5 == realised/billable per docs/schema_map.md.
-_REALISED_CODE = 5
+# Gesdén ``TtosMed.StaTto`` codes that mean "treatment was performed".
+# 5 dominates (~99 % of finished work) and 6 is a low-volume variant
+# also carrying ``FecFin``. The remaining codes (3 = in active plan
+# but not yet done, 1/2/4/8 = legacy/unclear) all leave ``FecFin``
+# null in the source and stay as ``pending`` items.
+_REALISED_CODES: set[int] = {5, 6}
+
+# Plan status to write for every migrated plan. Gesdén plans are by
+# definition already-accepted historical records — leaving them in
+# ``draft`` would force the operator to confirm each one manually
+# before any consumer (budget, payments, reports) treats them as
+# real. ``active`` is the post-acceptance state in DentalPin's plan
+# machine and is the right migration target.
+_MIGRATED_PLAN_STATUS = "active"
 
 # Catch-all clinical_type for source rows whose ``IdTipoOdg`` doesn't
 # map to a known DentalPin treatment vocabulary entry. Visible in
@@ -192,8 +204,8 @@ class AppliedTreatmentMapper:
             )
 
         # Status & timestamps.
-        status_code = payload.get("status_code")
-        is_realised = status_code == _REALISED_CODE
+        status_code = _coerce_int(payload.get("status_code"))
+        is_realised = status_code in _REALISED_CODES
         start_dt = _parse_datetime(payload.get("start_date")) or datetime.now(UTC)
         end_dt = _parse_datetime(payload.get("end_date"))
         amount = _decimal_or_none(payload.get("amount"))
@@ -394,6 +406,7 @@ class AppliedTreatmentMapper:
                 patient_id=patient_id,
                 plan_number=plan_number,
                 title=title,
+                status=_MIGRATED_PLAN_STATUS,
                 internal_notes=notes,
                 budget_id=budget_id,
                 created_by=ctx.created_by,

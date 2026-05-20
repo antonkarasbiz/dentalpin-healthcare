@@ -27,7 +27,10 @@ from app.modules.treatment_plan.models import (
 from ..models import ImportWarning
 from .base import MapperContext
 
-_REALISED_CODE = 5
+# Mirrors ``AppliedTreatmentMapper._REALISED_CODES`` — both StaTto
+# values (5 dominant, 6 variant) carry ``FecFin`` in the source and
+# correspond to a completed treatment.
+_REALISED_CODES: set[int] = {5, 6}
 
 
 class AppliedTreatmentPhaseMapper:
@@ -79,7 +82,23 @@ class AppliedTreatmentPhaseMapper:
         sequence += 1
         self._next_sequence[plan_item_id] = sequence
 
-        is_realised = payload.get("status_code") == _REALISED_CODE
+        # The Gesdén phase row carries its own ``StaTto`` but in the
+        # observed data it never takes the completed codes (it stays
+        # 1/3 even when the parent treatment is finished). The clinic-
+        # facing source of truth for completion is the parent
+        # ``TtosMed`` row, so we mirror the parent ``PlannedTreatmentItem``
+        # status: sessions of a completed item are completed.
+        status_code = payload.get("status_code")
+        try:
+            sc_int = int(status_code) if status_code is not None else None
+        except (TypeError, ValueError):
+            sc_int = None
+        phase_realised = sc_int in _REALISED_CODES
+        parent_status = await ctx.db.execute(
+            select(PlannedTreatmentItem.status).where(PlannedTreatmentItem.id == plan_item_id)
+        )
+        parent_status_value = parent_status.scalar_one_or_none()
+        is_realised = phase_realised or parent_status_value == "completed"
         executed_dt = _parse_datetime(payload.get("executed_on"))
 
         # We don't yet split the parent treatment's amount across phases

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- fix(applied_treatment): migrated plans land in ``active`` instead of
+  ``draft``. Gesdén plans are historical, post-acceptance records —
+  leaving them in DentalPin's pre-confirmation state forced the
+  operator to manually confirm every imported plan before any
+  consumer (budgets, payments, reports) treated it as real. ``active``
+  is the natural post-acceptance state in the plan machine and is
+  set directly on the model (bypassing the ``draft → pending →
+  active`` event chain that would fire spurious notifications for
+  historic data).
+- fix(applied_treatment): treat ``StaTto`` codes ``{5, 6}`` as
+  realised, not just ``5``. Code 6 is a low-volume variant that also
+  carries ``FecFin`` in the source and corresponds to a completed
+  treatment. The previous "code 5 only" rule made a handful of
+  finished items show as pending.
+- fix(applied_treatment_phase): mirror the parent ``PlannedTreatmentItem``
+  status when the source phase row doesn't carry a realised
+  ``StaTto`` itself. In the observed Gesdén export every phase row
+  stays at ``StaTto`` 1 or 3 even when its parent treatment is
+  finished — Gesdén tracks completion at the ``TtosMed`` level, not
+  per ``TtosMedFases``. Without the inheritance, sessions of
+  completed items stayed ``pending`` and dragged item-level
+  earned-ledger semantics off.
 - feat(applied_treatment): map Gesdén ``IdTipoOdg`` to DentalPin's
   ``TreatmentType`` enum (implant / crown / bridge / extraction /
   filling_composite / root_canal_full / veneer / sealant / band /
