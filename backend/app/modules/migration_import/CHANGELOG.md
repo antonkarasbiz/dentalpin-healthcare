@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- fix(professional): map canonical role ``doctor`` → DentalPin
+  ``dentist`` (was silently falling through to ``assistant``, so every
+  Gesdén dentist landed as auxiliar), and create the imported User
+  with ``is_active=True`` so the Users page shows them as active.
+  Login stays blocked by the ``!migration_disabled:`` sentinel hash
+  until the admin sends a password reset. The mapper also honours the
+  canonical ``deactivated`` flag when present.
 - fix(applied_treatment): only formal-done treatments enter the
   patient earned ledger. The first ledger pass counted every
   ``is_realised`` treatment (including the ones rescued by the

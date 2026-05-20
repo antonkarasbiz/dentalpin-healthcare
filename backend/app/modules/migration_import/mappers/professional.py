@@ -2,9 +2,14 @@
 
 We create a non-loginable User shell (random unguessable password hash)
 so the rest of the system can reference the professional via FK
-(``appointments.professional_id``, etc.). An admin invites the
-professional through the normal Users page after the import lands,
-which sends a password-reset email and activates the account.
+(``appointments.professional_id``, etc.). Login stays blocked by the
+``!migration_disabled:`` password hash until an admin sends a reset.
+
+The User row itself is created ``is_active=True`` so the admin sees
+imported professionals as live entries in the Users page (matching the
+source PMS, where these people are actively working in the clinic).
+The inactive flag is reserved for users an admin has explicitly
+disabled — not for "needs password reset".
 
 Email collisions across clinics resolve to the existing User —
 DentalPin's User table is global, ClinicMembership is per-clinic.
@@ -22,10 +27,13 @@ from app.core.auth.models import ClinicMembership, User
 
 from .base import MapperContext
 
-# Map DPMF's `role` string into DentalPin's membership role values.
-# Anything unrecognised falls back to "assistant" so the user can do
-# something useful while the admin re-roles.
+# Map DPMF's canonical `role` string (see dental-bridge's
+# ``ProfessionalRole`` StrEnum) into DentalPin's membership role values.
+# The source enum emits ``doctor`` — DentalPin calls the same role
+# ``dentist``. Anything unrecognised falls back to "assistant" so the
+# user can do something useful while the admin re-roles.
 _ROLE_MAP: dict[str, str] = {
+    "doctor": "dentist",
     "dentist": "dentist",
     "hygienist": "hygienist",
     "auxiliary": "assistant",
@@ -71,12 +79,12 @@ class ProfessionalMapper:
             user = User(
                 id=uuid4(),
                 email=email,
-                # Random unguessable hash — bcrypt-like length; the user
-                # cannot log in until an admin sends a password reset.
+                # Sentinel hash bcrypt cannot match; login stays blocked
+                # until an admin sends a password reset.
                 password_hash=f"!migration_disabled:{secrets.token_urlsafe(32)}",
                 first_name=first_name,
                 last_name=last_name,
-                is_active=False,
+                is_active=not bool(payload.get("deactivated", False)),
             )
             ctx.db.add(user)
             await ctx.db.flush()
