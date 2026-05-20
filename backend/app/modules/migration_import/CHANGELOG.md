@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- fix(applied_treatment): write the patient earned-ledger entry
+  directly. The patient balance UI reads from
+  ``patient_earned_entries`` (treatments performed → money the
+  clinic has earned), which is normally populated by the payments
+  module's event handlers reacting to
+  ``odontogram.treatment.performed`` /
+  ``treatment_plan.item_session_completed``. The migration bypasses
+  the services to avoid spurious notifications for historic data,
+  so those events never fire and the ledger stays empty — every
+  imported patient appears to be in massive credit because their
+  payments are recorded but the treatments they paid for aren't
+  counted. ``AppliedTreatmentMapper`` now inserts a
+  ``PatientEarnedEntry`` row for every completed treatment with
+  ``source_event='migration_import'`` and
+  ``source_session_id=NULL`` (matches the
+  ``odontogram.treatment.performed`` non-session path; our migrated
+  sessions carry ``amount=0`` so the per-session ledger path would
+  add nothing). Validated on una paciente de ejemplo: 39
+  performed treatments × prices = 32,645 €. With 16,135 € of payments
+  recorded, the balance flips from −16,135 (clinic owes the
+  patient) to +16,510 (patient still owes the clinic) — which
+  matches the operative reality of an in-progress implant /
+  prosthesis plan.
 - fix(budget): stamp the source ``FecPresup`` onto ``Budget.created_at``
   and ``Budget.updated_at`` so the UI shows the real budget date
   rather than the import-run timestamp. ``TimestampMixin`` was

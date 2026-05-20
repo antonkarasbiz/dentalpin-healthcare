@@ -37,6 +37,7 @@ from sqlalchemy import select
 
 from app.modules.budget.models import Budget, BudgetItem
 from app.modules.odontogram.models import ToothRecord, Treatment, TreatmentTooth
+from app.modules.payments.models import PatientEarnedEntry
 from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPlan
 
 from ..models import ImportWarning
@@ -346,6 +347,34 @@ class AppliedTreatmentMapper:
         )
         ctx.db.add(item)
         await ctx.db.flush()
+
+        # 3) PatientEarnedEntry — the patient ledger feeds off this
+        # table. The normal flow populates it via
+        # ``treatment_plan.item_session_completed`` /
+        # ``odontogram.treatment.performed`` event handlers in
+        # payments. Migration writes via the model directly to skip
+        # the event chain (we don't want spurious notifications for
+        # historic data) but we *must* still create the row, otherwise
+        # the balance shows "patient has a huge credit" because the
+        # completed treatments don't count against the payments
+        # received. ``source_session_id`` stays NULL — the per-session
+        # ledger path expects non-zero session amounts and our
+        # migrated sessions don't carry a price split.
+        if is_realised and amount is not None and amount > 0:
+            ctx.db.add(
+                PatientEarnedEntry(
+                    clinic_id=ctx.clinic_id,
+                    patient_id=patient_id,
+                    treatment_id=treatment.id,
+                    catalog_item_id=catalog_item_id,
+                    amount=amount,
+                    performed_at=end_dt or start_dt,
+                    professional_id=professional_id,
+                    source_event="migration_import",
+                    description=(payload.get("notes") or "")[:160] or None,
+                )
+            )
+            await ctx.db.flush()
 
         await ctx.resolver.set(
             entity_type="applied_treatment",
