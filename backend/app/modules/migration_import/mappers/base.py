@@ -85,6 +85,7 @@ class MapperContext:
     job_id: UUID
     resolver: MappingResolver
     import_fiscal_compliance: bool
+    created_by: UUID  # The admin who launched the import; used as actor for created_by FKs.
 
 
 class Mapper(Protocol):

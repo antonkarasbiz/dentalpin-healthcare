@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+- feat(mappers): new ``AppliedTreatmentMapper`` materialises DPMF
+  ``applied_treatment`` into a three-table cascade — one lazy
+  ``treatment_plan.TreatmentPlan`` per patient (titled
+  ``"Migrado de Gesdén"``, cached for the job), one
+  ``odontogram.Treatment`` per applied treatment (clinical_type
+  ``migrated``, with the source price snapshotted on
+  ``price_snapshot``), and the linking
+  ``treatment_plan.PlannedTreatmentItem``. Tooth/surface detail is
+  skipped — the canonical ``odontogram_raw`` bit-mask isn't decoded
+  upstream yet.
+- feat(mappers): new ``AppliedTreatmentPhaseMapper`` attaches DPMF
+  ``applied_treatment_phase`` rows as
+  ``PlannedTreatmentItemSession`` children of the imported plan
+  item. Per-session amount is left at zero (DentalPin sessions carry
+  an absolute amount; the canonical ``percent_to_bill`` is exposed
+  in the session label instead — clinics can rebalance manually).
+- chore(manifest): add ``odontogram`` to ``depends`` (used by
+  AppliedTreatmentMapper to construct Treatment rows directly).
+- feat(mappers): new ``CatalogItemMapper`` materialises DPMF
+  ``treatment_catalog_item`` rows into ``catalog.TreatmentCatalogItem``.
+  Items land under a lazy-created ``TreatmentCategory`` keyed
+  ``"migrado_gesden"`` so the clinic can re-classify them later
+  without touching the original taxonomy. ``internal_code`` is
+  synthesised from the canonical UUID (``MIG-xxxxxxxx``) to dodge
+  ``uq_catalog_item_clinic_code`` collisions when the source carries
+  duplicate codes across tariff variants.
+- feat(mappers): new ``CatalogVariantMapper`` resolves
+  ``treatment_catalog_variant`` to the parent
+  ``treatment_catalog_item`` (pipe-through). DentalPin's catalog
+  doesn't model a per-tariff axis, so the variant's canonical UUID
+  resolves to the same DentalPin row as its parent; pricing
+  differences survive as ``budget_line.unit_amount`` snapshots.
+- feat(mappers): new ``BudgetMapper`` + ``BudgetLineMapper`` materialise
+  DPMF ``budget`` / ``budget_line`` into ``budget.Budget`` /
+  ``budget.BudgetItem`` via the corresponding services. Budget header
+  status is derived from ``accepted_date`` / ``rejected_date`` presence
+  (canonical ``status_code`` is source-opaque). Line items resolve
+  ``treatment_uuid`` → ``treatment_variant_uuid`` as the catalog FK
+  fallback chain. Each line triggers ``_recalculate_totals`` on the
+  parent budget so the header subtotal/total stay in sync.
+- chore(base): add ``created_by: UUID`` to ``MapperContext`` (populated
+  from ``ImportJob.created_by``) — required by the budget mapper and
+  any future mapper whose target service tracks the acting user.
+- chore(manifest): add ``catalog`` and ``budget`` to ``depends``. Both
+  are real ORM imports by the new mappers, so the declaration is
+  required by the modular-architecture contract.
 - feat(mappers): new ``AppointmentMapper`` materialises DPMF
   ``appointment`` entities into ``agenda.Appointment`` rows. Resolves
   ``patient_uuid``/``professional_uuid`` via the

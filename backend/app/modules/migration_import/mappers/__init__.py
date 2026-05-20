@@ -18,8 +18,14 @@ Adding a new mapper:
 
 from __future__ import annotations
 
+from .applied_treatment import AppliedTreatmentMapper
+from .applied_treatment_phase import AppliedTreatmentPhaseMapper
 from .appointment import AppointmentMapper
 from .base import MapperContext, MappingResolver
+from .budget import BudgetMapper
+from .budget_line import BudgetLineMapper
+from .catalog import CatalogItemMapper
+from .catalog_variant import CatalogVariantMapper
 from .document import DocumentMapper
 from .fiscal_document import FiscalDocumentMapper
 from .patient import PatientMapper
@@ -33,6 +39,12 @@ DocumentMapperInst = DocumentMapper()
 PaymentMapperInst = PaymentMapper()
 FiscalDocumentMapperInst = FiscalDocumentMapper()
 AppointmentMapperInst = AppointmentMapper()
+CatalogItemMapperInst = CatalogItemMapper()
+CatalogVariantMapperInst = CatalogVariantMapper()
+BudgetMapperInst = BudgetMapper()
+BudgetLineMapperInst = BudgetLineMapper()
+AppliedTreatmentMapperInst = AppliedTreatmentMapper()
+AppliedTreatmentPhaseMapperInst = AppliedTreatmentPhaseMapper()
 FALLBACK_MAPPER = RawEntityMapper()
 
 MAPPERS: dict[str, object] = {
@@ -42,6 +54,12 @@ MAPPERS: dict[str, object] = {
     "payment": PaymentMapperInst,
     "fiscal_document": FiscalDocumentMapperInst,
     "appointment": AppointmentMapperInst,
+    "treatment_catalog_item": CatalogItemMapperInst,
+    "treatment_catalog_variant": CatalogVariantMapperInst,
+    "budget": BudgetMapperInst,
+    "budget_line": BudgetLineMapperInst,
+    "applied_treatment": AppliedTreatmentMapperInst,
+    "applied_treatment_phase": AppliedTreatmentPhaseMapperInst,
 }
 
 __all__ = [

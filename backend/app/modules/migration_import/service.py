@@ -343,6 +343,7 @@ class ImportJobService:
             job_id=job.id,
             resolver=resolver,
             import_fiscal_compliance=job.import_fiscal_compliance,
+            created_by=job.created_by,
         )
 
         with open_dpmf(Path(job.file_path), passphrase=passphrase) as handle:
