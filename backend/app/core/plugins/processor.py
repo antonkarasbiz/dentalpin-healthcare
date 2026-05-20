@@ -200,6 +200,8 @@ class PendingProcessor:
             if db_record.base_revision is None:
                 db_record.base_revision = applied_revision
             db_record.last_state_change = now
+            db_record.error_message = None
+            db_record.error_at = None
             await session.commit()
         await self._op_log.completed(finalize_log)
 
@@ -247,6 +249,8 @@ class PendingProcessor:
             db_record.state = ModuleState.INSTALLED.value
             db_record.applied_revision = applied_revision
             db_record.last_state_change = datetime.now(UTC)
+            db_record.error_message = None
+            db_record.error_at = None
             await session.commit()
         await self._op_log.completed(finalize_log)
 
@@ -301,6 +305,8 @@ class PendingProcessor:
             db_record.applied_revision = None
             db_record.installed_at = None
             db_record.last_state_change = datetime.now(UTC)
+            db_record.error_message = None
+            db_record.error_at = None
             await session.commit()
         await self._op_log.completed(finalize_log)
 

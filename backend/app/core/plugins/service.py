@@ -267,6 +267,13 @@ class ModuleService:
             )
             state = ModuleState(record.state) if record else ModuleState.UNINSTALLED
 
+            # `_mark_error` only fires while a pending op is in-flight, so
+            # an INSTALLED record carrying `error_message` is stale by
+            # construction — hide it from the card.
+            stale_error = record is not None and state == ModuleState.INSTALLED
+            err_msg = None if stale_error else (record.error_message if record else None)
+            err_at = None if stale_error else (record.error_at if record else None)
+
             infos.append(
                 ModuleInfo(
                     name=name,
@@ -279,8 +286,8 @@ class ModuleService:
                     last_state_change=(record.last_state_change if record else datetime.now(UTC)),
                     base_revision=record.base_revision if record else None,
                     applied_revision=record.applied_revision if record else None,
-                    error_message=record.error_message if record else None,
-                    error_at=record.error_at if record else None,
+                    error_message=err_msg,
+                    error_at=err_at,
                     summary=summary,
                     depends=depends,
                     in_disk=module is not None,
@@ -310,7 +317,7 @@ class ModuleService:
                 ModuleState.TO_REMOVE,
             }:
                 pending.append(info.name)
-            if info.error_message:
+            if info.error_message and info.state != ModuleState.INSTALLED:
                 errored.append(info.name)
 
         return {
@@ -349,7 +356,7 @@ class ModuleService:
         errored = [
             (name, record.error_message or "")
             for name, record in records.items()
-            if record.error_message
+            if record.error_message and record.state != ModuleState.INSTALLED.value
         ]
 
         return DoctorReport(
