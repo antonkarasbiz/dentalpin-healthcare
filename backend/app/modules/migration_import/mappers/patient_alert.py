@@ -42,8 +42,8 @@ from app.modules.clinical_notes.models import (
 from app.modules.patients.models import Patient
 from app.modules.patients_clinical.models import (
     Allergy,
-    Medication,
     MedicalContext,
+    Medication,
     SystemicDisease,
 )
 
@@ -104,6 +104,31 @@ class PatientAlertMapper:
             dentalpin_id=target_id,
         )
         return target_id
+
+    async def dispatch_freetext(
+        self,
+        ctx: MapperContext,
+        patient_id: UUID,
+        text: str,
+        *,
+        source_id: str,
+    ) -> str | None:
+        """Classify a free-text snippet and route it through the same
+        Allergy/Medication/SystemicDisease/MedicalContext pipeline as
+        a real ``AlertPac`` row. Used by the patient mapper to handle
+        ``Pacientes.Notas`` content with the existing rule set
+        (allergies/meds typed by clinicians into the patient-level
+        notes field, not the AlertPac popup, still get extracted into
+        structured tables). Returns the matched category, or ``None``
+        when the text is empty or unmappable."""
+        if not text or not text.strip():
+            return None
+        result = classify_alert(text)
+        dispatcher = _DISPATCH.get(result.category)
+        if dispatcher is None:
+            return None
+        await dispatcher(self, ctx, patient_id, result, source_id)
+        return result.category
 
     # ------ Dispatchers ------------------------------------------------
 
@@ -304,9 +329,7 @@ class PatientAlertMapper:
 
     # ------ Helpers ----------------------------------------------------
 
-    async def _ensure_context(
-        self, ctx: MapperContext, patient_id: UUID
-    ) -> MedicalContext:
+    async def _ensure_context(self, ctx: MapperContext, patient_id: UUID) -> MedicalContext:
         """Get-or-create the 1:1 MedicalContext for a patient. Cached
         per-mapper-instance to avoid repeated SELECTs when the patient
         has multiple flag-style alerts."""
@@ -368,7 +391,9 @@ async def _warn(ctx: MapperContext, source_id: str, code: str, message: str) -> 
     )
 
 
-_DOSAGE_RE = __import__("re").compile(r"\b(\d+(?:[.,]\d+)?\s*(?:MG|MCG|G|ML|UI))\b", __import__("re").IGNORECASE)
+_DOSAGE_RE = __import__("re").compile(
+    r"\b(\d+(?:[.,]\d+)?\s*(?:MG|MCG|G|ML|UI))\b", __import__("re").IGNORECASE
+)
 
 
 def _split_dosage(name: str) -> tuple[str | None, str]:
@@ -382,7 +407,7 @@ def _split_dosage(name: str) -> tuple[str | None, str]:
     if not match:
         return None, name
     dose = match.group(1).strip()
-    cleaned = (name[: match.start()] + name[match.end():]).strip()
+    cleaned = (name[: match.start()] + name[match.end() :]).strip()
     return dose, cleaned or name
 
 

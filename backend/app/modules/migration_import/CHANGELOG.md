@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- feat(patient): pipe ``Pacientes.Notas`` (new in dental-bridge
+  adapter 0.0.2) through the same classifier that handles
+  ``AlertPac.Texto``. Lines parse into ``Allergy`` / ``Medication`` /
+  ``SystemicDisease`` / ``MedicalContext`` flags / administrative
+  ``ClinicalNote`` rows; the unclassified remainder appends to
+  ``Patient.notes``. Reuses ``PatientAlertMapper.dispatch_freetext``
+  so a single rule change propagates to both sources.
 - feat(applied_treatment): mirror ``TtosMed.Notas`` into the
   ``clinical_notes`` module as ``note_type='treatment'`` rows owned by
   the imported ``Treatment``. The mapper had been storing the body on

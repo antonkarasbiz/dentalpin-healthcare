@@ -28,6 +28,7 @@ from uuid import UUID
 from app.modules.patients.service import PatientService
 
 from .base import MapperContext
+from .patient_alert import PatientAlertMapper
 
 _SEX_MAP: dict[str, str] = {
     "male": "male",
@@ -38,6 +39,13 @@ _SEX_MAP: dict[str, str] = {
 
 
 class PatientMapper:
+    def __init__(self) -> None:
+        # Reuse the alert pipeline across patients so the
+        # ``_context_cache`` inside it amortises the
+        # ``MedicalContext`` upsert. Created lazily — clinics whose
+        # source has no ``Pacientes.Notas`` content pay nothing.
+        self._alert_pipeline: PatientAlertMapper | None = None
+
     async def apply(
         self,
         ctx: MapperContext,
@@ -92,6 +100,22 @@ class PatientMapper:
         data = {k: v for k, v in data.items() if v is not None}
 
         patient = await PatientService.create_patient(ctx.db, ctx.clinic_id, data)
+
+        # Gesdén stores a free-text patient-level narrative in
+        # ``Pacientes.Notas`` (dental-bridge exports it as
+        # ``payload['notes']`` from adapter_version 0.0.2). Clinics
+        # use it interchangeably with the ``AlertPac`` popup table —
+        # allergies, medications, conditions and admin tags routinely
+        # appear in *both* places. Run each non-empty line through the
+        # same classifier the patient_alert mapper uses so the
+        # structured destinations (Allergy, Medication,
+        # SystemicDisease, MedicalContext flags) absorb whatever fits
+        # the rules; the catch-all "general" branch appends the
+        # remainder to ``Patient.notes``.
+        notes_blob = (payload.get("notes") or "").strip()
+        if notes_blob:
+            await self._absorb_patient_notes(ctx, patient.id, notes_blob, source_id)
+
         await ctx.resolver.set(
             entity_type="patient",
             canonical_uuid=canonical_uuid,
@@ -100,3 +124,27 @@ class PatientMapper:
             dentalpin_id=patient.id,
         )
         return patient.id
+
+    async def _absorb_patient_notes(
+        self,
+        ctx: MapperContext,
+        patient_id: UUID,
+        notes_blob: str,
+        source_id: str,
+    ) -> None:
+        """Split ``Pacientes.Notas`` by newline and pipe each line
+        through the alert classifier. Empty lines and pure separators
+        are skipped. We never raise — a single weird line can't fail
+        the whole patient row."""
+        if self._alert_pipeline is None:
+            self._alert_pipeline = PatientAlertMapper()
+        lines = [
+            ln.strip(" .-") for ln in notes_blob.replace("\r", "\n").split("\n") if ln.strip(" .-")
+        ]
+        for idx, line in enumerate(lines):
+            await self._alert_pipeline.dispatch_freetext(
+                ctx,
+                patient_id,
+                line,
+                source_id=f"patient_notes:{source_id}:{idx}",
+            )
