@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+- fix(payment): the historical Payment mapper was producing rows that
+  violated three NOT NULL columns on ``payments.Payment``:
+  ``currency`` (snapshot of ``Clinic.currency``), ``recorded_by`` (FK
+  to ``users``), and ``payment_date`` when the source row had no
+  parseable date. ``currency`` is now resolved once per clinic and
+  cached, ``recorded_by`` defaults to ``ctx.created_by`` (the admin
+  who launched the job), and the date falls back to today with the
+  notes field carrying the migration provenance. While here, fix two
+  field-name regressions: the canonical payload exposes ``paid_on``
+  (not ``paid_at``) and a numeric ``payment_kind`` code (not the
+  English string ``method``); both are now read and the Gesdén
+  ``Tipo`` code is decoded against ``_PAYMENT_KIND_MAP`` so real
+  ``cash``/``card``/``bank_transfer`` etc. land in DentalPin instead
+  of every payment defaulting to ``other``.
+- feat(mappers): new ``PatientClientLinkMapper`` plus client→patient
+  resolution in ``PaymentMapper``. In Gesdén ``DCobros`` references
+  the *client* (payer), not the patient — DentalPin's flat
+  ``Payment.patient_id`` couldn't be derived from the canonical row
+  alone. The new mapper walks ``patient_client_link`` payloads and
+  writes a secondary ``patient_for_client`` mapping (one row per
+  client, ON CONFLICT DO NOTHING so the first patient registered per
+  client wins) plus its primary ``patient_client_link`` mapping for
+  idempotent re-runs. ``PaymentMapper`` now resolves
+  ``client_uuid → patient_id`` via that sidecar before falling back
+  to a direct ``patient_uuid``. Ambiguous clients (multiple patients
+  linked) emit a ``patient_client_link.ambiguous_payer`` info
+  warning so the operator can reconcile manually.
+- feat(catalog): reuse existing DentalPin catalog items when the
+  imported Spanish name matches an active item (1:1, case- and
+  whitespace-normalised). On a unique match the resolver mapping
+  points at the existing row and a ``catalog.matched_existing``
+  info warning is emitted; ambiguous or missing matches still fall
+  through to the "Importado de Gesdén" create path. This preserves
+  pricing strategy, session template, VAT and odontogram mapping for
+  treatments the clinic already had configured.
 - perf(pipeline): batch the ``processed_entities`` counter update.
   Previously every persisted entity emitted
   ``migration.entity.persisted``, which a subscriber consumed in a
