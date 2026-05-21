@@ -365,9 +365,17 @@ class BudgetService:
         created_by: UUID,
         data: dict,
     ) -> Budget:
-        """Create a new budget."""
-        # Generate budget number
-        budget_number = await BudgetNumberService.generate_number(db, clinic_id)
+        """Create a new budget.
+
+        Callers may pre-set ``data['budget_number']`` to override the
+        auto-generated sequence — used by the migration importer so
+        historic Gesdén presupuestos keep their original year+number
+        instead of getting renumbered into the current year.
+        """
+        # Allow caller to pre-set the budget_number (migration import).
+        # When absent or None, fall through to the regular generator.
+        override = data.pop("budget_number", None)
+        budget_number = override or await BudgetNumberService.generate_number(db, clinic_id)
 
         # Extract items data
         items_data = data.pop("items", [])

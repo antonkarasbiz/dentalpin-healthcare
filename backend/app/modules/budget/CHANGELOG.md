@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- feat(service): ``create_budget`` now accepts an optional pre-set
+  ``budget_number`` in the ``data`` dict; absent/``None`` falls back
+  to ``BudgetNumberService.generate_number`` as before. Used by the
+  migration importer to preserve historic Gesdén ``Presu.NumPresu``
+  values instead of renumbering decades-old presupuestos into the
+  current year.
 - refactor(useBudgets): dedup the ``toListItem`` builder (2 sites → 1 helper).
 - refactor(types): drop the ``as unknown as Record<string, unknown>`` cast pattern (8 sites) now that ``useApi`` accepts ``object`` payloads.
 - refactor(perms): migrate hardcoded ``can('budget.{write,admin}')`` strings on the budget list and detail pages to ``PERMISSIONS.budget.*``.

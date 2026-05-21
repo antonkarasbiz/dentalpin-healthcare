@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- feat(budget): preserve the source budget number. The mapper now
+  composes ``PRES-YYYY-NNNN`` from ``CanonicalBudget.number`` +
+  ``quote_date.year`` (with a ``S{n}`` middle segment for non-default
+  series) instead of letting the destination renumber every historic
+  presupuesto into the current year. On collision with an existing
+  row in the destination the auto-generator takes over and a
+  ``budget.number_collision`` warning is emitted. Required a one-line
+  contract change in ``BudgetService.create_budget`` to honour
+  ``data['budget_number']`` when supplied.
 - fix(applied_treatment): drop budget-shadow planned rows whose
   performed counterpart was created as a *new* TtosMed entry.
   Gesdén never updates ``StaTto`` 3→5 in place — when a budgeted
