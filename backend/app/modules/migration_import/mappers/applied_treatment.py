@@ -302,6 +302,11 @@ class AppliedTreatmentMapper:
         # RawEntity via the catch-all so the audit trail isn't lost.
         id_tipo_odg = _coerce_int(raw.get("IdTipoOdg"))
         if id_tipo_odg in _NON_CLINICAL_TIPO_ODG:
+            # Already seen in a previous execute? Short-circuit so we
+            # don't duplicate the synthetic Treatment / earned ledger
+            # row or re-emit the audit warning.
+            if await ctx.resolver.was_skipped("applied_treatment", canonical_uuid):
+                return None
             # The row carries no tooth and shouldn't pollute the
             # odontogram chart, BUT non-clinical Gesdén entries often
             # carry a real billed amount (hygiene visits, panoramic
@@ -318,13 +323,30 @@ class AppliedTreatmentMapper:
                 "applied_treatment.non_clinical_entry",
                 f"Entrada no clínica omitida (IdTipoOdg={id_tipo_odg}).",
             )
-            await self._maybe_record_non_clinical_earned(
+            plan_item_id = await self._maybe_record_non_clinical_earned(
                 ctx,
                 patient_id=patient_id,
                 payload=payload,
                 source_id=source_id,
                 id_tipo_odg=id_tipo_odg,
             )
+            if plan_item_id is not None:
+                # Register against ``applied_treatment`` so downstream
+                # entities (phases, fiscal lines) that reference this
+                # canonical resolve to the synthetic plan item.
+                await ctx.resolver.set(
+                    entity_type="applied_treatment",
+                    canonical_uuid=canonical_uuid,
+                    source_system=source_system,
+                    dentalpin_table="planned_treatment_items",
+                    dentalpin_id=plan_item_id,
+                )
+            else:
+                # No earned entry created (zero amount or not formal_done).
+                # Drop a skip sentinel so re-runs don't re-warn.
+                await ctx.resolver.mark_skipped(
+                    "applied_treatment", canonical_uuid, source_system
+                )
             return None
 
         professional_id: UUID | None = None
@@ -336,6 +358,14 @@ class AppliedTreatmentMapper:
         variant_uuid = payload.get("treatment_variant_uuid")
         if variant_uuid:
             catalog_item_id = await ctx.resolver.get("treatment_catalog_variant", str(variant_uuid))
+            if catalog_item_id is None:
+                await _warn(
+                    ctx,
+                    source_id,
+                    "applied_treatment.unmapped_variant",
+                    f"Variante de catálogo {variant_uuid} no encontrada en mappings "
+                    "previos; se importa el tratamiento sin enlace de catálogo.",
+                )
 
         # Resolve clinical_type from Gesdén's ``IdTipoOdg`` so the UI
         # surfaces real labels ("filling_composite", "implant", "crown"
@@ -673,7 +703,7 @@ class AppliedTreatmentMapper:
         payload: dict[str, Any],
         source_id: str,
         id_tipo_odg: int | None,
-    ) -> None:
+    ) -> UUID | None:
         """Project a billable non-clinical Gesdén row (hygiene visit,
         panoramic X-ray, fluorisation, generic service…) into the
         destination so the patient ledger AND the per-patient
@@ -697,13 +727,13 @@ class AppliedTreatmentMapper:
         """
         amount = _decimal_or_none(payload.get("amount"))
         if amount is None or amount == 0:
-            return
+            return None
         status_code = _coerce_int(payload.get("status_code"))
         start_dt = _parse_datetime(payload.get("start_date")) or datetime.now(UTC)
         end_dt = _parse_datetime(payload.get("end_date"))
         formal_done = status_code in _REALISED_CODES or end_dt is not None
         if not formal_done:
-            return
+            return None
         professional_id: UUID | None = None
         prof_uuid = payload.get("professional_uuid")
         if prof_uuid:
@@ -718,6 +748,14 @@ class AppliedTreatmentMapper:
         variant_uuid = payload.get("treatment_variant_uuid")
         if variant_uuid:
             catalog_item_id = await ctx.resolver.get("treatment_catalog_variant", str(variant_uuid))
+            if catalog_item_id is None:
+                await _warn(
+                    ctx,
+                    source_id,
+                    "applied_treatment.unmapped_variant",
+                    f"Variante de catálogo {variant_uuid} no encontrada en mappings "
+                    "previos; se importa el tratamiento sin enlace de catálogo.",
+                )
 
         # 1) Treatment header — global_mouth keeps it off the per-tooth
         # paint while still enumerable from the plan view and the
@@ -780,6 +818,7 @@ class AppliedTreatmentMapper:
             )
         )
         await ctx.db.flush()
+        return item.id
 
     async def _update_tooth_condition(
         self,

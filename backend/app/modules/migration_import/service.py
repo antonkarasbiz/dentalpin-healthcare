@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins import module_registry
@@ -279,11 +279,21 @@ class ImportJobService:
         """
         async with async_session_maker() as session:
             try:
-                job = await ImportJobService.get_job_unscoped(session, job_id)
+                # Row-level lock: blocks a concurrent BackgroundTask from
+                # transitioning the same job to ``executing`` twice. The
+                # status check below runs against the locked snapshot, so
+                # only one task can win the race.
+                result = await session.execute(
+                    select(ImportJob).where(ImportJob.id == job_id).with_for_update()
+                )
+                job = result.scalar_one_or_none()
                 if job is None:
                     logger.error("execute: job %s missing", job_id)
                     return
-                if job.status not in {"validated", "previewing", "completed", "executing"}:
+                # ``executing`` is excluded on purpose — re-entry while
+                # another task is mid-pipeline would race against the
+                # batch counter and the entity-mapping inserts.
+                if job.status not in {"validated", "previewing", "completed"}:
                     logger.error("execute: job %s in status %s — refusing", job.id, job.status)
                     return
                 if job.clinic_id != clinic_id:
@@ -297,8 +307,23 @@ class ImportJobService:
 
                 job.status = "executing"
                 job.started_at = datetime.now(UTC)
+                job.completed_at = None
+                # Re-executing a ``completed`` job restarts the progress
+                # counter — mappers are idempotent (resolver short-circuit
+                # at the top of each ``apply``), so accumulating the
+                # previous run's counter would double-count without doing
+                # any actual work.
+                job.processed_entities = 0
+                job.last_checkpoint = None
                 job.import_fiscal_compliance = import_fiscal_compliance
                 job.error = None
+                # Drop warnings from the previous run so the audit log
+                # shows only the latest execution. Without this prune,
+                # every re-run doubles ``non_clinical_entry`` /
+                # ``unmapped_tipo_odg`` rows even though mappers were
+                # idempotent — the warning emission itself was the only
+                # non-idempotent path.
+                await session.execute(delete(ImportWarning).where(ImportWarning.job_id == job.id))
                 await session.commit()
 
                 await publish_job_started(job.id, job.clinic_id)
@@ -373,20 +398,29 @@ class ImportJobService:
                         )
                         continue
 
+                    # Savepoint per entity so a half-flushed mapper (e.g.
+                    # ``Treatment`` added but ``TreatmentTooth`` flush
+                    # crashed) rolls back to a clean snapshot instead of
+                    # leaving an orphan row that the next batch commit
+                    # would persist. ``begin_nested`` issues a SAVEPOINT;
+                    # exiting the ``with`` block with an exception
+                    # releases it.
                     try:
-                        await mapper.apply(
-                            ctx,
-                            entity_type=entity_type,
-                            payload=payload,
-                            raw=raw,
-                            canonical_uuid=canonical_uuid,
-                            source_id=source_id,
-                            source_system=source_system,
-                        )
+                        async with db.begin_nested():
+                            await mapper.apply(
+                                ctx,
+                                entity_type=entity_type,
+                                payload=payload,
+                                raw=raw,
+                                canonical_uuid=canonical_uuid,
+                                source_id=source_id,
+                                source_system=source_system,
+                            )
                     except Exception as exc:
-                        # One entity blowing up does not fail the whole job —
-                        # we surface it as a warning and continue. The op
-                        # gets a single "X warnings" badge to act on.
+                        # Savepoint already rolled back. One entity blowing
+                        # up does not fail the whole job — surface it as a
+                        # warning and continue. The op gets a single
+                        # "X warnings" badge to act on.
                         logger.warning(
                             "mapper %s failed for %s/%s: %s",
                             mapper.__class__.__name__,
@@ -394,6 +428,9 @@ class ImportJobService:
                             source_id,
                             exc,
                         )
+                        # Recorded on the outer session (still alive after
+                        # the savepoint rollback) so the warning survives
+                        # the next batch commit.
                         await ImportJobService._record_warning(
                             db,
                             job.id,

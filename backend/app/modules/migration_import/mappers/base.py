@@ -19,6 +19,11 @@ if TYPE_CHECKING:
     from ..dpmf import DpmfHandle
 
 
+_SKIP_SUFFIX = ".__skipped__"
+_SKIP_SENTINEL_TABLE = "__skipped__"
+_SKIP_SENTINEL_ID = UUID("00000000-0000-0000-0000-000000000000")
+
+
 class MappingResolver:
     """Read / write the ``entity_mappings`` table.
 
@@ -27,6 +32,14 @@ class MappingResolver:
 
     Memoisation is per-instance (one resolver per job), bounded by the
     number of distinct entity_type+canonical_uuid pairs in the file.
+
+    "Skipped" sidecar: mappers that decide to drop a canonical row (e.g.
+    a non-clinical Gesdén entry, an appointment with no schedule) can
+    call :meth:`mark_skipped` so a re-execute short-circuits via
+    :meth:`was_skipped` instead of re-running the side effects
+    (duplicate Treatment / PlannedTreatmentItem rows, redundant warning
+    emissions). The skipped marks live in ``entity_mappings`` under a
+    suffixed entity_type so :meth:`get` never returns them.
     """
 
     def __init__(self, db: AsyncSession, clinic_id: UUID, job_id: UUID) -> None:
@@ -34,6 +47,7 @@ class MappingResolver:
         self._clinic_id = clinic_id
         self._job_id = job_id
         self._cache: dict[tuple[str, str], UUID] = {}
+        self._skipped_cache: set[tuple[str, str]] = set()
 
     async def get(self, entity_type: str, canonical_uuid: str) -> UUID | None:
         """Return the DentalPin row id mapped to ``(entity_type, canonical_uuid)``.
@@ -77,6 +91,50 @@ class MappingResolver:
         )
         self._db.add(mapping)
         self._cache[(entity_type, canonical_uuid)] = dentalpin_id
+
+    async def mark_skipped(
+        self,
+        entity_type: str,
+        canonical_uuid: str,
+        source_system: str,
+    ) -> None:
+        """Record that this canonical was intentionally dropped.
+
+        Subsequent calls to :meth:`was_skipped` for the same key return
+        ``True`` so re-executes can short-circuit. Stored under a
+        suffixed entity_type so ordinary :meth:`get` lookups are not
+        polluted with the sentinel.
+        """
+        key = (entity_type, canonical_uuid)
+        if key in self._skipped_cache:
+            return
+        mapping = EntityMapping(
+            clinic_id=self._clinic_id,
+            job_id=self._job_id,
+            source_system=source_system,
+            entity_type=f"{entity_type}{_SKIP_SUFFIX}",
+            source_canonical_uuid=canonical_uuid,
+            dentalpin_table=_SKIP_SENTINEL_TABLE,
+            dentalpin_id=_SKIP_SENTINEL_ID,
+        )
+        self._db.add(mapping)
+        self._skipped_cache.add(key)
+
+    async def was_skipped(self, entity_type: str, canonical_uuid: str) -> bool:
+        key = (entity_type, canonical_uuid)
+        if key in self._skipped_cache:
+            return True
+        result = await self._db.execute(
+            select(EntityMapping.id).where(
+                EntityMapping.clinic_id == self._clinic_id,
+                EntityMapping.entity_type == f"{entity_type}{_SKIP_SUFFIX}",
+                EntityMapping.source_canonical_uuid == canonical_uuid,
+            )
+        )
+        if result.scalar_one_or_none() is not None:
+            self._skipped_cache.add(key)
+            return True
+        return False
 
 
 @dataclass

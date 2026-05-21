@@ -124,7 +124,7 @@ class AppointmentMapper:
         data = {k: v for k, v in data.items() if v is not None}
 
         appointment = await AppointmentService.create_appointment(
-            ctx.db, ctx.clinic_id, data, created_by=None
+            ctx.db, ctx.clinic_id, data, created_by=ctx.created_by
         )
         await ctx.resolver.set(
             entity_type="appointment",

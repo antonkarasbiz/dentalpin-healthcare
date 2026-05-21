@@ -2,6 +2,91 @@
 
 ## Unreleased
 
+- fix(catalog): extend the display-label fallback chain to include
+  ``patient_facing_description`` and ``name`` before falling through
+  to ``code``. The previous chain stopped at ``agenda_description``
+  and any DPMF whose adapter wrote a generic ``name`` field landed
+  with internal codes (``COD004``, ``COD007``…) as the UI label.
+  Treatments and budgets inherited the wrong label transitively. The
+  canonical v0.1 spec doesn't define ``name`` but we accept it
+  defensively so non-Gesdén adapters render correctly.
+- feat(pharmacological_history): map ``TTratamientos`` rows into
+  ``patients_clinical.Medication`` so the patient clinical sidebar
+  shows the imported medication list. Previously the rows fell into
+  ``RawEntity`` audit-only and the sidebar opened blank even when the
+  source had a full prescription history.
+- fix(applied_treatment): non-clinical Gesdén rows now register their
+  synthetic PlannedTreatmentItem in the resolver (when the row is
+  formal-done and billed) or drop a ``mark_skipped`` sentinel (when
+  it's a no-op). Re-executes used to duplicate the synthetic
+  ``Treatment(scope='global_mouth')`` + ``PatientEarnedEntry`` +
+  ``PlannedTreatmentItem`` every run because the non-clinical path
+  returned ``None`` without touching the resolver.
+- fix(applied_treatment_phase): drop a skipped sentinel when the phase
+  is rejected for missing/unmapped parent, so re-executes don't
+  re-emit ``phase.unmapped_parent`` / ``phase.no_parent`` warnings.
+- feat(MappingResolver): new ``mark_skipped`` / ``was_skipped``
+  primitives backed by a ``<entity>.__skipped__`` sidecar in
+  ``entity_mappings``. ``get`` ignores the sidecar so downstream FK
+  resolution still falls back to ``None`` for skipped rows; the
+  sidecar exists only to make the mapper-level short-circuit
+  persistent across re-executes.
+- fix(service): delete prior ``ImportWarning`` rows when transitioning
+  a re-executed job back to ``executing``. Without the prune,
+  warnings accumulated every run (236 → 472 → 708…) even though the
+  same canonical entities short-circuited at the resolver.
+- fix(fiscal_document): use real ``Invoice`` column names
+  (``invoice_number``, ``issue_date``, ``total_tax``, ``created_by``)
+  instead of the legacy ``series``/``number``/``issued_at``/``tax_total``
+  payload. The previous mapper crashed with ``'str' object has no
+  attribute '_sa_instance_state'`` when stamping the source legal
+  series onto ``Invoice.series`` (a relationship to ``InvoiceSeries``,
+  not a free-text column) — every imported fiscal document failed
+  silently and the new ``fiscal_document_line`` mapper had no parent
+  invoice to point at. The source series is now preserved as a prefix
+  in ``invoice_number`` (e.g. ``F-2024-073``) and ``series_id`` stays
+  ``NULL`` until the operator wires up an ``InvoiceSeries`` catalog.
+- feat(fiscal_document_line): map ``LinAdmin`` rows into ``InvoiceItem``
+  so imported invoices carry their concept lines instead of falling
+  into ``RawEntity``. Without this mapper the header showed the right
+  totals but reports that cross factura↔tratamiento returned empty.
+  ``catalog_item_id`` is resolved through the
+  ``applied_treatment_uuid`` chain when available; otherwise the line
+  stays unlinked. Mapper bypasses ``InvoiceItemService`` consistently
+  with the fiscal-document header path (historical billed snapshot,
+  not an unbilled treatment context).
+- fix(service): row-level lock on ``ImportJob`` before transitioning
+  to ``executing`` and drop ``executing`` from the allowed entry
+  states. A concurrent re-execute now blocks at the SELECT FOR UPDATE
+  and finds the job already running, returning without spawning a
+  second pipeline. Earlier behaviour let two BackgroundTasks race on
+  the same job, corrupting the progress counter and emitting
+  duplicate ``migration.entity.persisted`` events.
+- fix(service): reset ``processed_entities`` and ``last_checkpoint``
+  on transition to ``executing``. Re-executing a completed job
+  short-circuits at the per-mapper resolver but still incremented the
+  batch counter, so a re-run of a 100/100 job left
+  ``processed_entities=200`` — the UI badge stuck at "completed" with
+  nonsensical numbers. Mappers stay idempotent at the entity-mapping
+  level, so we lose no data by starting the counter at zero.
+- fix(service): wrap every ``mapper.apply`` in a savepoint
+  (``db.begin_nested()``) so a half-flushed mapper rolls back to a
+  clean snapshot. Earlier behaviour caught the exception, recorded a
+  warning, and continued — but anything already flushed (e.g.
+  ``Treatment`` added before ``TreatmentTooth`` blew up) survived the
+  next batch commit as an orphan row. Reports and odontogram views
+  rendered against those orphans drifted from reality.
+- fix(applied_treatment): emit
+  ``applied_treatment.unmapped_variant`` warning when a Gesdén row
+  carries a ``treatment_variant_uuid`` that the variant mapper did
+  not import (catalogue out of scope, variant suppressed, etc.).
+  Previously the treatment landed silently with ``catalog_item_id =
+  NULL`` and the UI showed "Sin catálogo" without any audit trail.
+- fix(appointment): stamp ``Appointment.created_by`` with the admin
+  who triggered the migration (``ctx.created_by``) instead of
+  ``None``. Other mappers (patient, professional, budget) already
+  preserved this; appointments were the only entity that lost the
+  audit trail.
 - fix(applied_treatment): resolve the destination ``catalog_item_id``
   for migrated non-clinical billed services too, so the BOCA COMPLETA
   chip strip / plan list render the real service name

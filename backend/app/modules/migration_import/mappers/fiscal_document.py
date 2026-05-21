@@ -70,17 +70,33 @@ class FiscalDocumentMapper:
         # see the historical record without re-issuing.
         from app.modules.billing.models import Invoice
 
+        # The source's ``series`` is a free-text legal series ("F", "FR",
+        # "A"…) that DentalPin models as a UUID FK to ``InvoiceSeries``.
+        # Building the InvoiceSeries catalog from a historical import is
+        # out of scope, so we stamp the source series into
+        # ``invoice_number`` (prefix preserves the legal chain visually)
+        # and leave ``series_id`` NULL. Downstream reports that group by
+        # series can still bucket by parsing the prefix.
+        source_series = (payload.get("series") or "MIG").strip() or "MIG"
+        source_number = str(payload.get("number") or source_id).strip()
+        source_year = payload.get("year")
+        if source_year:
+            invoice_number = f"{source_series}-{source_year}-{source_number}"
+        else:
+            invoice_number = f"{source_series}-{source_number}"
+
+        issue_date = _parse_date(payload.get("document_date") or payload.get("issued_at"))
         invoice = Invoice(
             id=uuid4(),
             clinic_id=ctx.clinic_id,
             patient_id=await self._resolve_patient(ctx, payload, source_id),
-            series=payload.get("series") or "MIG",
-            number=payload.get("number") or source_id,
-            issued_at=_parse_date(payload.get("issued_at")),
+            invoice_number=invoice_number[:50],
+            issue_date=issue_date,
             status=_map_status(payload.get("status")),
             total=_decimal(payload.get("total"), default="0"),
-            tax_total=_decimal(payload.get("tax_total"), default="0"),
+            total_tax=_decimal(payload.get("tax_total"), default="0"),
             subtotal=_decimal(payload.get("subtotal"), default="0"),
+            created_by=ctx.created_by,
         )
 
         if _verifactu_active(ctx):

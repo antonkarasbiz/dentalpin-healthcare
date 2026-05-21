@@ -28,10 +28,12 @@ from .catalog import CatalogItemMapper
 from .catalog_variant import CatalogVariantMapper
 from .document import DocumentMapper
 from .fiscal_document import FiscalDocumentMapper
+from .fiscal_document_line import FiscalDocumentLineMapper
 from .patient import PatientMapper
 from .patient_alert import PatientAlertMapper
 from .patient_client_link import PatientClientLinkMapper
 from .payment import PaymentMapper
+from .pharmacological_history import PharmacologicalHistoryMapper
 from .professional import ProfessionalMapper
 from .raw import RawEntityMapper
 
@@ -40,6 +42,7 @@ ProfessionalMapperInst = ProfessionalMapper()
 DocumentMapperInst = DocumentMapper()
 PaymentMapperInst = PaymentMapper()
 FiscalDocumentMapperInst = FiscalDocumentMapper()
+FiscalDocumentLineMapperInst = FiscalDocumentLineMapper()
 AppointmentMapperInst = AppointmentMapper()
 CatalogItemMapperInst = CatalogItemMapper()
 CatalogVariantMapperInst = CatalogVariantMapper()
@@ -49,6 +52,7 @@ AppliedTreatmentMapperInst = AppliedTreatmentMapper()
 AppliedTreatmentPhaseMapperInst = AppliedTreatmentPhaseMapper()
 PatientClientLinkMapperInst = PatientClientLinkMapper()
 PatientAlertMapperInst = PatientAlertMapper()
+PharmacologicalHistoryMapperInst = PharmacologicalHistoryMapper()
 FALLBACK_MAPPER = RawEntityMapper()
 
 MAPPERS: dict[str, object] = {
@@ -57,6 +61,7 @@ MAPPERS: dict[str, object] = {
     "patient_document": DocumentMapperInst,
     "payment": PaymentMapperInst,
     "fiscal_document": FiscalDocumentMapperInst,
+    "fiscal_document_line": FiscalDocumentLineMapperInst,
     "appointment": AppointmentMapperInst,
     "treatment_catalog_item": CatalogItemMapperInst,
     "treatment_catalog_variant": CatalogVariantMapperInst,
@@ -66,6 +71,7 @@ MAPPERS: dict[str, object] = {
     "applied_treatment_phase": AppliedTreatmentPhaseMapperInst,
     "patient_client_link": PatientClientLinkMapperInst,
     "patient_alert": PatientAlertMapperInst,
+    "pharmacological_history": PharmacologicalHistoryMapperInst,
 }
 
 __all__ = [

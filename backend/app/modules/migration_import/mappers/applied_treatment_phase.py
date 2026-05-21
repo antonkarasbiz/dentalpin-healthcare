@@ -53,10 +53,15 @@ class AppliedTreatmentPhaseMapper:
         existing = await ctx.resolver.get("applied_treatment_phase", canonical_uuid)
         if existing is not None:
             return existing
+        if await ctx.resolver.was_skipped("applied_treatment_phase", canonical_uuid):
+            return None
 
         parent_uuid = payload.get("applied_treatment_uuid")
         if not parent_uuid:
             await _warn(ctx, source_id, "phase.no_parent", "Fase sin tratamiento padre.")
+            await ctx.resolver.mark_skipped(
+                "applied_treatment_phase", canonical_uuid, source_system
+            )
             return None
 
         plan_item_id = await ctx.resolver.get("applied_treatment", str(parent_uuid))
@@ -64,6 +69,9 @@ class AppliedTreatmentPhaseMapper:
             await _warn(
                 ctx, source_id, "phase.unmapped_parent",
                 "Fase omitida: tratamiento padre no mapeado.",
+            )
+            await ctx.resolver.mark_skipped(
+                "applied_treatment_phase", canonical_uuid, source_system
             )
             return None
 

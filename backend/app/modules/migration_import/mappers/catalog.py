@@ -63,10 +63,19 @@ class CatalogItemMapper:
         if existing is not None:
             return existing
 
+        # Display label order: the canonical spec lists ``short_name``
+        # first (Gesdén's ``DescCorta``), then ``description``
+        # (``Descrip``), then ``agenda_description`` (``DescAgenda``).
+        # ``name`` is not in the v0.1 spec but we accept it for
+        # adapters that emit a generic label — falling all the way to
+        # ``code`` produces clinic UIs full of "COD001" entries which
+        # the user cannot recognise.
         name = (
             payload.get("short_name")
             or payload.get("description")
+            or payload.get("patient_facing_description")
             or payload.get("agenda_description")
+            or payload.get("name")
             or payload.get("code")
             or source_id
         )
