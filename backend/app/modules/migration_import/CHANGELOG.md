@@ -21,14 +21,14 @@
 - fix(applied_treatment): mirror billable non-clinical Gesdén entries
   (hygiene, panoramic X-rays, fluorisation, "Bonos", first-visit
   consultations, generic services — ``IdTipoOdg`` in
-  ``_NON_CLINICAL_TIPO_ODG``) into ``PatientEarnedEntry``. The mapper
-  was dropping these rows entirely so the odontogram chart stayed
-  clean, but their ``Importe`` was a real billed amount; ignoring it
-  left the matching payment on the ledger without a counterpart and
-  inflated patient credit across the board. Treatment /
-  PlannedTreatmentItem are still skipped — only the financial row is
-  recorded, with a stable uuid5 ``treatment_id`` so re-runs stay
-  idempotent under the ledger's unique constraint.
+  ``_NON_CLINICAL_TIPO_ODG``) into the destination as
+  ``Treatment(scope='global_mouth', clinical_type='migrated')`` +
+  ``PlannedTreatmentItem`` (on the per-year catch-all plan) +
+  ``PatientEarnedEntry``. Earlier passes only wrote the ledger row,
+  so the pagos tab showed services that didn't appear in plans or
+  budgets — the user couldn't trace what they were being billed for.
+  ``global_mouth`` keeps the odontogram chart clean (no tooth paint)
+  while the plan list now enumerates every billed service.
 - feat(budget): preserve the source budget number. The mapper now
   composes ``PRES-YYYY-NNNN`` from ``CanonicalBudget.number`` +
   ``quote_date.year`` (with a ``S{n}`` middle segment for non-default

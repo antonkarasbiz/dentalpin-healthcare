@@ -33,7 +33,7 @@ from collections import defaultdict
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -674,16 +674,26 @@ class AppliedTreatmentMapper:
         source_id: str,
         id_tipo_odg: int | None,
     ) -> None:
-        """Mirror a non-clinical Gesdén entry into the earned ledger
-        when it carries a real billed amount.
+        """Project a billable non-clinical Gesdén row (hygiene visit,
+        panoramic X-ray, fluorisation, generic service…) into the
+        destination so the patient ledger AND the per-patient
+        plan/payments UI both reflect it.
 
-        Gates: only formal-done rows (StaTto∈{5,6} or FecFin set) and
-        strictly positive ``Importe``. Treatment/PlannedTreatmentItem
-        are NOT created — the row would have no tooth and the
-        odontogram doesn't model whole-mouth admin services. The
-        synthetic ``treatment_id`` is a stable uuid5 from the source
-        canonical so re-runs are idempotent under the unique
-        constraint ``(treatment_id, source_session_id)``.
+        Three rows go in:
+
+        - ``Treatment(scope='global_mouth', clinical_type='migrated')``
+          so the row is enumerable from the treatment plan view but
+          paints no tooth on the odontogram chart.
+        - ``PlannedTreatmentItem`` on the same per-year catch-all plan
+          that hosts the patient's tooth treatments, so users browsing
+          ``/patients/{id}?tab=clinical&clinicalMode=plans`` actually
+          see what the patient was billed for.
+        - ``PatientEarnedEntry`` keyed by the new ``treatment_id`` so
+          the pagos tab adds up to the same total as the plan.
+
+        Gates: only formal-done rows (``StaTto`` ∈ {5,6} or ``FecFin``
+        set) AND non-zero ``Importe`` (negatives are kept — Gesdén
+        records refunds and discounts that way; see ``pay_0003``).
         """
         amount = _decimal_or_none(payload.get("amount"))
         if amount is None or amount == 0:
@@ -698,15 +708,57 @@ class AppliedTreatmentMapper:
         prof_uuid = payload.get("professional_uuid")
         if prof_uuid:
             professional_id = await ctx.resolver.get("professional", str(prof_uuid))
-        synthetic_treatment_id = uuid5(
-            NAMESPACE_URL,
-            f"migration_import.non_clinical:{ctx.clinic_id}:{source_id}",
+
+        # 1) Treatment header — global_mouth so the odontogram chart
+        # ignores it but the plan view still enumerates it.
+        treatment = Treatment(
+            clinic_id=ctx.clinic_id,
+            patient_id=patient_id,
+            clinical_type=_FALLBACK_CLINICAL_TYPE,
+            scope="global_mouth",
+            status="performed",
+            recorded_at=start_dt,
+            performed_at=end_dt or start_dt,
+            performed_by=professional_id,
+            price_snapshot=amount,
+            notes=payload.get("notes"),
+            source_module="migration_import",
         )
+        ctx.db.add(treatment)
+        await ctx.db.flush()
+
+        # 2) Plan grouping. Non-tooth services rarely belong to a
+        # source presupuesto, so we use the per-year catch-all that
+        # ``_get_or_create_plan`` already provides — the same year
+        # bucket the clinical rows for this patient land on.
+        plan_id = await self._get_or_create_plan(
+            ctx, patient_id, budget_id=None, year=start_dt.year
+        )
+        sequence = self._next_sequence.get(plan_id, 0) + 1
+        self._next_sequence[plan_id] = sequence
+        item = PlannedTreatmentItem(
+            clinic_id=ctx.clinic_id,
+            treatment_plan_id=plan_id,
+            treatment_id=treatment.id,
+            sequence_order=sequence,
+            status="completed",
+            completed_at=end_dt or start_dt,
+            completed_by=professional_id,
+            assigned_professional_id=professional_id,
+            notes=payload.get("notes"),
+        )
+        ctx.db.add(item)
+        await ctx.db.flush()
+
+        # 3) Earned ledger — keyed by the real Treatment.id now, no
+        # synthetic uuid5 needed; the unique constraint
+        # ``(treatment_id, source_session_id)`` remains satisfied
+        # because each migrated row gets its own Treatment.
         ctx.db.add(
             PatientEarnedEntry(
                 clinic_id=ctx.clinic_id,
                 patient_id=patient_id,
-                treatment_id=synthetic_treatment_id,
+                treatment_id=treatment.id,
                 catalog_item_id=None,
                 amount=amount,
                 performed_at=end_dt or start_dt,
