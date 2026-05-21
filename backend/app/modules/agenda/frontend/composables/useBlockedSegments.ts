@@ -8,7 +8,8 @@
  */
 import type { Ref } from 'vue'
 import { useScheduleAvailability } from './useScheduleAvailability'
-import { formatLocalDate } from '../utils/date'
+import type { IsoParts } from '../utils/date'
+import { formatLocalDate, isoPartsToDateKey, parseIsoParts } from '../utils/date'
 
 export interface BlockedSegment {
   dateKey: string
@@ -28,8 +29,8 @@ export function useBlockedSegments(opts: {
 }) {
   const { fetch: fetchAvailability } = useScheduleAvailability()
 
-  function timeToSlotIndex(d: Date): number {
-    const mins = d.getHours() * 60 + d.getMinutes()
+  function timeToSlotIndex(parts: IsoParts): number {
+    const mins = parts.hour * 60 + parts.minute
     return (mins - opts.startHour.value * 60) / opts.slotMinutes
   }
 
@@ -51,13 +52,16 @@ export function useBlockedSegments(opts: {
     const maxSlot = gridSlotsPerDay()
     for (const r of ranges) {
       if (r.state === 'open') continue
-      const startDate = new Date(r.start)
-      const endDate = new Date(r.end)
-      const startSlot = Math.max(0, timeToSlotIndex(startDate))
-      const endSlot = Math.min(maxSlot, timeToSlotIndex(endDate))
+      // Parse in clinic-local components — the backend serializes ranges
+      // with the clinic's timezone offset, but the calendar grid is
+      // rendered in clinic-local hours regardless of the browser TZ.
+      const startParts = parseIsoParts(r.start)
+      const endParts = parseIsoParts(r.end)
+      const startSlot = Math.max(0, timeToSlotIndex(startParts))
+      const endSlot = Math.min(maxSlot, timeToSlotIndex(endParts))
       if (endSlot <= startSlot) continue
       out.push({
-        dateKey: formatLocalDate(startDate),
+        dateKey: isoPartsToDateKey(startParts),
         professionalId,
         startSlot,
         endSlot,

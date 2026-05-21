@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- fix(calendar-tz): ``useCalendarBounds`` and ``useBlockedSegments``
+  now parse the wall-clock hour from the availability ISO string
+  verbatim instead of routing it through ``new Date().getHours()``,
+  which silently re-interpreted the timestamp in the browser timezone.
+  Symptom: a clinic configured for ``9–14, 16–20`` in NY served to a
+  Madrid browser rendered as a single ``15–20`` block (morning shift
+  shifted into the afternoon, afternoon shift crossed midnight and was
+  clipped). Hours are now always clinic-local regardless of browser TZ.
+- fix(filters): the professional filter chip strip now scrolls
+  horizontally instead of wrapping. With 50+ dentists the wrapped
+  rows pushed the calendar grid below the fold, leaving only the
+  afternoon visible. The chip strip is now bounded to one row with
+  an ``overflow-x-auto`` track; the calendar reclaims its height.
 - feat(ux): receptionist can create a new patient inline from the *Nueva cita* modal. The patient selector dropdown surfaces a ``+ Crear paciente "<query>"`` row when the typed name doesn't match an existing record; clicking it opens a 3-field mini-form (nombre, apellidos, teléfono) that POSTs to ``/api/v1/patients`` and auto-selects the created patient. Closes the 30-second "patient on the phone" workflow. See ``docs/features/agenda-quick-patient-create.md`` and ``docs/technical/agenda-quick-patient-create.md``.
 - perf(scheduler): replace ``AppointmentDailyView`` overlap-grouping loop with a union-find DSU (extracted to ``composables/calculateOverlapGroups.ts``); pre-bucket appointments by professional once; switch the per-column template ``v-for`` to a Map lookup and add ``v-memo`` so dragging an appointment no longer re-renders the other columns.
 - perf(scheduler): ``useBlockedSegments`` now fetches per-professional availability in parallel via ``Promise.all`` (was sequential ``for…of``).

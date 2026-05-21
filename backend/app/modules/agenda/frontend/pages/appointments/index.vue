@@ -652,25 +652,28 @@ watch(isMobile, async (mobile) => {
 
       <div
         v-if="professionalFilterOptions.length > 0"
-        class="flex items-center gap-2 flex-wrap"
+        class="flex items-center gap-2 min-w-0 flex-1"
       >
-        <span class="text-caption text-subtle">
+        <span class="text-caption text-subtle shrink-0">
           {{ t('appointments.professional') }}
         </span>
-        <FilterChip
-          v-for="prof in professionalFilterOptions"
-          :key="prof.value"
-          :label="prof.label"
-          :color="prof.color"
-          :initials="prof.label.split(' ').map((n: string) => n.charAt(0)).join('').substring(0, 2).toUpperCase()"
-          :selected="selectedProfessionals.includes(prof.value)"
-          @toggle="toggleProfessional(prof.value)"
-        />
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0 [&>*]:shrink-0">
+          <FilterChip
+            v-for="prof in professionalFilterOptions"
+            :key="prof.value"
+            :label="prof.label"
+            :color="prof.color"
+            :initials="prof.label.split(' ').map((n: string) => n.charAt(0)).join('').substring(0, 2).toUpperCase()"
+            :selected="selectedProfessionals.includes(prof.value)"
+            @toggle="toggleProfessional(prof.value)"
+          />
+        </div>
         <UButton
           v-if="selectedProfessionals.length < professionalFilterOptions.length"
           variant="ghost"
           color="neutral"
           size="xs"
+          class="shrink-0"
           @click="selectAllProfessionals"
         >
           {{ t('common.selectAll') }}
@@ -766,3 +769,8 @@ watch(isMobile, async (mobile) => {
     <CompletionFollowupHost />
   </div>
 </template>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
