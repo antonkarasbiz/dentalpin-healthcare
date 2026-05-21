@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- fix(applied_treatment): mirror billable non-clinical Gesdén entries
+  (hygiene, panoramic X-rays, fluorisation, "Bonos", first-visit
+  consultations, generic services — ``IdTipoOdg`` in
+  ``_NON_CLINICAL_TIPO_ODG``) into ``PatientEarnedEntry``. The mapper
+  was dropping these rows entirely so the odontogram chart stayed
+  clean, but their ``Importe`` was a real billed amount; ignoring it
+  left the matching payment on the ledger without a counterpart and
+  inflated patient credit across the board. Treatment /
+  PlannedTreatmentItem are still skipped — only the financial row is
+  recorded, with a stable uuid5 ``treatment_id`` so re-runs stay
+  idempotent under the ledger's unique constraint.
 - feat(budget): preserve the source budget number. The mapper now
   composes ``PRES-YYYY-NNNN`` from ``CanonicalBudget.number`` +
   ``quote_date.year`` (with a ``S{n}`` middle segment for non-default

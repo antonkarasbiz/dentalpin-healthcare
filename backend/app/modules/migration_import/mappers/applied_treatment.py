@@ -33,7 +33,7 @@ from collections import defaultdict
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from sqlalchemy import select
 
@@ -302,11 +302,28 @@ class AppliedTreatmentMapper:
         # RawEntity via the catch-all so the audit trail isn't lost.
         id_tipo_odg = _coerce_int(raw.get("IdTipoOdg"))
         if id_tipo_odg in _NON_CLINICAL_TIPO_ODG:
+            # The row carries no tooth and shouldn't pollute the
+            # odontogram chart, BUT non-clinical Gesdén entries often
+            # carry a real billed amount (hygiene visits, panoramic
+            # X-rays, fluorisation, "Bonos", first-visit consultations,
+            # generic services). Dropping their value entirely inflated
+            # patient credit because the payments that covered them
+            # stayed on the ledger while the matching earned amount
+            # disappeared. Record the financial value as a synthetic
+            # ``PatientEarnedEntry`` so the patient balance reconciles;
+            # skip Treatment / TreatmentTooth / PlannedTreatmentItem.
             await _warn(
                 ctx,
                 source_id,
                 "applied_treatment.non_clinical_entry",
                 f"Entrada no clínica omitida (IdTipoOdg={id_tipo_odg}).",
+            )
+            await self._maybe_record_non_clinical_earned(
+                ctx,
+                patient_id=patient_id,
+                payload=payload,
+                source_id=source_id,
+                id_tipo_odg=id_tipo_odg,
             )
             return None
 
@@ -643,6 +660,58 @@ class AppliedTreatmentMapper:
 
         self._shadow_index = shadow
         return shadow
+
+    async def _maybe_record_non_clinical_earned(
+        self,
+        ctx: MapperContext,
+        *,
+        patient_id: UUID,
+        payload: dict[str, Any],
+        source_id: str,
+        id_tipo_odg: int | None,
+    ) -> None:
+        """Mirror a non-clinical Gesdén entry into the earned ledger
+        when it carries a real billed amount.
+
+        Gates: only formal-done rows (StaTto∈{5,6} or FecFin set) and
+        strictly positive ``Importe``. Treatment/PlannedTreatmentItem
+        are NOT created — the row would have no tooth and the
+        odontogram doesn't model whole-mouth admin services. The
+        synthetic ``treatment_id`` is a stable uuid5 from the source
+        canonical so re-runs are idempotent under the unique
+        constraint ``(treatment_id, source_session_id)``.
+        """
+        amount = _decimal_or_none(payload.get("amount"))
+        if amount is None or amount <= 0:
+            return
+        status_code = _coerce_int(payload.get("status_code"))
+        start_dt = _parse_datetime(payload.get("start_date")) or datetime.now(UTC)
+        end_dt = _parse_datetime(payload.get("end_date"))
+        formal_done = status_code in _REALISED_CODES or end_dt is not None
+        if not formal_done:
+            return
+        professional_id: UUID | None = None
+        prof_uuid = payload.get("professional_uuid")
+        if prof_uuid:
+            professional_id = await ctx.resolver.get("professional", str(prof_uuid))
+        synthetic_treatment_id = uuid5(
+            NAMESPACE_URL,
+            f"migration_import.non_clinical:{ctx.clinic_id}:{source_id}",
+        )
+        ctx.db.add(
+            PatientEarnedEntry(
+                clinic_id=ctx.clinic_id,
+                patient_id=patient_id,
+                treatment_id=synthetic_treatment_id,
+                catalog_item_id=None,
+                amount=amount,
+                performed_at=end_dt or start_dt,
+                professional_id=professional_id,
+                source_event="migration_import",
+                description=(payload.get("notes") or f"Gesdén IdTipoOdg={id_tipo_odg}")[:160],
+            )
+        )
+        await ctx.db.flush()
 
     async def _update_tooth_condition(
         self,
