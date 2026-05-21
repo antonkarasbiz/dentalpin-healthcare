@@ -709,13 +709,25 @@ class AppliedTreatmentMapper:
         if prof_uuid:
             professional_id = await ctx.resolver.get("professional", str(prof_uuid))
 
-        # 1) Treatment header — global_mouth so the odontogram chart
-        # ignores it but the plan view still enumerates it.
+        # Resolve the destination catalog item from the canonical
+        # variant so the UI shows the real service name
+        # ("Mantenimiento periodontal", "Panorámica", "Bono ortodoncia"…)
+        # instead of the generic "migrated" clinical_type fallback when
+        # the BOCA COMPLETA strip / plan list render the chip.
+        catalog_item_id: UUID | None = None
+        variant_uuid = payload.get("treatment_variant_uuid")
+        if variant_uuid:
+            catalog_item_id = await ctx.resolver.get("treatment_catalog_variant", str(variant_uuid))
+
+        # 1) Treatment header — global_mouth keeps it off the per-tooth
+        # paint while still enumerable from the plan view and the
+        # whole-mouth chip strip.
         treatment = Treatment(
             clinic_id=ctx.clinic_id,
             patient_id=patient_id,
             clinical_type=_FALLBACK_CLINICAL_TYPE,
             scope="global_mouth",
+            catalog_item_id=catalog_item_id,
             status="performed",
             recorded_at=start_dt,
             performed_at=end_dt or start_dt,
@@ -759,7 +771,7 @@ class AppliedTreatmentMapper:
                 clinic_id=ctx.clinic_id,
                 patient_id=patient_id,
                 treatment_id=treatment.id,
-                catalog_item_id=None,
+                catalog_item_id=catalog_item_id,
                 amount=amount,
                 performed_at=end_dt or start_dt,
                 professional_id=professional_id,

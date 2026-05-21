@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- fix(applied_treatment): resolve the destination ``catalog_item_id``
+  for migrated non-clinical billed services too, so the BOCA COMPLETA
+  chip strip / plan list render the real service name
+  (Mantenimiento periodontal, Panorámica, Bono ortodoncia…) instead
+  of the generic ``migrated`` ``clinical_type`` fallback. Previously
+  only the per-tooth path looked up the variant; the global_mouth
+  shadow left ``catalog_item_id=NULL`` so the UI label-lookup chain
+  fell straight to the enum value.
 - feat(payment): split a Gesdén ``PagoCli`` across every patient
   linked to its payer client. The mapper used to attribute the whole
   amount to the first patient mapped, inflating that patient's credit
