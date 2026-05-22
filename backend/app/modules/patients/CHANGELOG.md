@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- feat(ux): patient list default sort changed from ``last_name:asc`` to
+  ``last_visit:desc`` so patients seen most recently surface first.
+  ``last_visit`` is computed via a ``MAX(start_time) GROUP BY patient_id``
+  subquery against the ``agenda.appointments`` table, LEFT JOINed with
+  NULLS LAST so never-seen patients fall to the bottom. The patients
+  module keeps ``depends = []``: the appointments table is referenced
+  via ``sqlalchemy.table()`` rather than importing the ``Appointment``
+  model — same workaround as ``get_recent_patients``. ``updated_at`` is
+  also exposed as an opt-in sort field. Frontend sort menu order:
+  Última visita, Apellidos, Nombre, Registro, Editado recientemente.
 - feat(ux): ``PatientVisualSelector`` (shared) gains an inline "create patient" mode. When the typed query has no match and the user has ``patients.write``, a footer row in the search dropdown opens a 3-field mini-form (nombre, apellidos, teléfono). Submitting POSTs ``/api/v1/patients`` and emits the selection upward. Includes soft-duplicate phone lookup (debounced + ``AbortController``-cancelled) reusing ``GET /patients?search=``. No backend changes — feeds into the agenda's *Nueva cita* flow. See ``docs/features/agenda-quick-patient-create.md``.
 - feat(ux): redesigned patient detail as a dashboard-first IA. The
   Resumen tab is now a grid of slot-driven smart cards (Plan, Próxima

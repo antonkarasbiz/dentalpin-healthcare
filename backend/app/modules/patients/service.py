@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, or_, select, text
+from fastapi import HTTPException, status
+from sqlalchemy import column, func, or_, select, table, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType, event_bus
@@ -17,12 +18,29 @@ from .models import Patient
 
 # Public field name → SQL column. Decouples the URL from internal naming
 # and prevents callers from sorting by arbitrary columns.
+#
+# ``last_visit`` is handled out-of-band (see ``list_patients``) because it
+# lives in the ``agenda.appointments`` table and ``patients`` is foundational
+# (``depends=[]``) — same workaround as ``get_recent_patients``.
 _SORT_ALLOW = {
     "last_name": Patient.last_name,
     "first_name": Patient.first_name,
     "created_at": Patient.created_at,
+    "updated_at": Patient.updated_at,
 }
-_SORT_DEFAULT = "last_name:asc"
+_SORT_DEFAULT = "last_visit:desc"
+_SORT_LAST_VISIT = "last_visit"
+
+# Lightweight reference to the agenda ``appointments`` table — avoids
+# importing ``Appointment`` from the agenda module while keeping the
+# query in SQLAlchemy Core rather than raw text(). The table name is
+# the only contract; agenda renames must be coordinated here.
+_appointments_t = table(
+    "appointments",
+    column("patient_id"),
+    column("clinic_id"),
+    column("start_time"),
+)
 
 
 class PatientService:
@@ -140,13 +158,52 @@ class PatientService:
 
         total = (await db.execute(select(func.count(Patient.id)).where(*conditions))).scalar() or 0
 
-        query = (
-            select(Patient)
-            .where(*conditions)
-            .order_by(parse_sort(sort, _SORT_ALLOW, _SORT_DEFAULT), Patient.first_name)
-            .offset(offset)
-            .limit(page_size)
-        )
+        sort_raw = (sort or _SORT_DEFAULT).strip()
+        sort_field, _, sort_dir = sort_raw.partition(":")
+        sort_field = sort_field.strip()
+        sort_dir = (sort_dir or "asc").strip().lower()
+
+        if sort_field == _SORT_LAST_VISIT:
+            if sort_dir not in ("asc", "desc"):
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid sort direction {sort_dir!r}. Use 'asc' or 'desc'.",
+                )
+            last_visit_sq = (
+                select(
+                    _appointments_t.c.patient_id.label("patient_id"),
+                    func.max(_appointments_t.c.start_time).label("last_visit"),
+                )
+                .where(
+                    _appointments_t.c.clinic_id == clinic_id,
+                    _appointments_t.c.patient_id.is_not(None),
+                )
+                .group_by(_appointments_t.c.patient_id)
+                .subquery()
+            )
+            last_visit_col = last_visit_sq.c.last_visit
+            order_clause = (
+                last_visit_col.desc().nulls_last()
+                if sort_dir == "desc"
+                else last_visit_col.asc().nulls_last()
+            )
+            query = (
+                select(Patient)
+                .outerjoin(last_visit_sq, last_visit_sq.c.patient_id == Patient.id)
+                .where(*conditions)
+                .order_by(order_clause, Patient.last_name, Patient.first_name)
+                .offset(offset)
+                .limit(page_size)
+            )
+        else:
+            query = (
+                select(Patient)
+                .where(*conditions)
+                .order_by(parse_sort(sort, _SORT_ALLOW, _SORT_DEFAULT), Patient.first_name)
+                .offset(offset)
+                .limit(page_size)
+            )
+
         result = await db.execute(query)
         return list(result.scalars().all()), total
 

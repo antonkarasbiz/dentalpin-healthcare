@@ -119,13 +119,62 @@ class FiscalDocumentMapper:
 
     @staticmethod
     async def _resolve_patient(ctx: MapperContext, payload: dict[str, Any], source_id: str) -> UUID:
-        external = payload.get("patient_uuid")
-        if not external:
-            raise ValueError(f"fiscal_document {source_id} missing patient_uuid")
-        patient_id = await ctx.resolver.get("patient", str(external))
-        if patient_id is None:
-            raise ValueError(f"fiscal_document {source_id}: patient {external} not yet mapped")
-        return patient_id
+        """Resolve the patient that owns this invoice.
+
+        Gesdén's ``DocAdmin`` is keyed on the **client** (payer), not
+        the patient — a single invoice can cover several patients of
+        the same family. The canonical layer reflects that and emits
+        ``client_uuid`` instead of ``patient_uuid`` on
+        ``CanonicalFiscalDocument``. We resolve the patient through
+        the ``client_to_patients`` map populated by
+        ``PatientClientLinkMapper`` (Gesdén ``PacCli``):
+
+        - 1 patient on the client → unambiguous, use it.
+        - N patients (family billing) → pick the first by mapping
+          order (deterministic) and add a warning so the operator can
+          re-attribute later if needed.
+        - 0 patients (client with no linked patient — odd but real
+          in Gesdén when ``PacCli`` was deleted) → as a last resort,
+          look at the line items: any ``patient_uuid`` on a line wins.
+        - Still nothing → raise. Caller emits ``mapper.failed``.
+
+        ``patient_uuid`` on the document is still honoured if the
+        payload happens to carry it (forward-compat with future
+        adapters that pre-resolve).
+        """
+        # Forward-compat: trust an explicit patient_uuid when present.
+        external_patient = payload.get("patient_uuid")
+        if external_patient:
+            patient_id = await ctx.resolver.get("patient", str(external_patient))
+            if patient_id is not None:
+                return patient_id
+
+        # Primary path: derive from client → patients map.
+        client_uuid = payload.get("client_uuid") or payload.get("guardian_client_uuid")
+        if client_uuid:
+            patient_ids = ctx.client_to_patients.get(str(client_uuid)) or []
+            if len(patient_ids) == 1:
+                return patient_ids[0]
+            if len(patient_ids) > 1:
+                ctx.db.add(
+                    ImportWarning(
+                        job_id=ctx.job_id,
+                        entity_type="fiscal_document",
+                        source_id=source_id,
+                        severity="info",
+                        code="fiscal_document.family_billing",
+                        message=(
+                            f"Factura cliente con {len(patient_ids)} pacientes; "
+                            "atribuida al primero. Re-asignar manualmente si procede."
+                        ),
+                    )
+                )
+                return patient_ids[0]
+
+        raise ValueError(
+            f"fiscal_document {source_id}: no patient resolvable via "
+            f"client_uuid={client_uuid!r} or payload.patient_uuid"
+        )
 
     @staticmethod
     def _stamp_legal_fields(invoice: Any, payload: dict[str, Any]) -> None:

@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import (
     BigInteger,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -82,6 +83,10 @@ class ImportJob(Base, TimestampMixin):
     import_fiscal_compliance: Mapped[bool] = mapped_column(
         default=False, server_default="false", nullable=False
     )
+    # Operator-tunable execute options serialised as JSONB so we can add
+    # new knobs without an Alembic migration each time. Currently carries
+    # the professional-filter sliders (see :class:`ExecuteRequest`).
+    execute_options: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -211,6 +216,84 @@ class ImportWarning(Base, TimestampMixin):
     raw_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     job: Mapped[ImportJob] = relationship(back_populates="warnings")
+
+
+class MappingDecision(Base, TimestampMixin):
+    """Operator-overridable proposed catalog mapping for a job.
+
+    Computed up-front during the new ``POST /jobs/{id}/proposals``
+    dry-run pass: every ``treatment_catalog_item`` from the DPMF gets
+    one row carrying the mapper's automatic proposal (existing seed
+    match, fuzzy candidate, or new-item creation in a specific
+    category). The operator reviews the list in the UI and PATCHes
+    individual rows to accept / re-link / create-new before launching
+    ``execute``.
+
+    The execute pass consults this table first: when an operator
+    decision exists it overrides the automatic matcher, so the import
+    honours the operator's choices verbatim. When no decisions exist
+    for a job, the mapper falls back to its automatic behaviour
+    (backward-compatible with pre-D job flows).
+
+    Indexed by ``(job_id, canonical_uuid)`` for the per-row PATCH path
+    and by ``(job_id, operator_action)`` for the bulk-accept page.
+    """
+
+    __tablename__ = "migration_import_mapping_decisions"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    job_id: Mapped[UUID] = mapped_column(
+        ForeignKey("migration_import_jobs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    clinic_id: Mapped[UUID] = mapped_column(
+        ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False, default="treatment_catalog_item")
+    canonical_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
+
+    # Snapshot of the Gesdén-side label for the UI. Free-form, never used as FK.
+    source_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Raw Gesdén code (Tratamientos.Codigo) for the operator to disambiguate
+    # near-identical rows in the proposals page.
+    source_code: Mapped[str | None] = mapped_column(String(50))
+    # IdTipoODG observed on the source row — informational, drives the
+    # category badge in the UI.
+    source_tipo_odg: Mapped[int | None] = mapped_column(Integer)
+
+    # Automatic proposal computed by the mapper dry-run:
+    #   action: "link" (matched seed item) / "fuzzy_link" (≥ threshold) /
+    #           "create" (new row in a specific category)
+    #   target_id: catalog item id when action ∈ {link, fuzzy_link}, else null
+    #   target_category_key: category key when action == "create"
+    #   score: 0..1 fuzzy match score when action == "fuzzy_link"
+    proposed_action: Mapped[str] = mapped_column(String(20), nullable=False)
+    proposed_target_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    proposed_target_label: Mapped[str | None] = mapped_column(String(255))
+    proposed_target_category_key: Mapped[str | None] = mapped_column(String(50))
+    proposed_score: Mapped[float | None] = mapped_column(Float)
+
+    # Operator decision. Status:
+    #   "pending"     — untouched (execute uses the proposal verbatim)
+    #   "accepted"    — operator confirmed the proposal explicitly
+    #   "relinked"    — operator picked a different catalog item
+    #   "create_new"  — operator wants a new row in `operator_target_category_key`
+    #   "ignored"     — operator wants this Gesdén row dropped (treated as skipped)
+    operator_action: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending"
+    )
+    operator_target_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    operator_target_category_key: Mapped[str | None] = mapped_column(String(50))
+    operator_notes: Mapped[str | None] = mapped_column(Text)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id", "entity_type", "canonical_uuid",
+            name="uq_migration_mapping_decision",
+        ),
+        Index("ix_migration_mapping_decision_action", "job_id", "operator_action"),
+    )
 
 
 class RawEntity(Base, TimestampMixin):

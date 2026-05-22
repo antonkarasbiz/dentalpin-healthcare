@@ -33,10 +33,19 @@ interface ImportJob {
   processed_entities: number
 }
 
+interface ProfessionalPreviewBreakdown {
+  deactivated_count: number
+  agenda_orphan_count: number
+  stale_24m_count: number
+  no_activity_count: number
+  by_role: Record<string, number>
+}
+
 interface EntityPreview {
   entity_type: string
   declared_count: number
   samples: Array<{ canonical_uuid: string; source_id: string; payload: Record<string, unknown> }>
+  professional_breakdown?: ProfessionalPreviewBreakdown | null
 }
 
 interface PreviewResponse {
@@ -48,6 +57,27 @@ interface PreviewResponse {
   verifactu_module_installed: boolean
 }
 
+interface ProposalSummary {
+  total: number
+  link: number
+  fuzzy_link: number
+  create: number
+}
+
+interface MappingProposal {
+  id: string
+  canonical_uuid: string
+  source_label: string
+  source_code: string | null
+  source_tipo_odg: number | null
+  proposed_action: string
+  proposed_target_id: string | null
+  proposed_target_label: string | null
+  proposed_target_category_key: string | null
+  proposed_score: number | null
+  operator_action: string
+}
+
 const file = ref<File | null>(null)
 const passphrase = ref('')
 const uploading = ref(false)
@@ -56,7 +86,28 @@ const uploadError = ref('')
 const job = ref<ImportJob | null>(null)
 const preview = ref<PreviewResponse | null>(null)
 const importFiscal = ref(false)
+const minActivityMonths = ref(24)
+const excludeAgendaOrphans = ref(true)
+const excludeInactiveInSource = ref(true)
+const excludeNonClinicalRoles = ref(false)
 let pollHandle: ReturnType<typeof setInterval> | null = null
+
+const professionalBreakdown = computed<ProfessionalPreviewBreakdown | null>(() => {
+  const ep = preview.value?.entities.find((e) => e.entity_type === 'professional')
+  return ep?.professional_breakdown ?? null
+})
+
+const professionalTotal = computed<number>(() => {
+  const ep = preview.value?.entities.find((e) => e.entity_type === 'professional')
+  return ep?.declared_count ?? 0
+})
+
+const proposalSummary = ref<ProposalSummary | null>(null)
+const proposals = ref<MappingProposal[]>([])
+const proposalsLoading = ref(false)
+const proposalsBuilding = ref(false)
+const proposalsError = ref('')
+const bulkAcceptedNotice = ref<number | null>(null)
 
 const canExecute = computed(() => can(PERMISSIONS.migrationImport.jobExecute))
 const verifactuOptInVisible = computed(
@@ -109,9 +160,85 @@ async function execute() {
   if (!job.value || !canExecute.value) return
   await api.post(`/api/v1/migration_import/jobs/${job.value.id}/execute`, {
     import_fiscal_compliance: importFiscal.value,
-    passphrase: passphrase.value || null
+    passphrase: passphrase.value || null,
+    professional_min_activity_months: minActivityMonths.value,
+    professional_exclude_agenda_orphans: excludeAgendaOrphans.value,
+    professional_exclude_inactive_in_source: excludeInactiveInSource.value,
+    professional_exclude_non_clinical_roles: excludeNonClinicalRoles.value
   })
   startPolling()
+}
+
+async function buildProposals() {
+  if (!job.value) return
+  proposalsBuilding.value = true
+  proposalsError.value = ''
+  try {
+    const res = await api.post<{ data: ProposalSummary }>(
+      `/api/v1/migration_import/jobs/${job.value.id}/proposals`,
+      { passphrase: passphrase.value || null }
+    )
+    proposalSummary.value = res.data
+    await loadProposals()
+  } catch (err: unknown) {
+    proposalsError.value = errorMessage(err, t('migrationImport.proposals.title'))
+  } finally {
+    proposalsBuilding.value = false
+  }
+}
+
+async function loadProposals() {
+  if (!job.value) return
+  proposalsLoading.value = true
+  try {
+    const res = await api.get<{ data: MappingProposal[] }>(
+      `/api/v1/migration_import/jobs/${job.value.id}/proposals?page_size=200`
+    )
+    proposals.value = res.data
+  } finally {
+    proposalsLoading.value = false
+  }
+}
+
+async function bulkAccept() {
+  if (!job.value) return
+  const res = await api.post<{ data: { accepted: number } }>(
+    `/api/v1/migration_import/jobs/${job.value.id}/proposals/bulk_accept`,
+    { min_score: 0.9, include_exact: true }
+  )
+  bulkAcceptedNotice.value = res.data.accepted
+  await loadProposals()
+}
+
+async function patchProposal(proposal: MappingProposal, operatorAction: string) {
+  if (!job.value) return
+  await api.patch<{ data: MappingProposal }>(
+    `/api/v1/migration_import/jobs/${job.value.id}/proposals/${proposal.canonical_uuid}`,
+    { operator_action: operatorAction }
+  )
+  await loadProposals()
+}
+
+function scoreBadgeColor(score: number | null): string {
+  if (score === null) return 'gray'
+  if (score >= 0.9) return 'green'
+  if (score >= 0.8) return 'blue'
+  return 'amber'
+}
+
+function operatorStatusKey(action: string): string {
+  switch (action) {
+    case 'accepted':
+      return 'migrationImport.proposals.operatorAccepted'
+    case 'relinked':
+      return 'migrationImport.proposals.operatorRelinked'
+    case 'create_new':
+      return 'migrationImport.proposals.operatorCreated'
+    case 'ignored':
+      return 'migrationImport.proposals.operatorIgnored'
+    default:
+      return 'migrationImport.proposals.operatorPending'
+  }
 }
 
 function startPolling() {
@@ -205,9 +332,162 @@ onUnmounted(() => {
           </ul>
         </div>
 
+        <!-- Catalog mapping proposals -->
+        <div class="mt-2 rounded border border-amber-200 bg-amber-50 p-4">
+          <h3 class="font-semibold">{{ t('migrationImport.proposals.title') }}</h3>
+          <p class="text-sm text-gray-700">{{ t('migrationImport.proposals.subtitle') }}</p>
+          <div class="mt-3 flex gap-2">
+            <UButton
+              :loading="proposalsBuilding"
+              :disabled="!canExecute"
+              variant="outline"
+              @click="buildProposals"
+            >
+              {{ proposalsBuilding ? t('migrationImport.proposals.building') : t('migrationImport.proposals.build') }}
+            </UButton>
+            <UButton
+              v-if="proposalSummary"
+              variant="ghost"
+              :disabled="!canExecute"
+              @click="bulkAccept"
+            >
+              {{ t('migrationImport.proposals.bulkAccept') }}
+            </UButton>
+          </div>
+          <UAlert v-if="proposalsError" color="red" :description="proposalsError" class="mt-2" />
+          <p v-if="proposalSummary" class="mt-2 text-xs text-gray-600">
+            {{
+              t('migrationImport.proposals.summary', {
+                total: proposalSummary.total,
+                link: proposalSummary.link,
+                fuzzy: proposalSummary.fuzzy_link,
+                create: proposalSummary.create
+              })
+            }}
+          </p>
+          <p v-if="bulkAcceptedNotice !== null" class="text-xs text-green-700">
+            {{ t('migrationImport.proposals.accepted', { n: bulkAcceptedNotice }) }}
+          </p>
+
+          <!-- Proposals table -->
+          <div
+            v-if="proposals.length"
+            class="mt-3 max-h-96 overflow-auto rounded border border-gray-200 bg-white"
+          >
+            <table class="w-full text-xs">
+              <thead class="sticky top-0 bg-gray-100">
+                <tr>
+                  <th class="px-2 py-1 text-left">{{ t('migrationImport.proposals.columnSource') }}</th>
+                  <th class="px-2 py-1 text-left">{{ t('migrationImport.proposals.columnProposed') }}</th>
+                  <th class="px-2 py-1 text-left">{{ t('migrationImport.proposals.columnStatus') }}</th>
+                  <th class="px-2 py-1 text-left">{{ t('migrationImport.proposals.columnAction') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in proposals" :key="p.id" class="border-t">
+                  <td class="px-2 py-1">
+                    <div class="font-medium">{{ p.source_label }}</div>
+                    <div class="text-[10px] text-gray-500">
+                      <span v-if="p.source_code">{{ p.source_code }} · </span>
+                      <span v-if="p.source_tipo_odg">IdTipoODG={{ p.source_tipo_odg }}</span>
+                    </div>
+                  </td>
+                  <td class="px-2 py-1">
+                    <div v-if="p.proposed_action === 'create'" class="italic text-gray-600">
+                      {{ t('migrationImport.proposals.actionCreate') }}
+                      <span v-if="p.proposed_target_category_key" class="text-[10px]">
+                        → {{ p.proposed_target_category_key }}
+                      </span>
+                    </div>
+                    <div v-else>
+                      <div>{{ p.proposed_target_label }}</div>
+                      <UBadge
+                        v-if="p.proposed_score !== null"
+                        :color="scoreBadgeColor(p.proposed_score)"
+                        size="xs"
+                      >
+                        {{ (p.proposed_score * 100).toFixed(0) }}%
+                      </UBadge>
+                    </div>
+                  </td>
+                  <td class="px-2 py-1">
+                    <UBadge size="xs" :color="p.operator_action === 'pending' ? 'gray' : 'green'">
+                      {{ t(operatorStatusKey(p.operator_action)) }}
+                    </UBadge>
+                  </td>
+                  <td class="px-2 py-1">
+                    <div class="flex gap-1">
+                      <UButton
+                        size="xs"
+                        variant="ghost"
+                        :disabled="!canExecute || p.operator_action === 'accepted'"
+                        @click="patchProposal(p, 'accepted')"
+                      >
+                        {{ t('migrationImport.proposals.acceptRow') }}
+                      </UButton>
+                      <UButton
+                        size="xs"
+                        color="red"
+                        variant="ghost"
+                        :disabled="!canExecute || p.operator_action === 'ignored'"
+                        @click="patchProposal(p, 'ignored')"
+                      >
+                        {{ t('migrationImport.proposals.ignoreRow') }}
+                      </UButton>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <UFormField v-if="verifactuOptInVisible" :help="t('migrationImport.preview.verifactuHelp')">
           <UCheckbox v-model="importFiscal" :label="t('migrationImport.preview.verifactuCheckbox')" />
         </UFormField>
+
+        <div
+          v-if="professionalTotal > 0"
+          class="rounded-lg border border-(--ui-border) bg-(--ui-bg-muted) p-4 space-y-3"
+        >
+          <div>
+            <h3 class="text-sm font-semibold text-(--ui-text-highlighted)">
+              {{ t('migrationImport.filters.title') }}
+            </h3>
+            <p class="text-xs text-(--ui-text-muted)">
+              {{ t('migrationImport.filters.description') }}
+            </p>
+          </div>
+
+          <div v-if="professionalBreakdown" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div>
+              <span class="text-(--ui-text-muted)">{{ t('migrationImport.filters.totalLabel') }}</span>
+              <span class="ml-1 font-medium">{{ professionalTotal }}</span>
+            </div>
+            <div>
+              <span class="text-(--ui-text-muted)">{{ t('migrationImport.filters.deactivatedLabel') }}</span>
+              <span class="ml-1 font-medium">{{ professionalBreakdown.deactivated_count }}</span>
+            </div>
+            <div>
+              <span class="text-(--ui-text-muted)">{{ t('migrationImport.filters.orphansLabel') }}</span>
+              <span class="ml-1 font-medium">{{ professionalBreakdown.agenda_orphan_count }}</span>
+            </div>
+            <div>
+              <span class="text-(--ui-text-muted)">{{ t('migrationImport.filters.stale24mLabel') }}</span>
+              <span class="ml-1 font-medium">{{ professionalBreakdown.stale_24m_count }}</span>
+            </div>
+          </div>
+
+          <UFormField :label="t('migrationImport.filters.minActivityLabel')" :help="t('migrationImport.filters.minActivityHelp')">
+            <UInput v-model.number="minActivityMonths" type="number" :min="0" :max="120" :step="1" class="w-32" />
+          </UFormField>
+
+          <div class="space-y-2">
+            <UCheckbox v-model="excludeAgendaOrphans" :label="t('migrationImport.filters.excludeOrphans')" />
+            <UCheckbox v-model="excludeInactiveInSource" :label="t('migrationImport.filters.excludeInactive')" />
+            <UCheckbox v-model="excludeNonClinicalRoles" :label="t('migrationImport.filters.excludeNonClinical')" />
+          </div>
+        </div>
 
         <UAlert color="amber" :description="t('migrationImport.preview.warning')" />
 

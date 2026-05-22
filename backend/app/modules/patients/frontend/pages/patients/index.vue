@@ -139,8 +139,8 @@ const {
 } = useListQuery<PatientListFilters, Patient>({
   defaults,
   pageSize: 20,
-  sortable: ['last_name', 'first_name', 'created_at'],
-  defaultSort: 'last_name:asc',
+  sortable: ['last_visit', 'last_name', 'first_name', 'created_at', 'updated_at'],
+  defaultSort: 'last_visit:desc',
   searchKey: 'q',
   fetcher,
 })
@@ -151,9 +151,11 @@ const statusItems = computed(() => [
 ])
 
 const sortOptions = computed(() => [
+  { field: 'last_visit', label: t('patients.sort.lastVisit'), defaultDir: 'desc' as const },
   { field: 'last_name', label: t('patients.sort.lastName'), defaultDir: 'asc' as const },
   { field: 'first_name', label: t('patients.sort.firstName'), defaultDir: 'asc' as const },
   { field: 'created_at', label: t('patients.sort.createdAt'), defaultDir: 'desc' as const },
+  { field: 'updated_at', label: t('patients.sort.updatedAt'), defaultDir: 'desc' as const },
 ])
 
 const activeFilterCount = computed(() => {

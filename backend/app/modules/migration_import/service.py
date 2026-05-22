@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins import module_registry
@@ -38,13 +38,20 @@ from .events import (
     publish_job_failed,
     publish_job_started,
 )
-from .mappers import FALLBACK_MAPPER, MAPPERS, MapperContext, MappingResolver
+from .mappers import (
+    FALLBACK_MAPPER,
+    MAPPERS,
+    MapperContext,
+    MappingResolver,
+    ProfessionalFilterOptions,
+)
 from .models import EntityMapping, FileStaging, ImportJob, ImportWarning
 from .schemas import (
     EntityPreview,
     FilesManifestSummary,
     PreviewResponse,
     PreviewSample,
+    ProfessionalPreviewBreakdown,
     WarningView,
 )
 
@@ -215,23 +222,38 @@ class ImportJobService:
         previews: list[EntityPreview] = []
         for entity_type, count in handle.entity_counts().items():
             samples: list[PreviewSample] = []
+            breakdown: ProfessionalPreviewBreakdown | None = None
+            cutoff_24m = date.today().replace(year=date.today().year - 2)
+            if entity_type == "professional":
+                breakdown = ProfessionalPreviewBreakdown()
             for i, row in enumerate(handle.entity_iter(entity_type)):
-                if i >= _PREVIEW_SAMPLE_SIZE:
-                    break
                 canonical_uuid, source_id, _src_system, payload_json, _raw, _ts = row
                 try:
                     payload = json.loads(payload_json)
                 except json.JSONDecodeError:
                     payload = {"_decode_error": True}
-                samples.append(
-                    PreviewSample(
-                        canonical_uuid=canonical_uuid,
-                        source_id=source_id,
-                        payload=payload,
+                if i < _PREVIEW_SAMPLE_SIZE:
+                    samples.append(
+                        PreviewSample(
+                            canonical_uuid=canonical_uuid,
+                            source_id=source_id,
+                            payload=payload,
+                        )
                     )
-                )
+                if breakdown is not None:
+                    _accumulate_professional_breakdown(
+                        breakdown,
+                        payload=payload,
+                        source_id=source_id,
+                        cutoff_24m=cutoff_24m,
+                    )
             previews.append(
-                EntityPreview(entity_type=entity_type, declared_count=count, samples=samples)
+                EntityPreview(
+                    entity_type=entity_type,
+                    declared_count=count,
+                    samples=samples,
+                    professional_breakdown=breakdown,
+                )
             )
         return previews
 
@@ -269,6 +291,7 @@ class ImportJobService:
         *,
         passphrase: str | None,
         import_fiscal_compliance: bool,
+        execute_options: dict[str, Any] | None = None,
     ) -> None:
         """Top-level entry point for the BackgroundTask.
 
@@ -320,6 +343,7 @@ class ImportJobService:
                 job.processed_entities = 0
                 job.last_checkpoint = None
                 job.import_fiscal_compliance = import_fiscal_compliance
+                job.execute_options = execute_options
                 job.error = None
                 # Drop warnings from the previous run so the audit log
                 # shows only the latest execution. Without this prune,
@@ -385,6 +409,7 @@ class ImportJobService:
             resolver=resolver,
             import_fiscal_compliance=job.import_fiscal_compliance,
             created_by=job.created_by,
+            professional_filters=_build_filter_options(job.execute_options),
         )
 
         with open_dpmf(Path(job.file_path), passphrase=passphrase) as handle:
@@ -501,6 +526,14 @@ class ImportJobService:
             # budget). Same idea would apply to other aggregates if
             # they get added.
             await ImportJobService._finalise_migrated_budgets(db, job)
+            # Roles for migrated professionals are best-effort at
+            # ingest time: Gesdén's ``IdTipoColab`` is often blank, so
+            # everyone lands as ``assistant`` — which the agenda
+            # filters out by role. Post-pipeline we promote any
+            # imported user who actually appears as the responsible
+            # clinician on an appointment or applied treatment to
+            # ``dentist``, restoring visibility in the agenda board.
+            await ImportJobService._finalise_migrated_professional_roles(db, job)
 
     @staticmethod
     async def _persist_files_manifest(db: AsyncSession, job: ImportJob, handle: DpmfHandle) -> None:
@@ -683,6 +716,94 @@ class ImportJobService:
         )
 
     @staticmethod
+    async def _finalise_migrated_professional_roles(db: AsyncSession, job: ImportJob) -> None:
+        """Upgrade migrated users with clinical activity to ``dentist``.
+
+        Why: Gesdén's ``TColabos.IdTipoColab`` is often blank, and many
+        clinics drive the agenda through ``TUsuAgd`` columns whose
+        canonical professional rows carry no role hint. dental-bridge
+        therefore emits ``role=other`` for those users, which DentalPin
+        maps to ``assistant``. The agenda's ``/professionals`` endpoint
+        only returns ``dentist``/``hygienist`` memberships — assistants
+        disappear from the dropdown — so the migrated appointments
+        render to nobody and the operator perceives them as "missing".
+
+        Fix: after the pipeline runs, any user that this job mapped AND
+        that now owns at least one ``Appointment`` or ``Treatment``
+        (i.e. shows up as the responsible clinician) is promoted to
+        ``dentist`` in this clinic's ``ClinicMembership``. Admins still
+        explicitly assigned roles (``admin``/``hygienist``/``dentist``/
+        ``receptionist``) are left untouched — only the ``assistant``
+        catch-all is moved up. Idempotent.
+        """
+        # Local imports so this module stays import-safe in test
+        # contexts that may stub out auth.
+        from app.core.auth.models import ClinicMembership
+        from app.modules.agenda.models import Appointment
+        from app.modules.odontogram.models import Treatment
+
+        # Users mapped by this job.
+        user_ids_q = await db.execute(
+            select(EntityMapping.dentalpin_id).where(
+                EntityMapping.job_id == job.id,
+                EntityMapping.entity_type.in_(("user", "professional")),
+            )
+        )
+        user_ids = {row[0] for row in user_ids_q.all()}
+        if not user_ids:
+            return
+
+        # Users that actually appear as the responsible clinician on
+        # something post-import.
+        appt_users = {
+            row[0]
+            for row in (
+                await db.execute(
+                    select(Appointment.professional_id).where(
+                        Appointment.clinic_id == job.clinic_id,
+                        Appointment.professional_id.in_(user_ids),
+                    )
+                )
+            ).all()
+        }
+        treat_users = {
+            row[0]
+            for row in (
+                await db.execute(
+                    select(Treatment.performed_by).where(
+                        Treatment.clinic_id == job.clinic_id,
+                        Treatment.performed_by.is_not(None),
+                        Treatment.performed_by.in_(user_ids),
+                    )
+                )
+            ).all()
+        }
+        clinical_users = appt_users | treat_users
+        if not clinical_users:
+            return
+
+        # Promote only the ``assistant`` rows — never override an
+        # explicit clinical role assignment.
+        result = await db.execute(
+            update(ClinicMembership)
+            .where(
+                ClinicMembership.clinic_id == job.clinic_id,
+                ClinicMembership.user_id.in_(clinical_users),
+                ClinicMembership.role == "assistant",
+            )
+            .values(role="dentist")
+            .execution_options(synchronize_session=False)
+        )
+        await db.commit()
+        promoted = int(result.rowcount or 0)
+        if promoted:
+            logger.info(
+                "post-pipeline: promoted %d assistant→dentist memberships (job %s)",
+                promoted,
+                job.id,
+            )
+
+    @staticmethod
     async def _persist_dpmf_warnings(db: AsyncSession, job: ImportJob, handle: DpmfHandle) -> None:
         for row in handle.warnings_iter():
             entity_type, source_id, severity, code, message, raw_data = row
@@ -757,6 +878,61 @@ class ImportJobService:
             .limit(page_size)
         )
         return list(rows.scalars().all()), total
+
+
+def _accumulate_professional_breakdown(
+    breakdown: ProfessionalPreviewBreakdown,
+    *,
+    payload: dict[str, Any],
+    source_id: str,
+    cutoff_24m: date,
+) -> None:
+    """Tally per-signal counts for one professional payload.
+
+    Called once per row inside :meth:`_build_entity_previews` so the UI
+    can show "X total / Y deactivated / Z stale" before the operator
+    commits the execute step. The 24-month window is the default; the UI
+    can recompute other windows client-side from the sample data, but
+    this gross summary is enough to size the slider.
+    """
+    if bool(payload.get("deactivated")):
+        breakdown.deactivated_count += 1
+    if source_id.startswith("usuagd:"):
+        breakdown.agenda_orphan_count += 1
+    last_activity = payload.get("last_activity_at")
+    if last_activity is None:
+        breakdown.no_activity_count += 1
+    else:
+        try:
+            parsed = date.fromisoformat(str(last_activity)[:10])
+        except ValueError:
+            parsed = None
+        if parsed is None or parsed < cutoff_24m:
+            breakdown.stale_24m_count += 1
+    role = (payload.get("role") or "other").lower()
+    breakdown.by_role[role] = breakdown.by_role.get(role, 0) + 1
+
+
+def _build_filter_options(execute_options: dict[str, Any] | None) -> ProfessionalFilterOptions:
+    """Hydrate :class:`ProfessionalFilterOptions` from the job's JSONB blob.
+
+    Legacy jobs (executed before the column existed) have ``None`` here
+    and fall back to safe defaults — same shape as :class:`ExecuteRequest`.
+    """
+    if not execute_options:
+        return ProfessionalFilterOptions()
+    return ProfessionalFilterOptions(
+        min_activity_months=int(execute_options.get("professional_min_activity_months", 24)),
+        exclude_agenda_orphans=bool(
+            execute_options.get("professional_exclude_agenda_orphans", True)
+        ),
+        exclude_inactive_in_source=bool(
+            execute_options.get("professional_exclude_inactive_in_source", True)
+        ),
+        exclude_non_clinical_roles=bool(
+            execute_options.get("professional_exclude_non_clinical_roles", False)
+        ),
+    )
 
 
 def _detect_verifactu_data(handle: DpmfHandle) -> bool:

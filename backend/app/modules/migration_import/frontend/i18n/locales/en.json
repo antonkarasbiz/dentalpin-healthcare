@@ -35,11 +35,47 @@
       "confirm": "Confirm and import",
       "warning": "This action cannot be undone. Review the data before confirming."
     },
+    "filters": {
+      "title": "Professional filtering",
+      "description": "Filtered staff are imported as inactive (kept for historical references but hidden from the agenda). You can reactivate them later in Settings → Users.",
+      "totalLabel": "Total",
+      "deactivatedLabel": "Inactive in source",
+      "orphansLabel": "Agenda-only columns",
+      "stale24mLabel": "No activity in last 24m",
+      "minActivityLabel": "Minimum activity (months)",
+      "minActivityHelp": "Soft-deactivate professionals with no clinical trace newer than this many months. Set 0 to disable.",
+      "excludeOrphans": "Exclude agenda-only columns without a real collaborator record",
+      "excludeInactive": "Exclude professionals marked as inactive in the source",
+      "excludeNonClinical": "Import only dentists and hygienists (skip auxiliaries and admin staff)"
+    },
     "execute": {
       "running": "Importing…",
       "progress": "{processed} of {total} entities",
       "ok": "Import completed",
       "failed": "Import failed"
+    },
+    "proposals": {
+      "title": "Review catalog mappings",
+      "subtitle": "Link each Gesdén treatment to the DentalPin catalog before importing.",
+      "build": "Compute proposals",
+      "building": "Computing…",
+      "summary": "{total} proposals: {link} linked, {fuzzy} fuzzy, {create} to create",
+      "bulkAccept": "Accept all matches with confidence ≥ 0.9",
+      "accepted": "{n} proposals accepted.",
+      "columnSource": "Gesdén treatment",
+      "columnProposed": "Proposal",
+      "columnAction": "Action",
+      "columnStatus": "Status",
+      "actionLink": "Link to catalog",
+      "actionFuzzy": "Fuzzy match",
+      "actionCreate": "Create new",
+      "operatorPending": "Pending",
+      "operatorAccepted": "Accepted",
+      "operatorRelinked": "Relinked",
+      "operatorCreated": "Create new",
+      "operatorIgnored": "Ignored",
+      "acceptRow": "Accept",
+      "ignoreRow": "Ignore"
     },
     "status": {
       "uploaded": "Uploaded",

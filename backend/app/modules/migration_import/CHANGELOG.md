@@ -2,6 +2,88 @@
 
 ## Unreleased
 
+- feat(professional): operator-tunable filtering at execute time.
+  Adds four knobs to ``ExecuteRequest`` — ``professional_min_activity_months``
+  (default 24), ``professional_exclude_agenda_orphans`` (on),
+  ``professional_exclude_inactive_in_source`` (on),
+  ``professional_exclude_non_clinical_roles`` (off). Rows that match any
+  enabled signal are still imported as Users (so historical FKs from
+  appointments / treatments / budgets / payments keep resolving) but
+  with ``is_active=False`` and ``ClinicMembership.role='assistant'`` so
+  the agenda filters them out. Each filtered row also emits an
+  ``info`` ``ImportWarning`` with the trigger reason. Real-world impact
+  on a representative Gesdén export: 100 imported staff (60 clinical +
+  40 auxiliary) collapses to ~22 active clinicians — close to the
+  clinic's actual 10-doctor headcount. Operators can review and
+  reactivate individual users from Settings → Users after import.
+- feat(preview): the entity preview now carries a
+  ``professional_breakdown`` block when the file declares
+  ``professional`` rows (deactivated / agenda-orphan / stale-24m /
+  no-activity counts plus a per-role tally). Drives the new wizard
+  filter panel so operators see how many staff each signal would
+  catch before they execute.
+- chore(schema): ``migration_import_jobs`` gains a JSONB
+  ``execute_options`` column (alembic ``mig_0003``) so future
+  operator opt-ins can be added without per-knob migrations.
+- fix(fiscal_document): resolve patient via ``client_to_patients`` map
+  instead of demanding ``patient_uuid`` on the payload. Gesdén's
+  ``DocAdmin`` is keyed on the **client** (payer) — a single invoice
+  can cover several family patients — so the canonical layer correctly
+  emits ``client_uuid`` only. Mapping path: 1 patient → use it,
+  N patients (family billing) → use the first and emit
+  ``fiscal_document.family_billing`` warning. End-to-end validated on
+  a real 500-patient Gesdén export: invoices imported climbed from
+  7 → 554 (547 had been failing as ``mapper.failed``).
+- feat(catalog_item): new generic dispatcher mapper. Handles
+  ``catalog_item`` (DPMF) → DentalPin. Today only ``kind=chair``
+  produces real rows: Gesdén ``TBoxes`` entries land as
+  :class:`agenda.Cabinet` so imported appointments resolve a real
+  ``cabinet_id`` instead of always landing on the DentalPin demo
+  cabinets. Other kinds (country, province, payment_method, …)
+  archive to :class:`RawEntity` for forward-compat. The
+  ``AppointmentMapper`` now resolves ``chair_uuid`` through the new
+  mapper's resolver (was a TODO).
+- feat(catalog): bidirectional subset-token rule inside the category
+  filter. When the mapper has a confirmed category (from
+  ``IdTipoODG``) and one seed candidate's tokens are a strict subset
+  of the source tokens (or vice versa), accept the link even below
+  the 0.7 threshold — but only when a single candidate wins. Catches
+  the common Gesdén pattern where the label appends a detail token
+  ("OBTURACION COMPOSITE PERMANENTE" vs ``Obturación composite``) or
+  drops one ("RECONSTRUCCION ESTETICA" vs ``Reconstrucción estética
+  con composite``). Validated on a real 189-row Gesdén ``Tratamientos``
+  export: auto-link rate climbed from ~13 % → ~20 % without
+  introducing new false positives beyond what operator review
+  surfaces.
+- feat(catalog): smarter Gesdén catalog mapper. The IdTipoODG signal
+  (46-value ``TTipoOdg`` master) now drives a per-category fuzzy
+  search instead of a flat global one, with a looser 0.7 threshold
+  inside the right bucket and the existing 0.8 elsewhere. A curated
+  abbreviation alias map (``OBTUR``→``obturacion``, ``MC``→``metal
+  ceramica``, ``IMPL TI``→``implante titanio``, …) expands the
+  Gesdén short labels before scoring so they reach the seed entries
+  they obviously match. When no match exists, the new item lands in
+  the inferred category (instead of always ``Importado de Gesdén``)
+  with inferred ``treatment_scope``, ``requires_surfaces`` and
+  ``odontogram_treatment_type`` — so migrated rows now paint on the
+  odontogram. All Gesdén-specific tables live in the new
+  ``mappers/_gesden_catalog.py`` module to keep the global catalog
+  schema untouched.
+- feat(proposals): new ``MappingDecision`` entity + four endpoints —
+  ``POST /jobs/{id}/proposals`` builds the per-row mapping proposals
+  in a dry-run pass, ``GET`` lists them paginated, ``PATCH``
+  ``/jobs/{id}/proposals/{canonical_uuid}`` records an operator
+  override (accept / relink / create-new / ignore), and ``POST
+  /jobs/{id}/proposals/bulk_accept`` accepts every high-confidence
+  match (default ≥ 0.9). Execute consults the table first and falls
+  back to the automatic matcher when no decision exists
+  (backward-compatible). Migration ``mig_0002`` adds the table on the
+  module's branch; uninstall round-trip drops it.
+- feat(applied_treatment): shared the 46-value ``IdTipoODG`` →
+  ``TreatmentType`` lookup with the catalog mapper via
+  ``mappers/_gesden_catalog`` so both stay in sync. Removes the
+  partial 14-entry duplicate that used to live inside
+  ``applied_treatment.py``.
 - fix(catalog): match Gesdén ``Tratamientos`` against the DentalPin
   seed even when the source label uses abbreviations/dots
   ("OBTUR. COMP.", "ENDODONCIA UNI."). The previous matcher required a

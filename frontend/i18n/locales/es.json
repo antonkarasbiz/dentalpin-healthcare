@@ -118,9 +118,11 @@
       "debt": "Deuda"
     },
     "sort": {
+      "lastVisit": "Última visita",
       "lastName": "Apellidos",
       "firstName": "Nombre",
-      "createdAt": "Registro"
+      "createdAt": "Registro",
+      "updatedAt": "Editado recientemente"
     },
     "doNotContact": {
       "label": "No contactar",

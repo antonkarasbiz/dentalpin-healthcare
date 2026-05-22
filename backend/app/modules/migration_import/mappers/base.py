@@ -197,6 +197,27 @@ class MappingResolver:
 
 
 @dataclass
+class ProfessionalFilterOptions:
+    """Knobs that gate which source professionals stay agenda-visible.
+
+    Applied by :class:`mappers.professional.ProfessionalMapper`. Every
+    filtered row is still imported as a ``User`` (so historical FKs
+    from appointments / treatments / budgets / payments keep resolving)
+    but with ``is_active=False`` and ``ClinicMembership.role='assistant'``
+    — that combination removes the row from the agenda's clinician list
+    (`backend/app/core/auth/router.py` filters on role + is_active).
+
+    Defaults mirror :class:`ExecuteRequest`. A ``None`` instance on the
+    context disables all filtering (legacy execute paths and tests).
+    """
+
+    min_activity_months: int = 24
+    exclude_agenda_orphans: bool = True
+    exclude_inactive_in_source: bool = True
+    exclude_non_clinical_roles: bool = False
+
+
+@dataclass
 class MapperContext:
     """Per-job context handed to every mapper invocation."""
 
@@ -206,6 +227,7 @@ class MapperContext:
     resolver: MappingResolver
     import_fiscal_compliance: bool
     created_by: UUID  # The admin who launched the import; used as actor for created_by FKs.
+    professional_filters: ProfessionalFilterOptions | None = field(default=None)
     # Optional reference to the open DPMF handle. Populated by the
     # service orchestrator inside ``_run_pipeline``. Mappers that need
     # to peek at sibling rows (e.g. the applied_treatment shadow-pairing

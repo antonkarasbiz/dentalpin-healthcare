@@ -14,7 +14,7 @@ DentalPin this requires three rows in cooperation:
    presupuesto" catch-all per patient.
 2. **One ``odontogram.Treatment``** for the actual tooth treatment
    record. ``clinical_type`` is derived from the raw Gesdén
-   ``IdTipoOdg`` code via ``_TIPO_ODG_TO_CLINICAL_TYPE`` so the UI
+   ``IdTipoOdg`` code via :func:`clinical_type_for_tipo_odg` so the UI
    shows real names ("filling_composite", "implant", "crown" …)
    instead of every row landing as the catch-all "migrated". The
    catalog item is also linked so the imported budget/treatment
@@ -43,6 +43,7 @@ from app.modules.odontogram.models import ToothRecord, Treatment, TreatmentTooth
 from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPlan
 
 from ..models import ImportWarning
+from ._gesden_catalog import clinical_type_for_tipo_odg
 from .base import MapperContext
 
 # Gesdén ``TtosMed.StaTto`` codes that mean "treatment was performed".
@@ -92,31 +93,12 @@ _MIGRATED_PLAN_STATUS = "active"
 # warnings so the operator can backfill the mapping.
 _FALLBACK_CLINICAL_TYPE = "migrated"
 
-# Gesdén ``IdTipoOdg`` codes (from ``TTipoOdg``) → DentalPin
-# ``TreatmentType`` enum values. Only odontogram-relevant codes are
-# included; admin/audit codes (Anotación, Nota Económica, Visita No
-# Atendida, Primera Visita, Nuevo Paciente, Bonos, Genérico, …) fall
-# through to the catch-all because they aren't tooth treatments.
-_TIPO_ODG_TO_CLINICAL_TYPE: dict[int, str] = {
-    7: "band",  # Bandas
-    8: "bracket",  # Brackets
-    21: "root_canal_full",  # Endodoncia
-    22: "filling_composite",  # Obturaciones
-    23: "apicoectomy",  # Apicectomía
-    24: "implant",  # Implante
-    25: "post",  # Perno-Muñón
-    26: "crown",  # Corona
-    27: "bridge",  # Puente
-    32: "sealant",  # Sellado
-    33: "veneer",  # Carilla
-    34: "filling_composite",  # Raspado → coarse fallback (no SRP enum yet)
-    35: "extraction",  # Cirugía → most often extraction-related
-    36: "extraction",  # Extracción Corona
-    37: "extraction",  # Extracción Pieza
-    44: "extraction",  # Rechazo Implante → records implant removal
-    45: "extraction",  # Retirada Implante
-    46: "implant",  # Reposición Implante
-}
+# Gesdén ``IdTipoOdg`` → DentalPin ``TreatmentType`` resolution lives
+# in :mod:`._gesden_catalog` and is shared with the catalog template
+# mapper so the two stay in sync over the 46-value ``TTipoOdg`` master.
+# Use :func:`clinical_type_for_tipo_odg` — returns ``None`` for
+# non-clinical entries (Higiene, Panorámica, Anotación, …) which this
+# mapper treats as the catch-all ``"migrated"``.
 
 # Once a treatment is realised, its DentalPin ``clinical_type`` often
 # implies an observable artefact on the tooth (missing, crown,
@@ -1046,10 +1028,14 @@ def _coerce_int(value: Any) -> int | None:
 
 
 def _resolve_clinical_type(id_tipo_odg: int | None) -> tuple[str, bool]:
-    """Return ``(clinical_type, was_resolved)`` for a Gesdén ``IdTipoOdg``."""
-    if id_tipo_odg is None:
-        return _FALLBACK_CLINICAL_TYPE, False
-    mapped = _TIPO_ODG_TO_CLINICAL_TYPE.get(id_tipo_odg)
+    """Return ``(clinical_type, was_resolved)`` for a Gesdén ``IdTipoOdg``.
+
+    Backed by the shared :mod:`._gesden_catalog` table. ``None`` from
+    the shared lookup (non-clinical Gesdén row like Higiene/Panorámica
+    or a value we genuinely don't know) maps to the catch-all
+    ``_FALLBACK_CLINICAL_TYPE`` so the operator sees a warning.
+    """
+    mapped = clinical_type_for_tipo_odg(id_tipo_odg)
     if mapped is None:
         return _FALLBACK_CLINICAL_TYPE, False
     return mapped, True

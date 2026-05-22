@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- feat(seed): cover advanced surgical, periodontal and orthodontic
+  techniques that any modern Spanish clinic offers and the Gesdén
+  importer was previously dumping into ``Importado de Gesdén``. New
+  catalog items: ``SURG-PRP`` (Plasma rico en plaquetas / PRGF),
+  ``SURG-PERIIMP`` (tratamiento de periimplantitis), ``SURG-BONE-VERT``
+  + ``SURG-BONE-HORIZ`` (aumento óseo vertical y horizontal),
+  ``SURG-SINUS-CLOSED`` (elevación de seno cerrada / atraumática),
+  ``PERIO-GINGIV`` (gingivectomía), ``PERIO-SURG-RESECT`` +
+  ``PERIO-SURG-REGEN`` (cirugía periodontal resectiva y regenerativa),
+  ``ORTO-TAD`` (microtornillo / anclaje esquelético temporal),
+  ``ENDO-APICOFORM`` (apicoformación), ``PED-SPACE-COMPOUND``
+  (mantenedor de espacio compuesto). Renames ``PED-FILL-TEMP`` from
+  "Obturación en pieza temporal" to "Obturación en dentición
+  temporal" — the standard Spanish wording, disambiguates from
+  ``REST-TEMP`` (temporary filling material on any tooth).
+- feat(seed): broaden coverage for Gesdén imports — add 36 treatments
+  across diagnóstico (urgencia, segunda opinión, telerradiografía),
+  preventivo (tartrectomía con curetaje, profilaxis infantil),
+  restauradora (reconstrucción amplia, recementado de corona, corona
+  sobre endodonciado, pilares de cicatrización/definitivo, reparación
+  de obturación), endodoncia (apertura cameral urgente, recambio
+  medicación, endo en temporal), periodoncia (curetaje por sextante,
+  estudio periodontal, férula post-RAR), cirugía (injerto conectivo,
+  alargamiento coronario, exéresis de quiste, exodoncia de incluido,
+  regularización ósea), ortodoncia (cementado / descementado de
+  bracket, separadores, expansor palatino), estética (reconstrucción
+  estética, eliminación de pigmentación), prótesis (provisional
+  removible, ajuste oclusal), odontopediatría (extracción / obturación
+  en temporal, pulpectomía). Lifts the seed from 82 to 118 items so
+  the migration_import fuzzy matcher finds a real destination instead
+  of dumping treatments in ``Importado de Gesdén``.
 - feat(seed): add catalog items for implant-supported crowns —
   ``REST-CROWN-IMPL-MC`` (metal-ceramic), ``REST-CROWN-IMPL-ZIR``
   (zirconia) and ``REST-CROWN-IMPL-PROV`` (provisional). They map to

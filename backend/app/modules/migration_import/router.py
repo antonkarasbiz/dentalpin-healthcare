@@ -45,10 +45,16 @@ from app.database import get_db
 
 from .binaries.ingest import ingest_binary
 from .lifecycle import _staging_root
+from .proposals import ProposalsService
 from .schemas import (
+    BulkAcceptRequest,
+    BulkAcceptResponse,
     ExecuteRequest,
     ImportJobResponse,
+    MappingDecisionPatch,
+    MappingDecisionResponse,
     PreviewResponse,
+    ProposalsBuildResponse,
     ValidateRequest,
     WarningResponse,
 )
@@ -199,6 +205,9 @@ async def execute_job(
         ctx.clinic_id,
         passphrase=request.passphrase,
         import_fiscal_compliance=request.import_fiscal_compliance,
+        execute_options=request.model_dump(
+            exclude={"import_fiscal_compliance", "passphrase"},
+        ),
     )
     return ApiResponse(data=ImportJobResponse.model_validate(job))
 
@@ -277,6 +286,123 @@ async def list_warnings(
         page=page,
         page_size=page_size,
     )
+
+
+# ---------------------------------------------------------------------------
+# Proposals — operator review of catalog mappings before execute
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/jobs/{job_id}/proposals",
+    response_model=ApiResponse[ProposalsBuildResponse],
+)
+async def build_proposals(
+    job_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("migration_import.job.execute"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    payload: ValidateRequest | None = None,
+) -> ApiResponse[ProposalsBuildResponse]:
+    """Run the catalog mapper in dry-run mode, persisting one
+    :class:`MappingDecision` per Gesdén ``treatment_catalog_item``.
+    Idempotent: re-calling skips rows already proposed and returns the
+    full tally.
+    """
+    job = await _get_job_or_404(db, ctx.clinic_id, job_id)
+    counts = await ProposalsService.build_proposals(
+        db, job, passphrase=(payload.passphrase if payload else None)
+    )
+    summary = ProposalsBuildResponse(
+        total=sum(counts.values()),
+        link=counts.get("link", 0),
+        fuzzy_link=counts.get("fuzzy_link", 0),
+        create=counts.get("create", 0),
+    )
+    return ApiResponse(data=summary)
+
+
+@router.get(
+    "/jobs/{job_id}/proposals",
+    response_model=PaginatedApiResponse[MappingDecisionResponse],
+)
+async def list_proposals(
+    job_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("migration_import.job.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    operator_action: str | None = Query(default=None),
+    proposed_action: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
+) -> PaginatedApiResponse[MappingDecisionResponse]:
+    await _get_job_or_404(db, ctx.clinic_id, job_id)
+    items, total = await ProposalsService.list_proposals(
+        db,
+        job_id,
+        page=page,
+        page_size=page_size,
+        operator_action=operator_action,
+        proposed_action=proposed_action,
+    )
+    return PaginatedApiResponse(
+        data=[MappingDecisionResponse.model_validate(i) for i in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.patch(
+    "/jobs/{job_id}/proposals/{canonical_uuid}",
+    response_model=ApiResponse[MappingDecisionResponse],
+)
+async def patch_proposal(
+    job_id: UUID,
+    canonical_uuid: str,
+    patch: MappingDecisionPatch,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("migration_import.job.execute"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[MappingDecisionResponse]:
+    await _get_job_or_404(db, ctx.clinic_id, job_id)
+    try:
+        decision = await ProposalsService.update_decision(
+            db,
+            job_id,
+            canonical_uuid,
+            operator_action=patch.operator_action,
+            operator_target_id=patch.operator_target_id,
+            operator_target_category_key=patch.operator_target_category_key,
+            operator_notes=patch.operator_notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    if decision is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="proposal not found"
+        )
+    return ApiResponse(data=MappingDecisionResponse.model_validate(decision))
+
+
+@router.post(
+    "/jobs/{job_id}/proposals/bulk_accept",
+    response_model=ApiResponse[BulkAcceptResponse],
+)
+async def bulk_accept_proposals(
+    job_id: UUID,
+    body: BulkAcceptRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("migration_import.job.execute"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[BulkAcceptResponse]:
+    await _get_job_or_404(db, ctx.clinic_id, job_id)
+    accepted = await ProposalsService.bulk_accept(
+        db, job_id, min_score=body.min_score, include_exact=body.include_exact
+    )
+    return ApiResponse(data=BulkAcceptResponse(accepted=accepted))
 
 
 # ---------------------------------------------------------------------------

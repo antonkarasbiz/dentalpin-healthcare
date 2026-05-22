@@ -13,7 +13,11 @@ Routes mounted at `/api/v1/migration_import/`.
 - `POST   /jobs`                       — `migration_import.job.write`. Upload `.dpm`.
 - `POST   /jobs/{id}/validate`         — `migration_import.job.write`. Decrypt/decompress/verify hash.
 - `POST   /jobs/{id}/preview`          — `migration_import.job.read`. Entity counts + sample rows + verifactu detection.
-- `POST   /jobs/{id}/execute`          — `migration_import.job.execute`. Runs mappers as a BackgroundTask.
+- `POST   /jobs/{id}/proposals`        — `migration_import.job.execute`. Dry-run catalog mapper, persist per-row `MappingDecision`. Idempotent.
+- `GET    /jobs/{id}/proposals`        — `migration_import.job.read`. Paginated list filterable by `operator_action` and `proposed_action`.
+- `PATCH  /jobs/{id}/proposals/{canonical_uuid}` — `migration_import.job.execute`. Operator decision: accepted / relinked / create_new / ignored.
+- `POST   /jobs/{id}/proposals/bulk_accept` — `migration_import.job.execute`. Accept every pending proposal whose score ≥ `min_score` (default 0.9).
+- `POST   /jobs/{id}/execute`          — `migration_import.job.execute`. Runs mappers as a BackgroundTask. Honours `MappingDecision` when present.
 - `GET    /jobs`                       — `migration_import.job.read`.
 - `GET    /jobs/{id}`                  — `migration_import.job.read`.
 - `GET    /jobs/{id}/warnings`         — `migration_import.job.read`.
@@ -63,6 +67,19 @@ mappers. Used to bump `ImportJob.processed_entities`.
 
 ## Gotchas
 
+- **Gesdén-specific tables live in ``mappers/_gesden_catalog.py``.**
+  ``IdTipoODG`` (46-value ``TTipoOdg`` master) drives clinical_type,
+  treatment_scope, requires_surfaces, category, pricing strategy AND
+  the abbreviation alias map. Both ``catalog.py`` and
+  ``applied_treatment.py`` consume the same tables — adding a new
+  IdTipoODG value lights up everywhere. The module asserts coverage
+  at import time so silent drift is impossible.
+- **Operator overrides win.** When ``MappingDecision.operator_action``
+  is not ``pending``, ``CatalogItemMapper.apply`` honours it instead
+  of running the matcher: ``accepted`` uses the proposal, ``relinked``
+  uses ``operator_target_id``, ``create_new`` forces creation in
+  ``operator_target_category_key``, ``ignored`` marks the row as
+  skipped (no resolver mapping, no catalog row).
 - **Patient ledger source of truth: ``DeudaCli``.** `DebtMapper`
   is the only mapper that writes ``PatientEarnedEntry`` — it
   consumes canonical ``debt`` rows (one per non-anulado, non-

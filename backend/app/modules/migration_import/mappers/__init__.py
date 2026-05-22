@@ -21,10 +21,11 @@ from __future__ import annotations
 from .applied_treatment import AppliedTreatmentMapper
 from .applied_treatment_phase import AppliedTreatmentPhaseMapper
 from .appointment import AppointmentMapper
-from .base import MapperContext, MappingResolver
+from .base import MapperContext, MappingResolver, ProfessionalFilterOptions
 from .budget import BudgetMapper
 from .budget_line import BudgetLineMapper
-from .catalog import CatalogItemMapper
+from .catalog import CatalogItemMapper as TreatmentCatalogItemMapper
+from .catalog_item import CatalogItemMapper
 from .catalog_variant import CatalogVariantMapper
 from .debt import DebtMapper
 from .document import DocumentMapper
@@ -47,6 +48,7 @@ PaymentMapperInst = PaymentMapper()
 FiscalDocumentMapperInst = FiscalDocumentMapper()
 FiscalDocumentLineMapperInst = FiscalDocumentLineMapper()
 AppointmentMapperInst = AppointmentMapper()
+TreatmentCatalogItemMapperInst = TreatmentCatalogItemMapper()
 CatalogItemMapperInst = CatalogItemMapper()
 CatalogVariantMapperInst = CatalogVariantMapper()
 BudgetMapperInst = BudgetMapper()
@@ -68,8 +70,9 @@ MAPPERS: dict[str, object] = {
     "fiscal_document": FiscalDocumentMapperInst,
     "fiscal_document_line": FiscalDocumentLineMapperInst,
     "appointment": AppointmentMapperInst,
-    "treatment_catalog_item": CatalogItemMapperInst,
+    "treatment_catalog_item": TreatmentCatalogItemMapperInst,
     "treatment_catalog_variant": CatalogVariantMapperInst,
+    "catalog_item": CatalogItemMapperInst,
     "budget": BudgetMapperInst,
     "budget_line": BudgetLineMapperInst,
     "applied_treatment": AppliedTreatmentMapperInst,
@@ -85,4 +88,5 @@ __all__ = [
     "MAPPERS",
     "MapperContext",
     "MappingResolver",
+    "ProfessionalFilterOptions",
 ]

@@ -35,11 +35,47 @@
       "confirm": "Confirmar e importar",
       "warning": "Esta acción no se puede deshacer. Revisa los datos antes de confirmar."
     },
+    "filters": {
+      "title": "Filtrado de profesionales",
+      "description": "Los profesionales filtrados se importan como inactivos (se conservan las referencias históricas pero quedan ocultos en la agenda). Puedes reactivarlos después en Ajustes → Usuarios.",
+      "totalLabel": "Total",
+      "deactivatedLabel": "Inactivos en origen",
+      "orphansLabel": "Columnas solo de agenda",
+      "stale24mLabel": "Sin actividad en 24m",
+      "minActivityLabel": "Actividad mínima (meses)",
+      "minActivityHelp": "Desactiva automáticamente a los profesionales sin actividad clínica más reciente que este número de meses. Pon 0 para desactivar la comprobación.",
+      "excludeOrphans": "Excluir columnas de agenda sin colaborador real asociado",
+      "excludeInactive": "Excluir profesionales marcados como inactivos en el origen",
+      "excludeNonClinical": "Importar solo dentistas e higienistas (descartar auxiliares y administración)"
+    },
     "execute": {
       "running": "Importando…",
       "progress": "{processed} de {total} entidades",
       "ok": "Importación completada",
       "failed": "La importación ha fallado"
+    },
+    "proposals": {
+      "title": "Revisar mapeos del catálogo",
+      "subtitle": "Asocia cada tratamiento de Gesdén al catálogo de DentalPin antes de importar.",
+      "build": "Calcular propuestas",
+      "building": "Calculando…",
+      "summary": "{total} propuestas: {link} enlazados, {fuzzy} similitud, {create} nuevos",
+      "bulkAccept": "Aceptar todos los matches con confianza ≥ 0,9",
+      "accepted": "{n} propuestas aceptadas.",
+      "columnSource": "Tratamiento Gesdén",
+      "columnProposed": "Propuesta",
+      "columnAction": "Acción",
+      "columnStatus": "Estado",
+      "actionLink": "Enlazar a catálogo",
+      "actionFuzzy": "Similitud",
+      "actionCreate": "Crear nuevo",
+      "operatorPending": "Pendiente",
+      "operatorAccepted": "Aceptado",
+      "operatorRelinked": "Re-enlazado",
+      "operatorCreated": "Crear nuevo",
+      "operatorIgnored": "Ignorado",
+      "acceptRow": "Aceptar",
+      "ignoreRow": "Ignorar"
     },
     "status": {
       "uploaded": "Subido",

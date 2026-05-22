@@ -10,7 +10,7 @@ Field mapping from `CanonicalAppointment` (DPMF v0.1):
 | duration_minutes    | end_time = start + duration              |
 | coarse_status       | status (mapped to agenda enum)           |
 | notes               | notes                                    |
-| chair_uuid          | _skipped_ — requires catalog mapper (#TODO) |
+| chair_uuid          | cabinet_id — resolved via CatalogItemMapper kind=chair |
 
 Skips with a warning when the source row is unusable: missing patient,
 missing professional, or no schedule (date/time null). Re-running the
@@ -113,6 +113,15 @@ class AppointmentMapper:
 
         status = _STATUS_MAP.get((payload.get("coarse_status") or "unknown").lower(), "scheduled")
 
+        # Cabinet (Gesdén ``TBoxes``) — landed earlier by the
+        # ``catalog_item`` mapper. Missing chair_uuid is fine: the
+        # cabinet is optional on the model and the operator can
+        # assign one later on the kanban board.
+        chair_uuid = payload.get("chair_uuid")
+        cabinet_id = (
+            await ctx.resolver.get("catalog_item", str(chair_uuid)) if chair_uuid else None
+        )
+
         data: dict[str, Any] = {
             "patient_id": patient_id,
             "professional_id": professional_id,
@@ -120,6 +129,7 @@ class AppointmentMapper:
             "end_time": end_dt,
             "status": status,
             "notes": payload.get("notes") or None,
+            "cabinet_id": cabinet_id,
         }
         data = {k: v for k, v in data.items() if v is not None}
 
