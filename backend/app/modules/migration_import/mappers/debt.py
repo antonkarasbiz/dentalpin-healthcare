@@ -130,6 +130,7 @@ class DebtMapper:
         catalog_item_id: UUID | None = None
         professional_id: UUID | None = None
         performed_at: datetime | None = None
+        clinical_type: str | None = None
         if treatment_id is not None:
             row = await ctx.db.execute(
                 select(
@@ -137,6 +138,7 @@ class DebtMapper:
                     Treatment.performed_by,
                     Treatment.performed_at,
                     Treatment.recorded_at,
+                    Treatment.clinical_type,
                 ).where(Treatment.id == treatment_id)
             )
             result = row.first()
@@ -144,6 +146,7 @@ class DebtMapper:
                 catalog_item_id = result.catalog_item_id
                 professional_id = result.performed_by
                 performed_at = result.performed_at or result.recorded_at
+                clinical_type = result.clinical_type
 
         # 6) Performed timestamp. Prefer (a) the source ``FecPlazo``
         # (due date — usually when the line was billed), (b) the
@@ -153,14 +156,21 @@ class DebtMapper:
         when = _parse_date(payload.get("due_date")) or performed_at or datetime.now(UTC)
 
         # 7) Snapshot label so the UI timeline can render without
-        # rejoining the source. 160 chars is the model cap.
+        # rejoining the source. The payments service ledger query
+        # prefers the joined catalog name, falls back to this
+        # ``description`` field, then to ``source_event`` — so a
+        # human label here saves the row from showing the raw
+        # ``migration_import:debt`` tag when the treatment has no
+        # destination catalog link. Format: friendly clinical type +
+        # source identifiers for traceability. 160 chars is the cap.
         treatment_number = payload.get("treatment_number")
         phase_number = payload.get("phase_number")
-        bits = [f"Adeudo Gesdén IdDeudaCli={source_id}"]
+        head = _CLINICAL_TYPE_LABELS.get(clinical_type, "Tratamiento migrado")
+        bits = [head]
         if treatment_number:
-            bits.append(f"NumTto={treatment_number}")
+            bits.append(f"NumTto {treatment_number}")
         if phase_number is not None:
-            bits.append(f"Fase={phase_number}")
+            bits.append(f"fase {phase_number}")
         description = " · ".join(bits)[:160]
 
         # The earned-entries table enforces ``(treatment_id,
@@ -195,6 +205,44 @@ class DebtMapper:
             dentalpin_id=entry.id,
         )
         return entry.id
+
+
+# Human-readable Spanish labels for the destination ``clinical_type``
+# values written by ``AppliedTreatmentMapper``. Used as the leading
+# bit of ``PatientEarnedEntry.description`` so the patient Pagos
+# timeline shows "Implante · NumTto 12 · fase 1" instead of the raw
+# ``migration_import:debt`` source_event tag when the underlying
+# Treatment lacks a destination ``TreatmentCatalogItem`` link (very
+# common: only ~33% of migrated treatments match a seed catalog
+# entry). Keys mirror the enum in ``odontogram.constants``.
+_CLINICAL_TYPE_LABELS: dict[str | None, str] = {
+    "band": "Banda ortodóncica",
+    "bracket": "Bracket",
+    "root_canal_full": "Endodoncia",
+    "root_canal_two_thirds": "Endodoncia parcial",
+    "root_canal_half": "Endodoncia parcial",
+    "root_canal_overfill": "Endodoncia",
+    "filling_composite": "Obturación composite",
+    "filling_amalgam": "Obturación amalgama",
+    "filling_temporary": "Obturación temporal",
+    "apicoectomy": "Apicectomía",
+    "implant": "Implante",
+    "post": "Perno",
+    "crown": "Corona",
+    "bridge": "Puente",
+    "sealant": "Sellado",
+    "veneer": "Carilla",
+    "extraction": "Extracción",
+    "inlay": "Incrustación",
+    "overlay": "Recubrimiento",
+    "crown_on_implant": "Corona sobre implante",
+    "provisional_crown_on_implant": "Corona provisional sobre implante",
+    "splint": "Férula",
+    "retainer": "Retenedor",
+    "attachment": "Attachment",
+    "migrated": "Tratamiento migrado",
+    None: "Adeudo migrado",
+}
 
 
 # Sentinel ``treatment_id`` for orphan debts whose source

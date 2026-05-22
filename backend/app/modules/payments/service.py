@@ -576,6 +576,7 @@ class LedgerService:
             text(
                 """
                 SELECT pe.id, pe.amount, pe.performed_at, pe.source_event,
+                       pe.description AS row_description,
                        pe.treatment_id, pe.professional_id,
                        t.status AS treatment_status,
                        ci.names AS catalog_names,
@@ -593,22 +594,25 @@ class LedgerService:
         for row in result.mappings():
             catalog_names = row["catalog_names"] or {}
             # Catalog names are stored as i18n JSONB; prefer the
-            # operative language Spanish, fall back to English, then
-            # to the source-event tag (e.g. "migration_import") so the
-            # row is never label-less.
+            # operative language Spanish, fall back to English.
             treatment_name: str | None = None
             if isinstance(catalog_names, dict):
                 treatment_name = catalog_names.get("es") or catalog_names.get("en")
             prof_first = row["prof_first_name"] or ""
             prof_last = row["prof_last_name"] or ""
             prof_name = f"{prof_first} {prof_last}".strip() or None
+            # Display label fallback chain: catalog name (joined) →
+            # snapshot ``description`` (writer-supplied human label,
+            # e.g. multi-session label or migration debt context) →
+            # bare ``source_event`` so the row is never label-less.
+            display_description = treatment_name or row["row_description"] or row["source_event"]
             entries.append(
                 LedgerEntry(
                     entry_type="earned",
                     occurred_at=row["performed_at"],
                     amount=row["amount"],
                     reference_id=row["id"],
-                    description=treatment_name or row["source_event"],
+                    description=display_description,
                     treatment_id=row["treatment_id"],
                     treatment_name=treatment_name,
                     treatment_status=row["treatment_status"],
