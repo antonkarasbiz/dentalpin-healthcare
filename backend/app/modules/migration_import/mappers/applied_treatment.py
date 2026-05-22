@@ -40,7 +40,6 @@ from sqlalchemy import select
 from app.modules.budget.models import Budget, BudgetItem
 from app.modules.clinical_notes.models import ClinicalNote
 from app.modules.odontogram.models import ToothRecord, Treatment, TreatmentTooth
-from app.modules.payments.models import PatientEarnedEntry
 from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPlan
 
 from ..models import ImportWarning
@@ -236,6 +235,11 @@ class AppliedTreatmentMapper:
         # Shadows whose performed twin hasn't been seen yet — we'll
         # redirect their resolver mapping once the twin lands.
         self._pending_shadow_links: dict[str, list[str]] = defaultdict(list)
+        #   performed_canonical_uuid -> Treatment.id
+        # Sidecar so the same redirection happens for the
+        # ``applied_treatment_record`` resolver entry — the DebtMapper
+        # reads that side car to recover the destination Treatment row.
+        self._performed_treatment_id: dict[str, UUID] = {}
 
     async def apply(
         self,
@@ -283,13 +287,21 @@ class AppliedTreatmentMapper:
                 f"(canonical_uuid={twin_uuid}).",
             )
             twin_item_id = self._performed_item_id.get(twin_uuid)
-            if twin_item_id is not None:
+            twin_treatment_id = self._performed_treatment_id.get(twin_uuid)
+            if twin_item_id is not None and twin_treatment_id is not None:
                 await ctx.resolver.set(
                     entity_type="applied_treatment",
                     canonical_uuid=canonical_uuid,
                     source_system=source_system,
                     dentalpin_table="planned_treatment_items",
                     dentalpin_id=twin_item_id,
+                )
+                await ctx.resolver.set(
+                    entity_type="applied_treatment_record",
+                    canonical_uuid=canonical_uuid,
+                    source_system=source_system,
+                    dentalpin_table="treatments",
+                    dentalpin_id=twin_treatment_id,
                 )
             else:
                 self._pending_shadow_links[twin_uuid].append(canonical_uuid)
@@ -308,32 +320,32 @@ class AppliedTreatmentMapper:
             if await ctx.resolver.was_skipped("applied_treatment", canonical_uuid):
                 return None
             # The row carries no tooth and shouldn't pollute the
-            # odontogram chart, BUT non-clinical Gesdén entries often
-            # carry a real billed amount (hygiene visits, panoramic
-            # X-rays, fluorisation, "Bonos", first-visit consultations,
-            # generic services). Dropping their value entirely inflated
-            # patient credit because the payments that covered them
-            # stayed on the ledger while the matching earned amount
-            # disappeared. Record the financial value as a synthetic
-            # ``PatientEarnedEntry`` so the patient balance reconciles;
-            # skip Treatment / TreatmentTooth / PlannedTreatmentItem.
+            # odontogram chart. We still materialise it on the plan
+            # view (hygiene visits, panoramic X-rays, fluorisation,
+            # "Bonos", first-visit consultations…) so the clinical
+            # timeline doesn't lose them. The patient ledger is
+            # driven separately by ``DebtMapper`` reading ``DeudaCli`` —
+            # this code path no longer touches earned entries.
             await _warn(
                 ctx,
                 source_id,
                 "applied_treatment.non_clinical_entry",
-                f"Entrada no clínica omitida (IdTipoOdg={id_tipo_odg}).",
+                f"Entrada no clínica registrada solo en plan (IdTipoOdg={id_tipo_odg}).",
             )
-            plan_item_id = await self._maybe_record_non_clinical_earned(
+            result = await self._record_non_clinical_treatment(
                 ctx,
                 patient_id=patient_id,
                 payload=payload,
                 source_id=source_id,
                 id_tipo_odg=id_tipo_odg,
             )
-            if plan_item_id is not None:
+            if result is not None:
+                plan_item_id, treatment_id = result
                 # Register against ``applied_treatment`` so downstream
                 # entities (phases, fiscal lines) that reference this
-                # canonical resolve to the synthetic plan item.
+                # canonical resolve to the synthetic plan item, and the
+                # sidecar ``applied_treatment_record`` so ``DebtMapper``
+                # can recover the Treatment row.
                 await ctx.resolver.set(
                     entity_type="applied_treatment",
                     canonical_uuid=canonical_uuid,
@@ -341,12 +353,18 @@ class AppliedTreatmentMapper:
                     dentalpin_table="planned_treatment_items",
                     dentalpin_id=plan_item_id,
                 )
-            else:
-                # No earned entry created (zero amount or not formal_done).
-                # Drop a skip sentinel so re-runs don't re-warn.
-                await ctx.resolver.mark_skipped(
-                    "applied_treatment", canonical_uuid, source_system
+                await ctx.resolver.set(
+                    entity_type="applied_treatment_record",
+                    canonical_uuid=canonical_uuid,
+                    source_system=source_system,
+                    dentalpin_table="treatments",
+                    dentalpin_id=treatment_id,
                 )
+            else:
+                # Non-realised non-clinical row → no plan/treatment
+                # created. Drop a skip sentinel so re-runs don't
+                # re-warn.
+                await ctx.resolver.mark_skipped("applied_treatment", canonical_uuid, source_system)
             return None
 
         professional_id: UUID | None = None
@@ -530,46 +548,14 @@ class AppliedTreatmentMapper:
         ctx.db.add(item)
         await ctx.db.flush()
 
-        # 3) PatientEarnedEntry — the patient ledger feeds off this
-        # table. The normal flow populates it via
-        # ``treatment_plan.item_session_completed`` /
-        # ``odontogram.treatment.performed`` event handlers in
-        # payments. Migration writes via the model directly to skip
-        # the event chain (we don't want spurious notifications for
-        # historic data) but we *must* still create the row, otherwise
-        # completed treatments don't count against the payments
-        # received and the balance reads "patient has a huge credit".
-        #
-        # We gate on ``is_realised`` (formal-done **or** heuristic
-        # promotion via age/notes), not just ``formal_done``. The
-        # previous gate left an inconsistency: heuristic-promoted
-        # rows landed with ``Treatment.status='performed'`` and
-        # ``PlannedTreatmentItem.status='completed'`` (so the plan
-        # tab shows the work done) yet skipped the earned-ledger row
-        # — the pagos tab then claimed the patient had a huge credit
-        # against work the UI told them was finished. The audit
-        # warnings (``completed_by_age``, ``completed_by_notes``)
-        # remain in place so ops can review the heuristic
-        # classifications.
-        if is_realised and amount is not None and amount != 0:
-            # Negative amounts are credit-note corrections coming from
-            # Gesdén — needed so the patient ledger nets out correctly
-            # against the matching payments. The CHECK constraint was
-            # lifted in ``pay_0003`` precisely for this path.
-            ctx.db.add(
-                PatientEarnedEntry(
-                    clinic_id=ctx.clinic_id,
-                    patient_id=patient_id,
-                    treatment_id=treatment.id,
-                    catalog_item_id=catalog_item_id,
-                    amount=amount,
-                    performed_at=end_dt or start_dt,
-                    professional_id=professional_id,
-                    source_event="migration_import",
-                    description=(payload.get("notes") or "")[:160] or None,
-                )
-            )
-            await ctx.db.flush()
+        # The patient ledger is populated by ``DebtMapper`` from
+        # ``DeudaCli`` (the only Gesdén source of truth for "this work
+        # was billed"). Booking earned from ``TtosMed.Importe`` would
+        # over-book — ~76% of realised treatments in real Gesdén
+        # exports have no ``DeudaCli``: staff/family/courtesy work,
+        # "incluido" bundle lines, pre-billing-system historicals.
+        # The clinical record below still lands so the odontogram and
+        # plan view show the work.
 
         # 4) ClinicalNote — Gesdén stores per-treatment narrative
         # (composite shade, implant lot, anaesthetic, surfaces,
@@ -605,13 +591,28 @@ class AppliedTreatmentMapper:
             dentalpin_table="planned_treatment_items",
             dentalpin_id=item.id,
         )
+        # Sidecar mapping for ``DebtMapper``: it needs ``Treatment.id``
+        # to enrich earned entries (catalog_item_id, professional_id,
+        # performed_at) and to honour the ledger's
+        # ``(treatment_id, source_session_id)`` constraint. The
+        # primary ``applied_treatment`` entry resolves to the
+        # PlannedTreatmentItem so downstream phase/budget mappers keep
+        # working; this second entry resolves to the Treatment row.
+        await ctx.resolver.set(
+            entity_type="applied_treatment_record",
+            canonical_uuid=canonical_uuid,
+            source_system=source_system,
+            dentalpin_table="treatments",
+            dentalpin_id=treatment.id,
+        )
 
         # Drain shadows that arrived before this performed twin: now
         # that the performed has a ``PlannedTreatmentItem``, redirect
         # each pending planned canonical_uuid at it so any
-        # ``applied_treatment_phase`` / ``budget_line`` still
-        # resolves cleanly.
+        # ``applied_treatment_phase`` / ``budget_line`` / ``debt``
+        # still resolves cleanly.
         self._performed_item_id[canonical_uuid] = item.id
+        self._performed_treatment_id[canonical_uuid] = treatment.id
         pending = self._pending_shadow_links.pop(canonical_uuid, None)
         if pending:
             for planned_uuid in pending:
@@ -622,6 +623,13 @@ class AppliedTreatmentMapper:
                     dentalpin_table="planned_treatment_items",
                     dentalpin_id=item.id,
                 )
+                await ctx.resolver.set(
+                    entity_type="applied_treatment_record",
+                    canonical_uuid=planned_uuid,
+                    source_system=source_system,
+                    dentalpin_table="treatments",
+                    dentalpin_id=treatment.id,
+                )
 
         return item.id
 
@@ -629,13 +637,22 @@ class AppliedTreatmentMapper:
         """One-pass scan over every ``applied_treatment`` row in the
         DPMF, building the planned→performed shadow map.
 
-        Pairing key: ``(patient_uuid, IdTto, IdTipoOdg, sorted_teeth)``.
+        Pairing key — preferred: ``(patient_uuid, IdPresuTto)``.
+        Gesdén explicitly links a planned (StaTto=3) line and its
+        realised twin via shared ``IdPresuTto`` (the budget-line FK,
+        ``PresuTto.Ident``), so two TtosMed rows sharing that FK are
+        the same clinical event even when ``IdTto`` differs (which
+        happens when the tariff was edited between plan-creation and
+        execution).
+
+        Fallback key — when ``IdPresuTto`` is null on either side:
+        ``(patient_uuid, IdTto, IdTipoOdg, sorted_teeth)``. Rows with
+        no budget link can still pair against same-tariff, same-type,
+        same-teeth siblings within the 24-month window.
+
         Within a group we match each performed row with the closest
-        earlier planned that no other performed has claimed yet, as
-        long as it falls inside the 24-month window. Rows missing any
-        component of the key (typically global-mouth procedures with
-        no IdTto) are still grouped — they only collide with other
-        same-key rows, which is the intended semantics.
+        earlier planned that no other performed has claimed yet,
+        within ``_SHADOW_WINDOW_DAYS``.
 
         Lazy: built on first call, returns ``{}`` when the DPMF
         handle isn't available (test paths, programmatic use).
@@ -657,17 +674,24 @@ class AppliedTreatmentMapper:
             patient_uuid = payload.get("patient_uuid")
             if not patient_uuid:
                 continue
-            id_tto = _coerce_int(raw.get("IdTto"))
-            id_tipo_odg = _coerce_int(raw.get("IdTipoOdg"))
-            if id_tto is None or id_tipo_odg is None:
-                continue
-            teeth = payload.get("teeth") or []
-            teeth_key = tuple(sorted(int(t) for t in teeth))
             start_dt = _parse_datetime(payload.get("start_date"))
             end_dt = _parse_datetime(payload.get("end_date"))
             status_code = _coerce_int(payload.get("status_code"))
             performed = status_code in _REALISED_CODES or end_dt is not None
-            key = (str(patient_uuid), id_tto, id_tipo_odg, teeth_key)
+
+            budget_line_uuid = payload.get("budget_line_uuid")
+            if budget_line_uuid:
+                key: tuple[Any, ...] = (
+                    "budget_line",
+                    str(patient_uuid),
+                    str(budget_line_uuid),
+                )
+            else:
+                id_tto = _coerce_int(raw.get("IdTto"))
+                id_tipo_odg = _coerce_int(raw.get("IdTipoOdg"))
+                teeth = payload.get("teeth") or []
+                teeth_key = tuple(sorted(int(t) for t in teeth))
+                key = ("legacy", str(patient_uuid), id_tto, id_tipo_odg, teeth_key)
             groups[key].append(
                 {
                     "canonical_uuid": cu,
@@ -713,7 +737,7 @@ class AppliedTreatmentMapper:
         self._shadow_index = shadow
         return shadow
 
-    async def _maybe_record_non_clinical_earned(
+    async def _record_non_clinical_treatment(
         self,
         ctx: MapperContext,
         *,
@@ -721,36 +745,37 @@ class AppliedTreatmentMapper:
         payload: dict[str, Any],
         source_id: str,
         id_tipo_odg: int | None,
-    ) -> UUID | None:
-        """Project a billable non-clinical Gesdén row (hygiene visit,
-        panoramic X-ray, fluorisation, generic service…) into the
-        destination so the patient ledger AND the per-patient
-        plan/payments UI both reflect it.
+    ) -> tuple[UUID, UUID] | None:
+        """Project a non-clinical Gesdén row (hygiene visit, panoramic
+        X-ray, fluorisation, "Bonos", primera visita, generic service…)
+        into the destination plan view.
 
-        Three rows go in:
+        Two rows go in:
 
         - ``Treatment(scope='global_mouth', clinical_type='migrated')``
-          so the row is enumerable from the treatment plan view but
-          paints no tooth on the odontogram chart.
-        - ``PlannedTreatmentItem`` on the same per-year catch-all plan
-          that hosts the patient's tooth treatments, so users browsing
-          ``/patients/{id}?tab=clinical&clinicalMode=plans`` actually
-          see what the patient was billed for.
-        - ``PatientEarnedEntry`` keyed by the new ``treatment_id`` so
-          the pagos tab adds up to the same total as the plan.
+          so the row is enumerable from the plan view + BOCA COMPLETA
+          strip but paints no tooth on the odontogram chart.
+        - ``PlannedTreatmentItem`` on the per-year catch-all plan so
+          ``/patients/{id}?tab=clinical&clinicalMode=plans`` lists what
+          the patient received.
 
-        Gates: ``is_realised`` rows (formal-done by ``StaTto`` ∈ {5,6}
-        or ``FecFin``, **or** heuristically promoted by age/notes —
-        matching the standard path's policy) AND non-zero ``Importe``
-        (negatives are kept — Gesdén records refunds and discounts
-        that way; see ``pay_0003``).
+        The patient ledger is **not** touched here. ``DeudaCli`` is the
+        only source of truth for billing — when a DPMF debt row points
+        at this canonical the ``DebtMapper`` will recover the Treatment
+        row via the ``applied_treatment_record`` resolver sidecar (set
+        by the caller in ``apply()``).
+
+        Gates: realised rows only — formal-done by ``StaTto ∈ {5,6}``
+        or ``FecFin``, or heuristically promoted by age/notes. Returns
+        ``(plan_item_id, treatment_id)`` or ``None`` when the row is
+        still planned. Amount is informational only; we accept null /
+        zero / negative — the Treatment row still surfaces on the
+        timeline.
         """
-        amount = _decimal_or_none(payload.get("amount"))
-        if amount is None or amount == 0:
-            return None
         status_code = _coerce_int(payload.get("status_code"))
         start_dt = _parse_datetime(payload.get("start_date")) or datetime.now(UTC)
         end_dt = _parse_datetime(payload.get("end_date"))
+        amount = _decimal_or_none(payload.get("amount"))
         formal_done = status_code in _REALISED_CODES or end_dt is not None
         is_realised = formal_done
         if not is_realised:
@@ -792,7 +817,9 @@ class AppliedTreatmentMapper:
 
         # 1) Treatment header — global_mouth keeps it off the per-tooth
         # paint while still enumerable from the plan view and the
-        # whole-mouth chip strip.
+        # whole-mouth chip strip. ``price_snapshot`` carries the
+        # source ``Importe`` for reference; the ledger amount comes
+        # from ``DeudaCli`` via ``DebtMapper``.
         treatment = Treatment(
             clinic_id=ctx.clinic_id,
             patient_id=patient_id,
@@ -832,26 +859,7 @@ class AppliedTreatmentMapper:
         )
         ctx.db.add(item)
         await ctx.db.flush()
-
-        # 3) Earned ledger — keyed by the real Treatment.id now, no
-        # synthetic uuid5 needed; the unique constraint
-        # ``(treatment_id, source_session_id)`` remains satisfied
-        # because each migrated row gets its own Treatment.
-        ctx.db.add(
-            PatientEarnedEntry(
-                clinic_id=ctx.clinic_id,
-                patient_id=patient_id,
-                treatment_id=treatment.id,
-                catalog_item_id=catalog_item_id,
-                amount=amount,
-                performed_at=end_dt or start_dt,
-                professional_id=professional_id,
-                source_event="migration_import",
-                description=(payload.get("notes") or f"Gesdén IdTipoOdg={id_tipo_odg}")[:160],
-            )
-        )
-        await ctx.db.flush()
-        return item.id
+        return item.id, treatment.id
 
     async def _update_tooth_condition(
         self,

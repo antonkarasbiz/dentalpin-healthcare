@@ -86,9 +86,7 @@ class FiscalDocumentMapper:
             invoice_number = f"{source_series}-{source_number}"
 
         issue_date = _parse_date(payload.get("document_date") or payload.get("issued_at"))
-        created_by = await ctx.resolver.resolve_actor(
-            payload.get("user_uuid"), ctx.created_by
-        )
+        created_by = await ctx.resolver.resolve_actor(payload.get("user_uuid"), ctx.created_by)
         invoice = Invoice(
             id=uuid4(),
             clinic_id=ctx.clinic_id,

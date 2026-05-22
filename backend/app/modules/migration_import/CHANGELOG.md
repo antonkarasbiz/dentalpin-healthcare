@@ -2,6 +2,82 @@
 
 ## Unreleased
 
+- fix(catalog): match Gesdén ``Tratamientos`` against the DentalPin
+  seed even when the source label uses abbreviations/dots
+  ("OBTUR. COMP.", "ENDODONCIA UNI."). The previous matcher required a
+  lower-cased exact hit on ``names->>'es'`` so practically every
+  source row fell into "Importado de Gesdén" and the odontogram +
+  plan view ended up showing "migrated" instead of the real
+  treatment name. The new matcher normalises both sides (accent
+  strip, punctuation→whitespace, whitespace collapse), then falls
+  back to a ``difflib`` similarity ratio ≥ 0.88 when the exact form
+  misses. Single best match wins; ties or sub-threshold scores fall
+  through to the create path. Fuzzy hits emit a
+  ``catalog.fuzzy_matched`` info warning so ops can spot-check.
+- feat(debt): new ``DebtMapper`` (``mappers/debt.py``) makes
+  Gesdén's ``DeudaCli`` table the only source of truth for the
+  patient ledger. One non-anulado / non-uncollectible debt row with
+  ``Adeudo > 0`` produces one ``PatientEarnedEntry`` with
+  ``amount = Adeudo``, idempotently keyed by a uuid5-derived
+  ``source_session_id`` so multi-phase billings on the same
+  treatment land cleanly. ``AppliedTreatmentMapper`` no longer
+  writes earned entries from ``TtosMed.Importe`` — that signal was
+  the catalog reference price (~76% of realised treatments in real
+  exports have no matching ``DeudaCli`` and were therefore booking
+  phantom debt). The clinical history is unchanged: Treatment,
+  PlannedTreatmentItem, TreatmentTooth, ToothRecord general
+  conditions and ClinicalNote keep coming from
+  ``AppliedTreatmentMapper`` regardless of billing — patients with
+  realised work but no debt see their odontogram and plan with
+  balance = 0.
+- feat(debt): sidecar resolver entry ``applied_treatment_record`` →
+  ``treatments.id`` set inside ``AppliedTreatmentMapper`` so
+  ``DebtMapper`` can recover the destination Treatment row (for
+  catalog_item_id / professional_id / performed_at snapshots and
+  for the ledger uniqueness constraint). Shadow planned twins
+  inherit the redirect along with the existing
+  ``applied_treatment`` mapping so a ``DeudaCli`` pointing at the
+  planned row still lands on the realised twin.
+- feat(payment): negative ``PagoCli`` rows now create
+  ``payments.Refund`` rows tied to a DentalPin ``Payment`` instead
+  of being skipped. ``_resolve_refund_target`` tries three
+  canonical-space signals in order: (1) explicit chain via
+  ``related_payment_uuid`` (``IdPagoCliRelacionado``), (2) first
+  positive ``PagoCli`` booked against the same
+  ``applied_treatment_uuid``, (3) most recent positive ``PagoCli``
+  for the same ``client_uuid`` whose source ``Pagado`` equals the
+  refund's ``abs(amount)``. The third signal anchors on the
+  canonical source amount so family-split downstream Payments
+  don't break the match. No date window — migration data often has
+  multi-year gaps between an original payment and its refund row
+  (post-hoc reconciliations), and the
+  ``Σ Refund.amount ≤ Payment.amount`` invariant prevents over-
+  refunding regardless. Refunds with none of the three signals
+  emit ``payment.refund_unmappable`` and drop. The previous
+  ``amount <= 0 → skip`` branch is split into
+  ``payment.zero_amount`` for true zeros and the refund branch for
+  negatives.
+- refactor(applied_treatment): removed ``_ensure_paid_index`` /
+  ``_paid_index`` (now driven from ``DeudaCli``, not ``PagoCli``
+  reverse lookup) and both ``PatientEarnedEntry`` creation blocks.
+  ``_maybe_record_non_clinical_earned`` renamed
+  ``_record_non_clinical_treatment`` — it no longer touches the
+  ledger; it just lands Treatment + PlannedTreatmentItem so the
+  plan view keeps showing radiografías / TACs / Bonos / primera
+  visita. The ``applied_treatment.earned_skipped_no_payment_signal``
+  warning is retired (superseded by the ``DeudaCli`` model).
+- fix(applied_treatment): shadow-dedup of planned→performed twins now
+  groups by ``(patient_uuid, IdPresuTto)`` whenever both rows carry a
+  budget-line link. ``IdPresuTto`` is Gesdén's authoritative join
+  between a presupuesto line and the realised TtosMed (per
+  ``PresuTto.IdTtoMedOrig``), so this catches pairs the previous
+  key — ``(patient, IdTto, IdTipoOdg, sorted_teeth)`` — missed when
+  the tariff was edited between plan-creation and execution
+  (observed on real exports). The legacy key is kept as a fallback
+  for rows without budget linkage, and the early ``continue`` that
+  dropped null-``IdTipoOdg`` rows from
+  the pre-pass is removed so legacy-keyed groups see every row.
+
 - perf(resolver): bulk-preload the entity_mappings cache at the start
   of ``_run_pipeline``. Re-executes that hit short-circuits for every
   row used to do 1 DB SELECT per entity (1.27 M SELECTs on a real

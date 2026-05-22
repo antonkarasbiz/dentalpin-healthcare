@@ -237,9 +237,7 @@ class BudgetLineMapper:
         vat_type_id = result.scalar_one_or_none()
         vat_rate = 0.0
         if vat_type_id is not None:
-            row = await ctx.db.execute(
-                select(VatType.rate).where(VatType.id == vat_type_id)
-            )
+            row = await ctx.db.execute(select(VatType.rate).where(VatType.id == vat_type_id))
             vat_rate = float(row.scalar_one_or_none() or 0.0)
         info = (vat_type_id, vat_rate)
         self._vat_cache[catalog_item_id] = info

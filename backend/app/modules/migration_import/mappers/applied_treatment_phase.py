@@ -67,7 +67,9 @@ class AppliedTreatmentPhaseMapper:
         plan_item_id = await ctx.resolver.get("applied_treatment", str(parent_uuid))
         if plan_item_id is None:
             await _warn(
-                ctx, source_id, "phase.unmapped_parent",
+                ctx,
+                source_id,
+                "phase.unmapped_parent",
                 "Fase omitida: tratamiento padre no mapeado.",
             )
             await ctx.resolver.mark_skipped(

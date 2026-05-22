@@ -26,6 +26,7 @@ from .budget import BudgetMapper
 from .budget_line import BudgetLineMapper
 from .catalog import CatalogItemMapper
 from .catalog_variant import CatalogVariantMapper
+from .debt import DebtMapper
 from .document import DocumentMapper
 from .fiscal_document import FiscalDocumentMapper
 from .fiscal_document_line import FiscalDocumentLineMapper
@@ -55,6 +56,7 @@ AppliedTreatmentPhaseMapperInst = AppliedTreatmentPhaseMapper()
 PatientClientLinkMapperInst = PatientClientLinkMapper()
 PatientAlertMapperInst = PatientAlertMapper()
 PharmacologicalHistoryMapperInst = PharmacologicalHistoryMapper()
+DebtMapperInst = DebtMapper()
 FALLBACK_MAPPER = RawEntityMapper()
 
 MAPPERS: dict[str, object] = {
@@ -75,6 +77,7 @@ MAPPERS: dict[str, object] = {
     "patient_client_link": PatientClientLinkMapperInst,
     "patient_alert": PatientAlertMapperInst,
     "pharmacological_history": PharmacologicalHistoryMapperInst,
+    "debt": DebtMapperInst,
 }
 
 __all__ = [

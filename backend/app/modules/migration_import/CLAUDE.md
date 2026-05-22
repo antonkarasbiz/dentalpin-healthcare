@@ -63,6 +63,27 @@ mappers. Used to bump `ImportJob.processed_entities`.
 
 ## Gotchas
 
+- **Patient ledger source of truth: ``DeudaCli``.** `DebtMapper`
+  is the only mapper that writes ``PatientEarnedEntry`` — it
+  consumes canonical ``debt`` rows (one per non-anulado, non-
+  uncollectible Gesdén receivable with ``Adeudo > 0``). The
+  ``applied_treatment`` mapper used to derive earned from
+  ``TtosMed.Importe`` (the catalog reference price) but that
+  over-books by ~50% in real exports because most realised
+  treatments are off-books (staff / family / courtesy work,
+  "incluido" bundle lines, pre-billing-system historicals).
+  Clinical history is independent: Treatment, PlannedTreatmentItem,
+  TreatmentTooth, ToothRecord conditions and ClinicalNote all land
+  regardless of whether ``DeudaCli`` ever materialised, so the
+  odontogram + plan view still surface every realised treatment.
+  ``DebtMapper`` registers a sidecar ``applied_treatment_record``
+  resolver entry from ``AppliedTreatmentMapper`` to recover the
+  Treatment row for catalog/professional/performed_at snapshots and
+  to honour the
+  ``(treatment_id, source_session_id)`` uniqueness constraint —
+  if you add another writer of ``PatientEarnedEntry`` here, use a
+  uuid5-derived ``source_session_id`` to keep multi-phase rows
+  collision-free.
 - **`clinic_id` always comes from `ctx`**, never from the DPMF payload.
   Mappers that read `clinic_id` from the file are a tenancy bug.
 - **External IDs are never used as FKs.** Every cross-entity reference

@@ -616,9 +616,9 @@ class ImportJobService:
                 if not plan_item_by_uuid:
                     continue
                 pti_rows = await db.execute(
-                    select(
-                        PlannedTreatmentItem.id, PlannedTreatmentItem.treatment_id
-                    ).where(PlannedTreatmentItem.id.in_(plan_item_by_uuid.values()))
+                    select(PlannedTreatmentItem.id, PlannedTreatmentItem.treatment_id).where(
+                        PlannedTreatmentItem.id.in_(plan_item_by_uuid.values())
+                    )
                 )
                 treatment_by_plan_item = {r[0]: r[1] for r in pti_rows.all()}
                 for budget_item_id, applied_uuid in batch:
@@ -672,11 +672,7 @@ class ImportJobService:
             return
         for batch_start in range(0, len(budget_ids), 200):
             batch = budget_ids[batch_start : batch_start + 200]
-            budgets = (
-                (await db.execute(select(Budget).where(Budget.id.in_(batch))))
-                .scalars()
-                .all()
-            )
+            budgets = (await db.execute(select(Budget).where(Budget.id.in_(batch)))).scalars().all()
             for budget in budgets:
                 await BudgetService._recalculate_totals(db, budget)
             await db.commit()

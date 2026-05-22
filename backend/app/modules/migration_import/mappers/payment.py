@@ -13,7 +13,8 @@ data.
 
 from __future__ import annotations
 
-from datetime import date
+import json as _json
+from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
@@ -49,12 +50,44 @@ _PAYMENT_KIND_MAP: dict[int, str] = {
     5: "insurance",
 }
 
+# In a live system 90 days would be the right window for matching a
+# refund to its source payment. Migration import is different: real
+# Gesdén exports often have a multi-year gap between the original
+# ``PagoCli`` and the refund row that voided it (post-hoc data
+# entries, lump-sum reconciliations, treatments that were paid and
+# then refunded years later when the work was undone). Inside the
+# importer we trade strict temporal correlation for completeness —
+# refunds still attach to a same-client + same-amount Payment, the
+# constraint ``Σ Refund.amount ≤ Payment.amount`` keeps over-refund
+# impossible, and the operator can re-assign individual refunds in
+# the UI if a recovered attachment is wrong.
+_REFUND_DATE_WINDOW_DAYS: int | None = None
+
 
 class PaymentMapper:
     def __init__(self) -> None:
         # Clinic.currency is a snapshot field on payments.Payment;
         # resolved once per clinic and reused for the whole job.
         self._currency_cache: dict[UUID, str] = {}
+        # Refund-target lookup tables, built together by a single DPMF
+        # pre-pass over ``payment`` rows on first refund hit. All keys
+        # are canonical (source-space) — the destination Payment.id is
+        # resolved through ``EntityMapping`` afterwards, so the
+        # canonical → Payment chain works regardless of family-split.
+        #
+        # ``_refund_target_built`` flips True after the scan so the
+        # other two dicts may legitimately stay empty.
+        self._refund_target_built: bool = False
+        # applied_treatment_uuid → canonical_payment_uuid (first
+        # positive PagoCli against that TtosMed).
+        self._refund_target_by_treatment: dict[str, str] = {}
+        # (client_uuid, source_amount) → list of (paid_on,
+        # canonical_payment_uuid) ordered by paid_on. Used when
+        # ``IdPagoCliRelacionado`` is null and the refund's
+        # applied_treatment_uuid doesn't share a positive sibling —
+        # we still match on "the same client paid this exact amount
+        # within the refund window".
+        self._refund_target_by_client_amount: dict[tuple[str, str], list[tuple[date, str]]] = {}
 
     async def apply(
         self,
@@ -109,11 +142,26 @@ class PaymentMapper:
         except (InvalidOperation, TypeError):
             await _warn(ctx, source_id, "payment.invalid_amount", "Pago omitido: importe inválido.")
             return None
-        if amount <= 0:
-            await _warn(
-                ctx, source_id, "payment.zero_amount", "Pago omitido: importe nulo o negativo."
-            )
+        if amount == 0:
+            await _warn(ctx, source_id, "payment.zero_amount", "Pago omitido: importe nulo.")
             return None
+        if amount < 0:
+            # Gesdén ``PagoCli`` with ``Pagado < 0`` is a refund of an
+            # earlier payment (linked via ``IdPagoCliRelacionado``).
+            # The destination ``Refund`` entity needs a FK to the
+            # original ``Payment``, so we resolve via the canonical
+            # ``related_payment_uuid``. When the source row never
+            # imported (rare, e.g. orphan refund in a subset), warn
+            # and drop — we don't manufacture synthetic payments to
+            # offset, the user explicitly chose strict refund matching.
+            return await self._apply_refund(
+                ctx,
+                payload=payload,
+                source_id=source_id,
+                source_system=source_system,
+                canonical_uuid=canonical_uuid,
+                amount=abs(amount),
+            )
 
         # Canonical Payment exposes ``payment_kind`` (the source numeric
         # ``Tipo`` code) and ``payment_method_uuid`` (FK to the source
@@ -136,9 +184,7 @@ class PaymentMapper:
         # Preserve original Gesdén cashier when available — falls back
         # to the migration admin when the source had no user link or
         # the referenced user wasn't imported.
-        recorded_by = await ctx.resolver.resolve_actor(
-            payload.get("user_uuid"), ctx.created_by
-        )
+        recorded_by = await ctx.resolver.resolve_actor(payload.get("user_uuid"), ctx.created_by)
 
         from app.modules.payments.models import Payment
 
@@ -195,6 +241,190 @@ class PaymentMapper:
             dentalpin_id=first_payment_id,
         )
         return first_payment_id
+
+    async def _resolve_refund_target(
+        self, ctx: MapperContext, payload: dict[str, Any]
+    ) -> UUID | None:
+        """Find the destination ``Payment.id`` a refund should attach
+        to. Three canonical-space signals tried in order:
+
+        1. **Explicit chain**: Gesdén's ``IdPagoCliRelacionado``
+           (``payload["related_payment_uuid"]``).
+        2. **Same-treatment positive**: the first positive ``PagoCli``
+           booked against the same ``applied_treatment_uuid``.
+        3. **Same client + same source amount**: the most recent
+           positive ``PagoCli`` from the same ``client_uuid`` whose
+           source ``Pagado`` equals ``abs(refund_amount)`` and whose
+           ``paid_on`` falls within ``_REFUND_DATE_WINDOW_DAYS``
+           before the refund. Anchored on the canonical PagoCli
+           amount, not the per-patient share, so a family-split
+           original Payment still matches.
+
+        Each level resolves through ``EntityMapping`` so the
+        ``Refund → Payment → patient_id`` chain stays correct.
+        Returns ``None`` when no signal yields a Payment that landed
+        in DentalPin; the caller emits
+        ``payment.refund_unmappable``.
+        """
+        related = payload.get("related_payment_uuid")
+        if related:
+            resolved = await ctx.resolver.get("payment", str(related))
+            if resolved is not None:
+                return resolved
+        self._ensure_refund_target_index(ctx)
+        at_uuid = payload.get("applied_treatment_uuid")
+        if at_uuid:
+            candidate = self._refund_target_by_treatment.get(str(at_uuid))
+            if candidate:
+                resolved = await ctx.resolver.get("payment", candidate)
+                if resolved is not None:
+                    return resolved
+        return await self._match_refund_by_client_amount(ctx, payload)
+
+    async def _match_refund_by_client_amount(
+        self, ctx: MapperContext, payload: dict[str, Any]
+    ) -> UUID | None:
+        """Pick the most recent positive ``PagoCli`` from the same
+        ``client_uuid`` with the same source ``Pagado`` as the
+        refund's ``abs(amount)``, within the date window.
+        """
+        client_uuid = payload.get("client_uuid")
+        if not client_uuid:
+            return None
+        amount = _decimal_or_none(payload.get("amount"))
+        if amount is None or amount == 0:
+            return None
+        candidates = self._refund_target_by_client_amount.get((str(client_uuid), str(abs(amount))))
+        if not candidates:
+            return None
+        # Iterate from the tail because the pre-pass appends in DPMF
+        # iteration order (typically ascending paid_on), so the last
+        # qualifying hit is the most recent. No date filter — see the
+        # ``_REFUND_DATE_WINDOW_DAYS`` comment for the rationale.
+        for _paid_on, canonical in reversed(candidates):
+            resolved = await ctx.resolver.get("payment", canonical)
+            if resolved is not None:
+                return resolved
+        return None
+
+    def _ensure_refund_target_index(self, ctx: MapperContext) -> None:
+        """Single DPMF scan that populates both refund-lookup tables.
+
+        - ``_refund_target_by_treatment`` keeps the first positive
+          ``PagoCli`` per ``applied_treatment_uuid``.
+        - ``_refund_target_by_client_amount`` collects every positive
+          ``PagoCli`` per ``(client_uuid, source_amount_str)``,
+          ordered by ``paid_on`` (ascending — appends preserve
+          source-iteration order). ``_match_refund_by_client_amount``
+          consumes from the tail to pick the most recent that fits
+          the refund's date window.
+
+        Both tables only consider positive payments. Idempotent
+        across calls via ``_refund_target_built``. No-op when
+        ``ctx.handle`` is unavailable (test paths).
+        """
+        if self._refund_target_built:
+            return
+        self._refund_target_built = True
+        if ctx.handle is None:
+            return
+        for row in ctx.handle.entity_iter("payment"):
+            canonical_payment_uuid, _src_id, _src_sys, payload_json, _raw, _ts = row
+            try:
+                payload = _json.loads(payload_json)
+            except _json.JSONDecodeError:
+                continue
+            try:
+                amt = Decimal(str(payload.get("amount") or "0"))
+            except (InvalidOperation, TypeError):
+                continue
+            if amt <= 0:
+                continue
+            at_uuid = payload.get("applied_treatment_uuid")
+            if at_uuid:
+                self._refund_target_by_treatment.setdefault(str(at_uuid), canonical_payment_uuid)
+            client_uuid = payload.get("client_uuid")
+            if client_uuid:
+                paid_on = (
+                    _parse_date(
+                        payload.get("paid_on")
+                        or payload.get("paid_at")
+                        or payload.get("payment_date")
+                    )
+                    or date.min
+                )
+                key = (str(client_uuid), str(amt))
+                self._refund_target_by_client_amount.setdefault(key, []).append(
+                    (paid_on, canonical_payment_uuid)
+                )
+
+    async def _apply_refund(
+        self,
+        ctx: MapperContext,
+        *,
+        payload: dict[str, Any],
+        source_id: str,
+        source_system: str,
+        canonical_uuid: str,
+        amount: Decimal,
+    ) -> UUID | None:
+        """Import a negative ``PagoCli`` as a ``Refund`` row tied to a
+        DentalPin ``Payment``. Target resolution lives in
+        :meth:`_resolve_refund_target` — direct ``IdPagoCliRelacionado``
+        chain first, ``applied_treatment_uuid`` fallback second.
+
+        Refund model: ``payments.Refund(payment_id, amount, method,
+        reason_code, reason_note, refunded_at, refunded_by)``. The
+        amount is always positive; we pass ``abs(Pagado)``.
+        """
+        from app.modules.payments.models import Refund
+
+        original_payment_id = await self._resolve_refund_target(ctx, payload)
+        if original_payment_id is None:
+            await _warn(
+                ctx,
+                source_id,
+                "payment.refund_unmappable",
+                "Refund omitido: sin PagoCli original vinculado y sin "
+                "Payment al mismo tratamiento para asociar.",
+            )
+            return None
+
+        method = _PAYMENT_KIND_MAP.get(payload.get("payment_kind"), "other")
+        refunded_at = _parse_date(
+            payload.get("paid_on") or payload.get("paid_at") or payload.get("payment_date")
+        )
+        if refunded_at is None:
+            refunded_at = date.today()
+        refunded_at_dt = datetime(refunded_at.year, refunded_at.month, refunded_at.day, tzinfo=UTC)
+        refunded_by = await ctx.resolver.resolve_actor(payload.get("user_uuid"), ctx.created_by)
+
+        notes = payload.get("notes") or f"Importado dental-bridge (PagoCli={source_id})"
+        refund = Refund(
+            clinic_id=ctx.clinic_id,
+            payment_id=original_payment_id,
+            amount=amount,
+            method=method,
+            reason_code="other",
+            reason_note=notes[:1000],
+            refunded_at=refunded_at_dt,
+            refunded_by=refunded_by,
+        )
+        ctx.db.add(refund)
+        await ctx.db.flush()
+
+        # Register against ``payment`` so a re-execute short-circuits
+        # at the top of apply(). We don't introduce a separate
+        # ``refund`` entity_type — the canonical row is a PagoCli, so
+        # the natural key stays in the payment namespace.
+        await ctx.resolver.set(
+            entity_type="payment",
+            canonical_uuid=canonical_uuid,
+            source_system=source_system,
+            dentalpin_table="refunds",
+            dentalpin_id=refund.id,
+        )
+        return refund.id
 
     async def _split_amounts(
         self,
@@ -280,4 +510,13 @@ def _parse_date(value: Any) -> date | None:
     try:
         return date.fromisoformat(str(value)[:10])
     except (TypeError, ValueError):
+        return None
+
+
+def _decimal_or_none(value: Any) -> Decimal | None:
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
         return None

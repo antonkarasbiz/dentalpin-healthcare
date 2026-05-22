@@ -181,9 +181,7 @@ class MappingResolver:
             return True
         return False
 
-    async def resolve_actor(
-        self, source_user_uuid: Any, fallback: UUID
-    ) -> UUID:
+    async def resolve_actor(self, source_user_uuid: Any, fallback: UUID) -> UUID:
         """Resolve a DPMF ``user_uuid`` to a destination ``users.id``.
 
         Falls back to ``fallback`` (typically ``ctx.created_by``) when

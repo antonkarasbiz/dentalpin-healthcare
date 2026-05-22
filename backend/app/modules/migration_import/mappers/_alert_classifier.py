@@ -52,9 +52,7 @@ class AlertClassification:
 def _strip_accents(text: str) -> str:
     """Strip Spanish accents so 'ALÉRGICO' matches the same rule as 'ALERGICO'."""
     return "".join(
-        ch
-        for ch in unicodedata.normalize("NFD", text)
-        if unicodedata.category(ch) != "Mn"
+        ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn"
     )
 
 
@@ -76,7 +74,12 @@ _RULES: Final[list[tuple[re.Pattern[str], str]]] = [
     # ---- Administrative leftovers ----
     (re.compile(r"^PRESU\b"), "administrative"),
     (re.compile(r"^DTO\b|DESCUENTO|^\d+\s*%"), "administrative"),
-    (re.compile(r"\b(?:COBRAR|COBRA|NO\s+SE\s+COBRA|ABONA|PAGAR|PAGA|ENVIAR\s+FACTURA|FACTURA\s+CADA)"), "administrative"),
+    (
+        re.compile(
+            r"\b(?:COBRAR|COBRA|NO\s+SE\s+COBRA|ABONA|PAGAR|PAGA|ENVIAR\s+FACTURA|FACTURA\s+CADA)"
+        ),
+        "administrative",
+    ),
     (re.compile(r"^BUSCAR\b"), "administrative"),
     (re.compile(r"^VIENE\s+REFERIDO|^REFERIDA?\s+POR\b"), "administrative"),
     (re.compile(r"\bHISTORIAL\s+ALERGICO\s+ESCANEADO\b"), "administrative"),
@@ -86,7 +89,12 @@ _RULES: Final[list[tuple[re.Pattern[str], str]]] = [
     # ---- Anesthesia ----
     (re.compile(r"\bANESTESIA\b|\bVASOCONSTRICTOR\b|SIN\s+VASO\b|\bADRENALINA\b"), "anesthesia"),
     # ---- Anticoagulants (medication subset that matters clinically) ----
-    (re.compile(r"\b(SINTROM|WARFARIN|ALDOCUMAR|HEPARIN|ADIRO|PRADAXA|XARELTO|ELIQUIS|CLOPIDOGREL|PLAVIX|ANTICOAG)"), "anticoagulant"),
+    (
+        re.compile(
+            r"\b(SINTROM|WARFARIN|ALDOCUMAR|HEPARIN|ADIRO|PRADAXA|XARELTO|ELIQUIS|CLOPIDOGREL|PLAVIX|ANTICOAG)"
+        ),
+        "anticoagulant",
+    ),
     # ---- Bruxism ----
     (re.compile(r"\bBRUXISM|\bRECHINAR\b|\bAPRIETA\s+(?:LOS\s+)?DIENTES\b"), "bruxism"),
     # ---- Lifestyle: smoking ----
@@ -162,9 +170,9 @@ def _extract(
     """Build the category-specific payload (item list, frequency string, …)."""
     if category in ("medication", "allergy"):
         match = pattern.search(normalised)
-        if match and ":" in raw[match.start():]:
+        if match and ":" in raw[match.start() :]:
             # Strip the "MEDICACION: " / "ALERGIA: " prefix before splitting.
-            payload = raw[match.start():].split(":", 1)[1]
+            payload = raw[match.start() :].split(":", 1)[1]
         elif raw.upper().startswith("TOMA "):
             payload = raw[5:]
         else:
