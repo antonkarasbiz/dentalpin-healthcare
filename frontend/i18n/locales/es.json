@@ -526,7 +526,8 @@
         "bridge_pontic": "Póntico",
         "rotate": "Rotado",
         "displace": "Desplazado",
-        "splint": "Férula"
+        "splint": "Férula",
+        "migrated": "Tratamiento general"
       },
       "treatmentAdded": "Tratamiento añadido",
       "treatmentPerformed": "Tratamiento marcado como realizado",

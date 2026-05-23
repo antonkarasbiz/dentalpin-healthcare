@@ -505,7 +505,8 @@
         "retainer": "Retainer",
         "rotate": "Rotated",
         "displace": "Displaced",
-        "splint": "Splint"
+        "splint": "Splint",
+        "migrated": "General treatment"
       },
       "treatmentAdded": "Treatment added",
       "treatmentPerformed": "Treatment marked as performed",

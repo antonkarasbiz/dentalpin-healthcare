@@ -33,14 +33,26 @@ function labelFor(tr: Treatment): string {
     = tr.catalog_item?.names?.[locale.value]
       || tr.catalog_item?.names?.es
       || tr.catalog_item?.names?.en
-  if (!name) return tr.clinical_type
-  if (tr.scope === 'global_arch' && tr.arch) {
-    const archLabel = tr.arch === 'upper'
-      ? t('odontogram.globals.upperArch')
-      : t('odontogram.globals.lowerArch')
-    return `${name} · ${archLabel}`
+  if (name) {
+    if (tr.scope === 'global_arch' && tr.arch) {
+      const archLabel = tr.arch === 'upper'
+        ? t('odontogram.globals.upperArch')
+        : t('odontogram.globals.lowerArch')
+      return `${name} · ${archLabel}`
+    }
+    return name
   }
-  return name
+  // Migrated free-text treatments often arrive without a catalog link
+  // (Gesdén TtosMed.IdTto is null when the receptionist typed it
+  // free-form). Show the notes as the label so the chip is meaningful
+  // instead of repeating the placeholder "migrated" clinical_type.
+  if (tr.clinical_type === 'migrated' && tr.notes) {
+    const trimmed = tr.notes.trim()
+    return trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed
+  }
+  const key = `odontogram.treatments.types.${tr.clinical_type}`
+  const translated = t(key)
+  return translated === key ? tr.clinical_type : translated
 }
 
 function iconFor(tr: Treatment): string {

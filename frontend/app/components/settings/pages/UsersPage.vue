@@ -14,6 +14,26 @@ const translatedRoles = computed(() =>
   }))
 )
 
+const ROLE_ORDER: Record<UserRole, number> = {
+  admin: 0,
+  dentist: 1,
+  hygienist: 2,
+  assistant: 3,
+  receptionist: 4
+}
+
+const sortedUsers = computed(() => {
+  return [...users.value].sort((a, b) => {
+    if (a.is_active !== b.is_active) return a.is_active ? -1 : 1
+    const ra = ROLE_ORDER[a.role] ?? 99
+    const rb = ROLE_ORDER[b.role] ?? 99
+    if (ra !== rb) return ra - rb
+    const na = `${a.first_name} ${a.last_name}`.toLowerCase()
+    const nb = `${b.first_name} ${b.last_name}`.toLowerCase()
+    return na.localeCompare(nb)
+  })
+})
+
 const showCreate = ref(false)
 const isCreating = ref(false)
 const newUser = ref({ email: '', password: '', first_name: '', last_name: '' })
@@ -155,7 +175,7 @@ async function handleDelete() {
       class="divide-y divide-[var(--color-border-subtle)]"
     >
       <div
-        v-for="user in users"
+        v-for="user in sortedUsers"
         :key="user.id"
         class="flex items-center justify-between gap-3 py-3 flex-wrap sm:flex-nowrap"
       >

@@ -131,7 +131,8 @@ function isHighlighted(itemId: string): boolean {
   return props.highlightedItems?.includes(itemId) ?? false
 }
 
-// Format item name: catalog name (localized) > clinical_type i18n key.
+// Format item name: catalog name (localized) > notes (when migrated
+// free-text with no catalog link) > clinical_type i18n key.
 // The catalog link lives on the Treatment — check item.catalog_item first (item
 // level, used for historical records), then item.treatment.catalog_item.
 function getItemName(item: PlannedTreatmentItem): string {
@@ -141,6 +142,12 @@ function getItemName(item: PlannedTreatmentItem): string {
     if (name) return name
   }
   const clinicalType = item.treatment?.clinical_type
+  if (clinicalType === 'migrated' && item.treatment?.notes) {
+    const trimmed = item.treatment.notes.trim()
+    if (trimmed.length > 0) {
+      return trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed
+    }
+  }
   if (clinicalType) {
     const key = `odontogram.treatments.types.${clinicalType}`
     const translated = t(key)
