@@ -555,6 +555,13 @@ async function handleCancel() {
 function closeModal() {
   emit('update:open', false)
 }
+
+function openPatientFile() {
+  if (!selectedPatient.value) return
+  const id = selectedPatient.value.id
+  closeModal()
+  navigateTo(`/patients/${id}`)
+}
 </script>
 
 <template>
@@ -576,12 +583,26 @@ function closeModal() {
               <h2 class="text-h1 text-default truncate">
                 {{ modalTitle }}
               </h2>
-              <p
+              <div
                 v-if="selectedPatient"
-                class="text-caption text-subtle truncate mt-0.5"
+                class="flex items-center gap-2 mt-0.5 flex-wrap min-w-0"
               >
-                {{ selectedPatient.first_name }} {{ selectedPatient.last_name }}
-              </p>
+                <p class="text-caption text-subtle truncate min-w-0">
+                  {{ selectedPatient.first_name }} {{ selectedPatient.last_name }}
+                </p>
+                <UButton
+                  v-if="can(PERMISSIONS.patients.read)"
+                  variant="link"
+                  color="primary"
+                  size="xs"
+                  icon="i-lucide-external-link"
+                  :padded="false"
+                  :aria-label="`${t('appointments.openPatientFile')} — ${selectedPatient.first_name} ${selectedPatient.last_name}`"
+                  @click="openPatientFile"
+                >
+                  {{ t('appointments.openPatientFile') }}
+                </UButton>
+              </div>
             </div>
             <UButton
               variant="ghost"

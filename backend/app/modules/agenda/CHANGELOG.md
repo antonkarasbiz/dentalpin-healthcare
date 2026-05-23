@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- feat(ux): `AppointmentModal` header now exposes an "Abrir ficha"
+  link next to the selected patient's name. Closes the modal and
+  navigates to `/patients/{id}` so receptionists/dentists can jump
+  to the clinical record without first cancelling the modal and
+  searching the patients list. Gated by `patients.read`; hidden
+  when no patient is selected yet.
 - fix(calendar-tz): ``useCalendarBounds`` and ``useBlockedSegments``
   now parse the wall-clock hour from the availability ISO string
   verbatim instead of routing it through ``new Date().getHours()``,
