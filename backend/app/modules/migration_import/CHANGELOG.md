@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- fix(entity_mappings): widen ``source_canonical_uuid`` from
+  ``VARCHAR(36)`` to ``VARCHAR(64)`` (alembic ``mig_0004``). The
+  ``appointment_note`` sidecar registers a derived canonical of shape
+  ``<uuid>:note`` (~41 chars), which silently overflowed the column
+  and aborted every appointment savepoint with
+  ``StringDataRightTruncationError`` — turning the entire
+  ``appointment`` entity into ``mapper.failed`` warnings (0 of N
+  appointments persisted). The widened column leaves room for future
+  ``<uuid>:<short_suffix>`` sidecars without another migration.
+- feat(recall): new ``RecallMapper`` hydrates Gesdén ``Recalls`` →
+  ``recalls.Recall``. Status derived from ``attended`` /
+  ``status_code`` / ``scheduled`` / ``contact_date``
+  (done / contacted_scheduled / contacted_no_answer / pending).
+  ``due_month`` bucketed from ``scheduled_date``; free-text
+  ``Comentario`` + ``Observaciones`` land in ``reason_note``.
+  Without a master decoder for ``IdMotivo`` the reason falls back to
+  ``other`` — the note preserves clinical context. Idempotent via
+  the resolver.
 - feat(appointment): free-text ``appointment.notes`` in the DPMF
   payload is now routed to a polymorphic ``ClinicalNote`` row
   (``owner_type='appointment'``,

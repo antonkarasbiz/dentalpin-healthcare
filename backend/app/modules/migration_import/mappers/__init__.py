@@ -38,6 +38,7 @@ from .payment import PaymentMapper
 from .pharmacological_history import PharmacologicalHistoryMapper
 from .professional import ProfessionalMapper
 from .raw import RawEntityMapper
+from .recall import RecallMapper
 from .user import UserMapper
 
 PatientMapperInst = PatientMapper()
@@ -59,6 +60,7 @@ PatientClientLinkMapperInst = PatientClientLinkMapper()
 PatientAlertMapperInst = PatientAlertMapper()
 PharmacologicalHistoryMapperInst = PharmacologicalHistoryMapper()
 DebtMapperInst = DebtMapper()
+RecallMapperInst = RecallMapper()
 FALLBACK_MAPPER = RawEntityMapper()
 
 MAPPERS: dict[str, object] = {
@@ -81,6 +83,7 @@ MAPPERS: dict[str, object] = {
     "patient_alert": PatientAlertMapperInst,
     "pharmacological_history": PharmacologicalHistoryMapperInst,
     "debt": DebtMapperInst,
+    "recall": RecallMapperInst,
 }
 
 __all__ = [

@@ -130,7 +130,7 @@ class EntityMapping(Base, TimestampMixin):
 
     source_system: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    source_canonical_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
+    source_canonical_uuid: Mapped[str] = mapped_column(String(64), nullable=False)
 
     dentalpin_table: Mapped[str] = mapped_column(String(60), nullable=False)
     dentalpin_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
