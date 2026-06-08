@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- feat(copilot): UI Fase 1 (PR-C) — humanized confirmations + copy. Write
+  confirmations now render labeled rows (`CopilotConfirmCard`) instead of raw
+  JSON: ids resolved to names via a session name cache harvested from read
+  tools (`patient_id` → "Olivia Wilson"), ISO datetimes formatted, a friendly
+  action line, and a red ring + "can't be undone" note for destructive tools
+  (cancel/delete/refund). Assistant messages get a hover "copy" button.
+  ES/EN parity. Frontend-only.
+
 - chore(copilot): default OpenAI chat model → `gpt-5.4-mini`
   (`COPILOT_MODEL_CHAT_OPENAI`). The OpenAI provider now sends
   `max_completion_tokens` instead of `max_tokens` for GPT-5 / o-series

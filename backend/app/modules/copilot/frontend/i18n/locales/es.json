@@ -8,6 +8,7 @@
     "empty": "Pregúntame sobre pacientes, agenda o pídeme que agende una cita.",
     "placeholder": "Escribe tu mensaje…",
     "send": "Enviar",
+    "copy": "Copiar",
     "new": "Nueva conversación",
     "thinking": "Pensando…",
     "you": "Tú",
@@ -72,7 +73,32 @@
       "approve": "Confirmar",
       "reject": "Cancelar",
       "approved": "Confirmado",
-      "rejected": "Cancelado"
+      "rejected": "Cancelado",
+      "destructiveNote": "Esta acción no se puede deshacer.",
+      "action": {
+        "book_appointment": "La IA quiere agendar una cita.",
+        "cancel_appointment": "La IA quiere cancelar una cita.",
+        "create_patient": "La IA quiere crear un paciente."
+      },
+      "field": {
+        "patient_id": "Paciente",
+        "professional_id": "Profesional",
+        "appointment_id": "Cita",
+        "cabinet_id": "Gabinete",
+        "cabinet": "Gabinete",
+        "start_time": "Fecha",
+        "end_time": "Fin",
+        "datetime": "Fecha",
+        "service": "Servicio",
+        "reason": "Motivo",
+        "duration_minutes": "Duración (min)",
+        "first_name": "Nombre",
+        "last_name": "Apellidos",
+        "phone": "Teléfono",
+        "email": "Email",
+        "date_of_birth": "Fecha de nacimiento",
+        "query": "Búsqueda"
+      }
     },
     "budgetExceeded": "Se ha alcanzado el límite de uso mensual de la IA.",
     "error": "Ha ocurrido un error.",

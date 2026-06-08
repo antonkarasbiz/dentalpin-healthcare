@@ -8,6 +8,7 @@
     "empty": "Ask me about patients, the schedule, or to book an appointment.",
     "placeholder": "Type your message…",
     "send": "Send",
+    "copy": "Copy",
     "new": "New conversation",
     "thinking": "Thinking…",
     "you": "You",
@@ -72,7 +73,32 @@
       "approve": "Confirm",
       "reject": "Cancel",
       "approved": "Confirmed",
-      "rejected": "Cancelled"
+      "rejected": "Cancelled",
+      "destructiveNote": "This action can't be undone.",
+      "action": {
+        "book_appointment": "The IA wants to book an appointment.",
+        "cancel_appointment": "The IA wants to cancel an appointment.",
+        "create_patient": "The IA wants to create a patient."
+      },
+      "field": {
+        "patient_id": "Patient",
+        "professional_id": "Professional",
+        "appointment_id": "Appointment",
+        "cabinet_id": "Cabinet",
+        "cabinet": "Cabinet",
+        "start_time": "Date",
+        "end_time": "End",
+        "datetime": "Date",
+        "service": "Service",
+        "reason": "Reason",
+        "duration_minutes": "Duration (min)",
+        "first_name": "First name",
+        "last_name": "Last name",
+        "phone": "Phone",
+        "email": "Email",
+        "date_of_birth": "Date of birth",
+        "query": "Search"
+      }
     },
     "budgetExceeded": "The monthly IA usage limit has been reached.",
     "error": "Something went wrong.",

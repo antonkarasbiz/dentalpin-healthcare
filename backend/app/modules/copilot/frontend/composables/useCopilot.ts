@@ -48,6 +48,9 @@ export function useCopilot() {
   // Live activity under the composer: 'working' while a tool runs, 'writing'
   // once the assistant starts streaming text, null otherwise.
   const phase = useState<'working' | 'writing' | null>('copilot:phase', () => null)
+  // id -> human label, harvested from read tools, so confirmation cards can
+  // show "María García" where the args only carry a patient_id.
+  const nameCache = useState<Record<string, string>>('copilot:names', () => ({}))
 
   function toggle() {
     open.value = !open.value
@@ -68,6 +71,27 @@ export function useCopilot() {
       context: captureContext()
     })
     conversationId.value = res.data.id
+  }
+
+  // Harvest id -> name pairs from read-tool results into nameCache.
+  function cacheNames(toolName: string, result: unknown): void {
+    if (!result || typeof result !== 'object') return
+    const r = result as Record<string, unknown>
+    const short = toolName.split('.').pop()
+    const put = (id: unknown, label: unknown) => {
+      if (typeof id === 'string' && typeof label === 'string') nameCache.value[id] = label
+    }
+    const rows = (key: string): Record<string, unknown>[] =>
+      Array.isArray(r[key]) ? (r[key] as Record<string, unknown>[]) : []
+
+    if (short === 'search_patients') rows('patients').forEach((p) => put(p.id, p.full_name))
+    else if (short === 'get_patient') put(r.id, r.full_name)
+    else if (short === 'get_day_overview')
+      rows('appointments').forEach((a) => put(a.patient_id, a.patient_name))
+    else if (short === 'get_appointment') put(r.patient_id, r.patient_name)
+    else if (short === 'list_professionals')
+      rows('professionals').forEach((p) => put(p.id, p.professional_name))
+    else if (short === 'list_cabinets') rows('cabinets').forEach((c) => put(c.id, c.name))
   }
 
   function lastStreamingAssistant(): TextUiMessage | null {
@@ -98,6 +122,7 @@ export function useCopilot() {
       if (tool) {
         tool.status = data.ok ? 'done' : 'failed'
         tool.result = data.result
+        if (data.ok) cacheNames(tool.name, data.result)
       }
     } else if (event === 'confirmation_required') {
       const c: ConfirmUiMessage = {
@@ -157,5 +182,5 @@ export function useCopilot() {
     phase.value = null
   }
 
-  return { open, messages, busy, pending, phase, toggle, send, confirm, reset }
+  return { open, messages, busy, pending, phase, nameCache, toggle, send, confirm, reset }
 }

@@ -7,6 +7,10 @@ const { t } = useI18n()
 
 const expanded = ref(true)
 
+function copyText(text: string) {
+  navigator.clipboard?.writeText(text)
+}
+
 const toolLabel = computed(() => {
   if (props.message.kind !== 'tool') return ''
   const key =
@@ -36,8 +40,8 @@ function toggleCard() {
   <!-- User / assistant text bubble -->
   <div
     v-if="message.kind === 'text'"
-    class="flex"
-    :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+    class="group flex flex-col"
+    :class="message.role === 'user' ? 'items-end' : 'items-start'"
   >
     <div
       class="max-w-[85%] rounded-lg px-3 py-2 text-sm"
@@ -55,6 +59,16 @@ function toggleCard() {
         {{ message.text }}
       </template>
     </div>
+    <UButton
+      v-if="message.role === 'assistant' && !message.streaming && message.text"
+      icon="i-lucide-copy"
+      color="neutral"
+      variant="ghost"
+      size="xs"
+      class="mt-0.5 opacity-0 transition focus:opacity-100 group-hover:opacity-100"
+      :aria-label="t('copilot.copy')"
+      @click="copyText(message.text)"
+    />
   </div>
 
   <!-- Tool-call chip + expandable result card -->
@@ -96,45 +110,12 @@ function toggleCard() {
   </div>
 
   <!-- Inline confirmation card -->
-  <UCard
+  <CopilotConfirmCard
     v-else-if="message.kind === 'confirmation'"
-    :ui="{ body: 'p-3 sm:p-3' }"
-  >
-    <p class="text-sm font-medium">
-      {{ t('copilot.confirm.title') }}
-    </p>
-    <p class="mt-1 text-sm text-muted">
-      {{ t('copilot.confirm.body', { name: message.name }) }}
-    </p>
-    <pre class="mt-2 overflow-x-auto rounded bg-elevated p-2 text-xs">{{
-      JSON.stringify(message.args, null, 2)
-    }}</pre>
-
-    <div
-      v-if="!message.resolved"
-      class="mt-3 flex justify-end gap-2"
-    >
-      <UButton
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="emit('confirm', message.callId, 'reject')"
-      >
-        {{ t('copilot.confirm.reject') }}
-      </UButton>
-      <UButton
-        color="primary"
-        size="sm"
-        @click="emit('confirm', message.callId, 'confirm')"
-      >
-        {{ t('copilot.confirm.approve') }}
-      </UButton>
-    </div>
-    <p
-      v-else
-      class="mt-2 text-xs text-muted"
-    >
-      {{ message.resolved === 'confirm' ? t('copilot.confirm.approved') : t('copilot.confirm.rejected') }}
-    </p>
-  </UCard>
+    :call-id="message.callId"
+    :name="message.name"
+    :args="message.args"
+    :resolved="message.resolved"
+    @confirm="(id, d) => emit('confirm', id, d)"
+  />
 </template>
