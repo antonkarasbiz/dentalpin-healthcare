@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- fix(copilot): expose "New conversation" action (calls `reset()`) on the
+  `/copilot` page header and the slide-over header, shown once a
+  conversation has messages and disabled while streaming. Previously an
+  open conversation could not be cleared from the UI.
 - feat(copilot): UI Fase 0 — rebrand the surface to **"IA"** across i18n
   (ES/EN), markdown rendering for assistant replies (`CopilotMarkdown`,
   `marked` + `isomorphic-dompurify`, sanitized), permission-filtered
