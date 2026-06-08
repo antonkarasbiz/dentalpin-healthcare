@@ -11,34 +11,38 @@ const { money } = useCopilotFormat()
 
 type Obj = Record<string, unknown>
 
+// Tool names arrive namespaced by the registry (e.g. "patients.search_patients").
+// Match on the bare tool name after the last dot.
+const tool = computed(() => props.name.split('.').pop() ?? props.name)
+
 const obj = computed<Obj>(() =>
   props.result && typeof props.result === 'object' ? (props.result as Obj) : {}
 )
 const errorCode = computed(() => (typeof obj.value.error === 'string' ? obj.value.error : null))
 
 const patients = computed<PatientResult[]>(() => {
-  if (props.name === 'search_patients') return (obj.value.patients as PatientResult[]) ?? []
-  if (props.name === 'get_patient' && obj.value.id) return [obj.value as unknown as PatientResult]
+  if (tool.value === 'search_patients') return (obj.value.patients as PatientResult[]) ?? []
+  if (tool.value === 'get_patient' && obj.value.id) return [obj.value as unknown as PatientResult]
   return []
 })
 
 const appointments = computed<AppointmentResult[]>(() => {
-  if (props.name === 'get_day_overview') return (obj.value.appointments as AppointmentResult[]) ?? []
-  if (props.name === 'get_appointment' && obj.value.id) return [obj.value as unknown as AppointmentResult]
+  if (tool.value === 'get_day_overview') return (obj.value.appointments as AppointmentResult[]) ?? []
+  if (tool.value === 'get_appointment' && obj.value.id) return [obj.value as unknown as AppointmentResult]
   return []
 })
 
 const slots = computed<SlotResult[]>(() => {
-  if (props.name === 'find_free_slots') return (obj.value.slots as SlotResult[]) ?? []
-  if (props.name === 'get_availability') return (obj.value.open_windows as SlotResult[]) ?? []
+  if (tool.value === 'find_free_slots') return (obj.value.slots as SlotResult[]) ?? []
+  if (tool.value === 'get_availability') return (obj.value.open_windows as SlotResult[]) ?? []
   return []
 })
 
 const mode = computed<'error' | 'patients' | 'appointments' | 'slots' | 'generic'>(() => {
   if (errorCode.value) return 'error'
-  if (['search_patients', 'get_patient'].includes(props.name)) return 'patients'
-  if (['get_day_overview', 'get_appointment'].includes(props.name)) return 'appointments'
-  if (['find_free_slots', 'get_availability'].includes(props.name)) return 'slots'
+  if (['search_patients', 'get_patient'].includes(tool.value)) return 'patients'
+  if (['get_day_overview', 'get_appointment'].includes(tool.value)) return 'appointments'
+  if (['find_free_slots', 'get_availability'].includes(tool.value)) return 'slots'
   return 'generic'
 })
 
