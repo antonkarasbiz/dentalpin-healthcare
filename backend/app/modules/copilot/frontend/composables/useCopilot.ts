@@ -8,6 +8,8 @@ export interface ToolUiMessage {
   callId: string
   name: string
   status: 'running' | 'done' | 'failed'
+  args?: Record<string, unknown>
+  result?: unknown
 }
 
 export interface ConfirmUiMessage {
@@ -82,12 +84,21 @@ export function useCopilot() {
       else messages.value.push({ kind: 'text', role: 'assistant', text: String(data.text ?? ''), streaming: true })
     } else if (event === 'tool_call') {
       phase.value = 'working'
-      messages.value.push({ kind: 'tool', callId: String(data.call_id), name: String(data.name), status: 'running' })
+      messages.value.push({
+        kind: 'tool',
+        callId: String(data.call_id),
+        name: String(data.name),
+        status: 'running',
+        args: (data.arguments as Record<string, unknown>) ?? {}
+      })
     } else if (event === 'tool_result') {
       const tool = [...messages.value].reverse().find(
         (m): m is ToolUiMessage => m.kind === 'tool' && m.callId === data.call_id
       )
-      if (tool) tool.status = data.ok ? 'done' : 'failed'
+      if (tool) {
+        tool.status = data.ok ? 'done' : 'failed'
+        tool.result = data.result
+      }
     } else if (event === 'confirmation_required') {
       const c: ConfirmUiMessage = {
         kind: 'confirmation',

@@ -44,6 +44,28 @@
       "done": "{name} done",
       "failed": "{name} failed"
     },
+    "card": {
+      "viewPatient": "View record",
+      "noResults": "No results",
+      "notFound": "Not found",
+      "more": "+{n} more",
+      "freeSlots": "Free slots",
+      "appointments": "Appointments",
+      "patients": "Patients"
+    },
+    "patientStatus": {
+      "active": "active",
+      "archived": "archived"
+    },
+    "apptStatus": {
+      "scheduled": "Scheduled",
+      "confirmed": "Confirmed",
+      "checked_in": "Checked in",
+      "in_treatment": "In treatment",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
     "confirm": {
       "title": "Confirm action",
       "body": "The IA wants to run {name}.",

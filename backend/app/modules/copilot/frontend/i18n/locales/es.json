@@ -44,6 +44,28 @@
       "done": "{name} completado",
       "failed": "{name} falló"
     },
+    "card": {
+      "viewPatient": "Ver ficha",
+      "noResults": "Sin resultados",
+      "notFound": "No encontrado",
+      "more": "+{n} más",
+      "freeSlots": "Huecos libres",
+      "appointments": "Citas",
+      "patients": "Pacientes"
+    },
+    "patientStatus": {
+      "active": "activo",
+      "archived": "archivado"
+    },
+    "apptStatus": {
+      "scheduled": "Programada",
+      "confirmed": "Confirmada",
+      "checked_in": "En sala",
+      "in_treatment": "En tratamiento",
+      "completed": "Completada",
+      "cancelled": "Cancelada",
+      "no_show": "No asistió"
+    },
     "confirm": {
       "title": "Confirmar acción",
       "body": "La IA quiere ejecutar {name}.",

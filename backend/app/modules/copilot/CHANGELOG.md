@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- feat(copilot): UI Fase 1 — rich result cards. Tool results now render as
+  typed cards instead of a bare chip: `CopilotPatientCard` (search_patients,
+  get_patient), `CopilotAppointmentCard` (get_day_overview, get_appointment),
+  `CopilotSlotCard` (find_free_slots, get_availability), with a generic
+  key/value fallback for the rest (reports, timeline, …) via
+  `CopilotResultCard`. The tool chip is now an accordion (expanded by
+  default) toggling the card; `ToolUiMessage` carries `args`/`result`;
+  locale-aware date/money formatting (`useCopilotFormat`); ES/EN parity.
+  Frontend-only; no backend or tool-contract changes.
 - fix(copilot): expose "New conversation" action (calls `reset()`) on the
   `/copilot` page header and the slide-over header, shown once a
   conversation has messages and disabled while streaming. Previously an

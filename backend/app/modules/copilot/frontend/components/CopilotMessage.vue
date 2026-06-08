@@ -5,6 +5,8 @@ const props = defineProps<{ message: CopilotUiMessage }>()
 const emit = defineEmits<{ confirm: [callId: string, decision: 'confirm' | 'reject'] }>()
 const { t } = useI18n()
 
+const expanded = ref(true)
+
 const toolLabel = computed(() => {
   if (props.message.kind !== 'tool') return ''
   const key =
@@ -15,6 +17,19 @@ const toolLabel = computed(() => {
         : 'copilot.tool.done'
   return t(key, { name: props.message.name })
 })
+
+// A finished tool with an object result gets an expandable rich card.
+const hasCard = computed(
+  () =>
+    props.message.kind === 'tool' &&
+    props.message.status === 'done' &&
+    !!props.message.result &&
+    typeof props.message.result === 'object'
+)
+
+function toggleCard() {
+  if (hasCard.value) expanded.value = !expanded.value
+}
 </script>
 
 <template>
@@ -42,22 +57,42 @@ const toolLabel = computed(() => {
     </div>
   </div>
 
-  <!-- Tool-call chip -->
+  <!-- Tool-call chip + expandable result card -->
   <div
     v-else-if="message.kind === 'tool'"
-    class="flex items-center gap-2 px-1 text-xs text-muted"
+    class="px-1 text-xs text-muted"
   >
-    <UIcon
-      :name="
-        message.status === 'running'
-          ? 'i-lucide-loader-circle'
-          : message.status === 'failed'
-            ? 'i-lucide-circle-x'
-            : 'i-lucide-circle-check'
-      "
-      :class="message.status === 'running' ? 'animate-spin' : ''"
-    />
-    <span>{{ toolLabel }}</span>
+    <button
+      type="button"
+      class="flex items-center gap-2"
+      :class="hasCard ? 'cursor-pointer hover:text-default' : 'cursor-default'"
+      @click="toggleCard"
+    >
+      <UIcon
+        :name="
+          message.status === 'running'
+            ? 'i-lucide-loader-circle'
+            : message.status === 'failed'
+              ? 'i-lucide-circle-x'
+              : 'i-lucide-circle-check'
+        "
+        :class="message.status === 'running' ? 'animate-spin' : ''"
+      />
+      <span>{{ toolLabel }}</span>
+      <UIcon
+        v-if="hasCard"
+        :name="expanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+      />
+    </button>
+    <div
+      v-if="hasCard && expanded"
+      class="mt-1.5"
+    >
+      <CopilotResultCard
+        :name="message.name"
+        :result="message.result"
+      />
+    </div>
   </div>
 
   <!-- Inline confirmation card -->
