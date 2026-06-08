@@ -74,8 +74,12 @@ const validDurations = durationOptions.map(d => d.value)
 // Edit mode check
 const isEditMode = computed(() => !!props.appointment)
 
-// Auto-update duration based on selected treatments
+// Auto-update duration based on selected treatments.
+// Gated by initialDataLoaded so the initial edit-mode population (which sets
+// selectedTreatments) does NOT overwrite the duration we just derived from the
+// appointment's start/end times. Only user-driven treatment changes adjust it.
 watch(selectedTreatments, (treatments) => {
+  if (!initialDataLoaded.value) return
   const totalMinutes = treatments.reduce((acc, t) => {
     // Get duration from catalog_item if available
     const duration = t.catalog_item?.default_price ? 30 : 0 // Default 30 min

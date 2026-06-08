@@ -58,3 +58,8 @@ class CatalogModule(BaseModule):
             "write",  # Create/update catalog items
             "admin",  # Manage categories, bulk operations
         ]
+
+    def get_tools(self) -> list:
+        from .tools import get_tools
+
+        return get_tools()

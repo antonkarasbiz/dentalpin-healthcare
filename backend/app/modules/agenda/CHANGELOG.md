@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- fix(modal): show the correct duration when editing an appointment. The
+  `selectedTreatments` watcher recomputed `formData.duration` from a
+  treatment-count heuristic and clobbered the value derived from the
+  appointment's start/end times during initial edit-mode population. Gated
+  the watcher behind `initialDataLoaded` so only user-driven treatment
+  changes adjust the duration.
 - feat(agents): expose `tools.py` for the copilot agentic layer —
   `get_day_overview` (READ), `book_appointment` (WRITE),
   `cancel_appointment` (DESTRUCTIVE). Thin wrappers over

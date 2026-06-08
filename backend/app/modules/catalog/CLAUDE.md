@@ -15,6 +15,18 @@ Routes mounted at `/api/v1/catalog/`.
 
 `catalog.read`, `catalog.write`, `catalog.admin`.
 
+## Tools exposed
+
+Agent tools in `tools.py` (wrap `CatalogService`, no logic duplicated).
+
+| Tool | Category | Wraps | Permission |
+|---|---|---|---|
+| `list_catalog_items` | READ | `CatalogService.list_items` | `catalog.read` |
+| `get_catalog_item` | READ | `CatalogService.get_item` | `catalog.read` |
+
+Both filter by `ctx.clinic_id`. `names`/`descriptions` are localized
+JSONB; the tools collapse to `es` → `en` → first value for the agent.
+
 ## Events emitted
 
 None.

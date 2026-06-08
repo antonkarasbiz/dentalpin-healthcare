@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- feat(tools): expose `list_catalog_items` + `get_catalog_item` READ
+  agent tools (wrap `CatalogService`) so the copilot can read the
+  treatment catalog — name, code, category, price, duration, scope.
+
 - feat(seed): cover advanced surgical, periodontal and orthodontic
   techniques that any modern Spanish clinic offers and the Gesdén
   importer was previously dumping into ``Importado de Gesdén``. New
