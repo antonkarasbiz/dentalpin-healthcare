@@ -42,10 +42,13 @@ Agent tool in `tools.py` (wraps `AvailabilityService`, no logic duplicated).
 
 `get_availability` returns **open working windows** for a day (not gaps
 minus appointments). `find_free_slots` does the real thing: it subtracts
-the professional's booked appointments from those windows and returns
-discrete bookable slots (nearest first, filterable by duration /
-part-of-day / window). It reads agenda appointments directly — allowed
-because `agenda` is in `manifest.depends`.
+the professional's booked appointments from those windows and returns the
+**contiguous free windows** as `free_windows` (each with real `start`,
+`end` and `minutes`), nearest first, filterable by minimum duration
+(`slot_minutes`) / part-of-day / window. Returning the true extent of each
+gap (not fixed-size slots) lets the agent know whether a hole is 9:00–9:30
+or 9:00–18:00. It reads agenda appointments directly — allowed because
+`agenda` is in `manifest.depends`.
 
 ## Events emitted
 

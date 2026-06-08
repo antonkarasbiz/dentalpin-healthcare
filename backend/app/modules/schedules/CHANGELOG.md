@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- fix(agents): `find_free_slots` now returns contiguous free **windows**
+  (`free_windows` with real `start`/`end`/`minutes`) instead of a single
+  fixed-size slot per gap that masked its true extent. The agent could not
+  tell a 9:00–9:30 hole from a 9:00–18:00 one; now it can. `slot_minutes`
+  becomes a minimum-duration filter; `part_of_day` filtering is overlap-based
+  (`_in_part` → `_overlaps_part`).
+
 - feat(agents): expose `tools.py` — `get_availability` (READ) wrapping
   `AvailabilityService.resolve` (open working windows for a day; the
   agent combines it with `agenda.get_day_overview` to find gaps). Issue

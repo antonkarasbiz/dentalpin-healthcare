@@ -38,7 +38,12 @@ class AvailabilityArgs(BaseModel):
 
 class FreeSlotsArgs(BaseModel):
     professional_id: UUID
-    slot_minutes: int = Field(default=30, ge=5, le=480)
+    slot_minutes: int = Field(
+        default=30,
+        ge=5,
+        le=480,
+        description="Duración mínima (min) que debe caber en la ventana libre para incluirla.",
+    )
     days_ahead: int = Field(default=14, ge=1, le=60)
     part_of_day: Literal["morning", "afternoon", "any"] = "any"
     date_from: date_cls | None = Field(
@@ -72,11 +77,13 @@ def _subtract(start: datetime, end: datetime, busy: list[tuple[datetime, datetim
     return free
 
 
-def _in_part(local_start: datetime, part: str) -> bool:
+def _overlaps_part(local_start: datetime, local_end: datetime, part: str) -> bool:
+    """Whether a free window overlaps the requested part of the day (split at 14:00)."""
     if part == "morning":
         return local_start.hour < 14
     if part == "afternoon":
-        return local_start.hour >= 14
+        noon = local_start.replace(hour=14, minute=0, second=0, microsecond=0)
+        return local_end > noon
     return True
 
 
@@ -88,7 +95,7 @@ async def _find_free_slots(ctx: AgentContext, params: FreeSlotsArgs) -> dict:
     )
     open_ranges = sorted((r.start, r.end) for r in ranges if r.state == "open")
     if not open_ranges:
-        return {"professional_id": params.professional_id, "slots": []}
+        return {"professional_id": params.professional_id, "free_windows": []}
 
     appts, _ = await AppointmentService.list_appointments(
         ctx.db,
@@ -105,22 +112,28 @@ async def _find_free_slots(ctx: AgentContext, params: FreeSlotsArgs) -> dict:
     )
 
     tz = ZoneInfo(tz_name)
-    slot = timedelta(minutes=params.slot_minutes)
-    candidates: list[tuple[datetime, datetime]] = []
+    min_dur = timedelta(minutes=params.slot_minutes)
+    windows: list[tuple[datetime, datetime]] = []
     for win_start, win_end in open_ranges:
         for free_start, free_end in _subtract(win_start, win_end, busy):
-            if free_end - free_start < slot:
+            if free_end - free_start < min_dur:
                 continue
             local_start = free_start.astimezone(tz)
-            if not _in_part(local_start, params.part_of_day):
+            local_end = free_end.astimezone(tz)
+            if not _overlaps_part(local_start, local_end, params.part_of_day):
                 continue
-            candidates.append((local_start, (free_start + slot).astimezone(tz)))
+            windows.append((local_start, local_end))
 
-    candidates.sort(key=lambda c: c[0])
+    windows.sort(key=lambda w: w[0])
     return {
         "professional_id": params.professional_id,
-        "slot_minutes": params.slot_minutes,
-        "slots": [{"start": s, "end": e} for s, e in candidates[: params.limit]],
+        "min_minutes": params.slot_minutes,
+        # Contiguous free windows (real start/end), not fixed-size slots, so the
+        # agent knows the true extent of each gap.
+        "free_windows": [
+            {"start": s, "end": e, "minutes": int((e - s).total_seconds() // 60)}
+            for s, e in windows[: params.limit]
+        ],
     }
 
 
@@ -140,10 +153,12 @@ def get_tools() -> list[Tool]:
         Tool(
             name="find_free_slots",
             description=(
-                "Huecos libres reales de un profesional (horario abierto menos citas ya "
-                "reservadas), ordenados del más cercano al más lejano. Permite filtrar por "
-                "duración (slot_minutes), franja (part_of_day: morning/afternoon/any) y ventana "
-                "de días (days_ahead)."
+                "Ventanas libres reales de un profesional (horario abierto menos citas ya "
+                "reservadas), ordenadas de la más cercana a la más lejana. Devuelve "
+                "`free_windows` con `start`, `end` y `minutes` (la duración real de cada hueco "
+                "contiguo), no slots de tamaño fijo: úsalo para saber cuánto dura cada hueco y "
+                "proponer una hora dentro. `slot_minutes` filtra ventanas que no llegan a esa "
+                "duración mínima. Filtra también por franja (part_of_day) y días (days_ahead)."
             ),
             parameters=FreeSlotsArgs,
             handler=_find_free_slots,

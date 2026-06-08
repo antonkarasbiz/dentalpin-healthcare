@@ -33,7 +33,7 @@ const appointments = computed<AppointmentResult[]>(() => {
 })
 
 const slots = computed<SlotResult[]>(() => {
-  if (tool.value === 'find_free_slots') return (obj.value.slots as SlotResult[]) ?? []
+  if (tool.value === 'find_free_slots') return (obj.value.free_windows as SlotResult[]) ?? []
   if (tool.value === 'get_availability') return (obj.value.open_windows as SlotResult[]) ?? []
   return []
 })

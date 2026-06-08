@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- fix(copilot): `CopilotSlotCard` reads `find_free_slots`' new `free_windows`
+  shape and renders each as a real time range + duration (e.g. "16:00–19:00
+  · 3h") instead of a bare start-time chip.
+
 - feat(copilot): UI Fase 1 (PR-C) — humanized confirmations + copy. Write
   confirmations now render labeled rows (`CopilotConfirmCard`) instead of raw
   JSON: ids resolved to names via a session name cache harvested from read
