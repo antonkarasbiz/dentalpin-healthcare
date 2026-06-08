@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- fix(search): multi-term patient search. `PatientService.list_patients`
+  now splits the `search` string on whitespace and requires **every**
+  term to match **some** field (AND across terms, OR across fields),
+  matching against `first_name`, `last_name`, the concatenated full
+  name, `phone`, `email` and `national_id`. Fixes "Nombre Apellido"
+  (and reversed "Apellido Nombre") returning no results — previously the
+  whole input was one substring ILIKE'd against each field separately,
+  so a name split across `first_name`/`last_name` never matched. Same
+  fix reaches the copilot `search_patients` tool (shared service path);
+  its arg description now tells the agent to pass the full name as one
+  query. No frontend change — UI already routes through this service.
+
 - feat(agents): expose `tools.py` for the copilot agentic layer —
   `search_patients`, `get_patient` (READ), `create_patient` (WRITE).
   Thin wrappers over `PatientService`; clinic-scoped; RBAC via existing

@@ -8,7 +8,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import column, func, or_, select, table, text
+from sqlalchemy import and_, column, func, or_, select, table, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType, event_bus
@@ -41,6 +41,43 @@ _appointments_t = table(
     column("clinic_id"),
     column("start_time"),
 )
+
+
+# Fields a free-text search term is matched against. Concatenated
+# ``first_name || ' ' || last_name`` is added per-term so a single term
+# can span the name boundary (e.g. matching "an Sm" against "Juan Smith").
+_SEARCH_FIELDS = (
+    Patient.first_name,
+    Patient.last_name,
+    Patient.phone,
+    Patient.email,
+    Patient.national_id,
+)
+_FULL_NAME = func.concat(Patient.first_name, " ", Patient.last_name)
+
+
+def _search_condition(search: str | None):
+    """Build the WHERE clause for a free-text patient search.
+
+    The query is split on whitespace into terms. A patient matches when
+    **every** term matches **some** field (AND across terms, OR across
+    fields). This makes "first last" — and the reversed "last first" —
+    find a patient whose name is split across ``first_name`` and
+    ``last_name``, which a single substring ILIKE could never do.
+    """
+    if not search or not search.strip():
+        return None
+    terms = search.split()
+    per_term = []
+    for term in terms:
+        like = f"%{term}%"
+        per_term.append(
+            or_(
+                *(field.ilike(like) for field in _SEARCH_FIELDS),
+                _FULL_NAME.ilike(like),
+            )
+        )
+    return and_(*per_term)
 
 
 class PatientService:
@@ -145,16 +182,9 @@ class PatientService:
         if do_not_contact is not None:
             conditions.append(Patient.do_not_contact.is_(do_not_contact))
 
-        if search:
-            like = f"%{search}%"
-            conditions.append(
-                or_(
-                    Patient.first_name.ilike(like),
-                    Patient.last_name.ilike(like),
-                    Patient.phone.ilike(like),
-                    Patient.email.ilike(like),
-                )
-            )
+        search_clause = _search_condition(search)
+        if search_clause is not None:
+            conditions.append(search_clause)
 
         total = (await db.execute(select(func.count(Patient.id)).where(*conditions))).scalar() or 0
 

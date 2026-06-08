@@ -166,6 +166,29 @@ async def test_search_patients(
     assert data["total"] == 1
     assert data["data"][0]["first_name"] == "Juan"
 
+    # Full name "first last" across both fields (the original bug).
+    response = await client.get(
+        "/api/v1/patients", headers=auth_headers, params={"search": "Juan Garcia"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["data"][0]["first_name"] == "Juan"
+
+    # Reversed "last first" must match too.
+    response = await client.get(
+        "/api/v1/patients", headers=auth_headers, params={"search": "Garcia Juan"}
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+    # Both terms must match — "Juan Lopez" mixes two patients, finds neither.
+    response = await client.get(
+        "/api/v1/patients", headers=auth_headers, params={"search": "Juan Lopez"}
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
 
 @pytest.mark.asyncio
 async def test_get_patient_not_found(

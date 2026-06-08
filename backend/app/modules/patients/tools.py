@@ -21,7 +21,15 @@ from .service import PatientService
 
 
 class SearchPatientsArgs(BaseModel):
-    query: str = Field(description="Name, phone or email fragment to search for.")
+    query: str = Field(
+        description=(
+            "Search text: full name, partial name, phone, email or national "
+            "ID. Multiple words are matched independently against the "
+            "patient's name fields, so 'Juan Pérez' (or reversed 'Pérez "
+            "Juan') finds the patient — pass the whole name as one query, "
+            "don't split it into separate searches."
+        )
+    )
     limit: int = Field(default=20, ge=1, le=50)
 
 
@@ -74,7 +82,11 @@ def get_tools() -> list[Tool]:
     return [
         Tool(
             name="search_patients",
-            description="Buscar pacientes de la clínica por nombre, teléfono o email.",
+            description=(
+                "Buscar pacientes de la clínica por nombre (completo o "
+                "parcial), teléfono, email o DNI/NIE. Pasa el nombre y "
+                "apellido juntos en una sola consulta."
+            ),
             parameters=SearchPatientsArgs,
             handler=_search_patients,
             permissions=["patients.read"],
