@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     # provider.)
     OPENAI_API_KEY: str = ""
     COPILOT_PROVIDER_DEFAULT: str = "openai"
-    COPILOT_MODEL_CHAT_OPENAI: str = "gpt-4.1"
+    COPILOT_MODEL_CHAT_OPENAI: str = "gpt-5.4-mini"
     COPILOT_MAX_TOKENS: int = 4096
     COPILOT_REDACTION_DEFAULT: bool = True
 

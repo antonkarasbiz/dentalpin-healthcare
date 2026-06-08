@@ -51,10 +51,16 @@ class OpenAIProvider:
         max_tokens: int,
     ) -> AsyncIterator[ProviderEvent]:
         wire_messages = _to_openai_messages(system, messages)
+        # The GPT-5 / o-series models reject the legacy `max_tokens` param and
+        # require `max_completion_tokens`. Older chat models still take
+        # `max_tokens`.
+        token_param = (
+            "max_completion_tokens" if _uses_completion_tokens(model) else "max_tokens"
+        )
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": wire_messages,
-            "max_tokens": max_tokens,
+            token_param: max_tokens,
             "stream": True,
             "stream_options": {"include_usage": True},
         }
@@ -111,6 +117,12 @@ class OpenAIProvider:
 # registry namespaces with a dot (``patients.search_patients``). Tool /
 # module names are snake_case with no hyphens, so ``.`` <-> ``-`` is a
 # lossless bijection confined to this provider.
+def _uses_completion_tokens(model: str) -> bool:
+    """GPT-5 and the o-series require `max_completion_tokens`, not `max_tokens`."""
+    m = model.lower()
+    return m.startswith(("gpt-5", "o1", "o3", "o4"))
+
+
 def _to_openai_name(qualified: str) -> str:
     return qualified.replace(".", "-")
 

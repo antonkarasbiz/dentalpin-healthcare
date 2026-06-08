@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- chore(copilot): default OpenAI chat model → `gpt-5.4-mini`
+  (`COPILOT_MODEL_CHAT_OPENAI`). The OpenAI provider now sends
+  `max_completion_tokens` instead of `max_tokens` for GPT-5 / o-series
+  models, which reject the legacy param.
 - feat(copilot): UI Fase 1 — rich result cards. Tool results now render as
   typed cards instead of a bare chip: `CopilotPatientCard` (search_patients,
   get_patient), `CopilotAppointmentCard` (get_day_overview, get_appointment),
