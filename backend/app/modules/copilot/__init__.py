@@ -27,7 +27,7 @@ class CopilotModule(BaseModule):
         "category": "official",
         "depends": [],
         "installable": True,
-        "auto_install": False,
+        "auto_install": True,
         "removable": True,
         "role_permissions": {
             "admin": ["*"],

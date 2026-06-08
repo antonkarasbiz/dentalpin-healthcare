@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- chore(copilot): `auto_install=True` — the module now installs on every
+  clinic by default instead of requiring manual activation from the module
+  admin UI.
+
 - fix(copilot): after a confirmed write tool, publish the mutated module's
   namespace on the shared client `useDataBus` so the owning page refetches.
   Fixes appointments booked via the copilot not appearing in the agenda
