@@ -31,6 +31,8 @@ async def _agent_session(db: AsyncSession, clinic_id) -> tuple:
 async def _ctx(
     db: AsyncSession, clinic_id, permissions: list[str], supervisor_id=None
 ) -> AgentContext:
+    from app.modules.copilot.bridge import COPILOT_GUARDRAILS
+
     agent, session = await _agent_session(db, clinic_id)
     return AgentContext(
         agent_id=agent.id,
@@ -41,6 +43,9 @@ async def _ctx(
         tools=tool_registry,
         db=db,
         supervisor_id=supervisor_id,
+        # Same policy the copilot bridge runs with: inline confirmation
+        # replaces the approval queue (rate limits + denylist stay).
+        guardrail_config=COPILOT_GUARDRAILS,
     )
 
 
@@ -681,6 +686,200 @@ async def test_recall_tools_clinic_scoped(db_session, test_clinic) -> None:
     )
     assert res.ok
     assert res.data["error"] == "not_found"
+
+
+def test_money_tools_registered() -> None:
+    names = tool_registry.list()
+    for expected in (
+        "budget.list_budgets",
+        "budget.get_budget",
+        "budget.send_budget",
+        "billing.list_invoices",
+        "billing.get_invoice",
+        "payments.record_payment",
+        "payments.patient_payment_history",
+    ):
+        assert expected in names
+
+
+async def _money_world(db: AsyncSession, clinic_id) -> dict:
+    """Patient (no email) + user + empty draft budget + draft invoice."""
+    from datetime import date
+
+    from app.modules.billing.models import Invoice
+    from app.modules.budget.models import Budget
+
+    user = await _supervisor(db)
+    patient = await PatientService.create_patient(
+        db, clinic_id, {"first_name": "Paco", "last_name": "Pagos"}
+    )
+    budget = Budget(
+        clinic_id=clinic_id,
+        patient_id=patient.id,
+        budget_number="PRES-TEST-0001",
+        status="draft",
+        valid_from=date(2032, 1, 1),
+        created_by=user.id,
+    )
+    invoice = Invoice(
+        clinic_id=clinic_id,
+        patient_id=patient.id,
+        status="draft",
+        created_by=user.id,
+    )
+    db.add_all([budget, invoice])
+    await db.flush()
+    return {"user": user, "patient": patient, "budget": budget, "invoice": invoice}
+
+
+@pytest.mark.asyncio
+async def test_budget_tools_and_send_errors(db_session, test_clinic) -> None:
+    world = await _money_world(db_session, test_clinic.id)
+    ctx = await _ctx(
+        db_session,
+        test_clinic.id,
+        ["budget.read", "budget.write"],
+        supervisor_id=world["user"].id,
+    )
+
+    listed = await tool_registry.call(ctx, "budget.list_budgets", {"status": ["draft"]})
+    assert listed.ok
+    assert listed.data["total"] == 1
+    assert listed.data["budgets"][0]["patient_name"] == "Paco Pagos"
+
+    detail = await tool_registry.call(
+        ctx, "budget.get_budget", {"budget_id": str(world["budget"].id)}
+    )
+    assert detail.ok
+    assert detail.data["items"] == []
+
+    # Patient has no email → structured error, no state change.
+    res = await tool_registry.call(
+        ctx, "budget.send_budget", {"budget_id": str(world["budget"].id), "send_email": True}
+    )
+    assert res.ok
+    assert res.data["error"] == "no_patient_email"
+
+    # Manual delivery of an empty budget → workflow error.
+    res = await tool_registry.call(
+        ctx, "budget.send_budget", {"budget_id": str(world["budget"].id), "send_email": False}
+    )
+    assert res.ok
+    assert res.data["error"] == "workflow_error"
+
+
+@pytest.mark.asyncio
+async def test_invoice_tools_are_invoice_axis_only(db_session, test_clinic) -> None:
+    world = await _money_world(db_session, test_clinic.id)
+    ctx = await _ctx(db_session, test_clinic.id, ["billing.read"])
+
+    listed = await tool_registry.call(ctx, "billing.list_invoices", {"status": ["draft"]})
+    assert listed.ok
+    assert listed.data["total"] == 1
+    row = listed.data["invoices"][0]
+    # off-books: invoice axis only — no paid/pending amounts, ever.
+    for forbidden in ("paid", "total_paid", "pending", "amount_paid"):
+        assert forbidden not in row
+
+    detail = await tool_registry.call(
+        ctx, "billing.get_invoice", {"invoice_id": str(world["invoice"].id)}
+    )
+    assert detail.ok
+    assert "payments" not in detail.data
+    assert "invoice_payments" not in detail.data
+    assert detail.data["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_record_payment_and_history(db_session, test_clinic) -> None:
+    world = await _money_world(db_session, test_clinic.id)
+    ctx = await _ctx(
+        db_session,
+        test_clinic.id,
+        ["payments.record.read", "payments.record.write"],
+        supervisor_id=world["user"].id,
+    )
+    patient_id = str(world["patient"].id)
+
+    # Float JSON amount must coerce to Decimal cleanly.
+    res = await tool_registry.call(
+        ctx,
+        "payments.record_payment",
+        {
+            "patient_id": patient_id,
+            "amount": 50.10,
+            "method": "cash",
+            "payment_date": "2032-01-10",
+            "allocations": [{"target_type": "on_account", "amount": 50.10}],
+        },
+    )
+    assert res.ok
+    assert res.data["amount"] == 50.1
+    assert res.data["currency"] == "EUR"
+
+    # Allocation sum mismatch → structured workflow error.
+    res = await tool_registry.call(
+        ctx,
+        "payments.record_payment",
+        {
+            "patient_id": patient_id,
+            "amount": 100,
+            "method": "card",
+            "payment_date": "2032-01-11",
+            "allocations": [{"target_type": "on_account", "amount": 60}],
+        },
+    )
+    assert res.ok
+    assert res.data["error"] == "workflow_error"
+
+    history = await tool_registry.call(
+        ctx, "payments.patient_payment_history", {"patient_id": patient_id}
+    )
+    assert history.ok
+    assert history.data["total_paid"] == 50.1
+    assert history.data["on_account_balance"] == 50.1
+    assert len(history.data["movements"]) == 1
+    # off-books: collection axis only — never the paid-vs-earned diff.
+    for forbidden in ("total_earned", "patient_credit", "clinic_receivable"):
+        assert forbidden not in history.data
+
+
+@pytest.mark.asyncio
+async def test_record_payment_denied_without_write(db_session, test_clinic) -> None:
+    ctx = await _ctx(db_session, test_clinic.id, ["payments.record.read"])
+    res = await tool_registry.call(
+        ctx,
+        "payments.record_payment",
+        {
+            "patient_id": str(uuid4()),
+            "amount": 10,
+            "method": "cash",
+            "payment_date": "2032-01-10",
+            "allocations": [{"target_type": "on_account", "amount": 10}],
+        },
+    )
+    assert res.ok is False
+    assert "permission denied" in (res.error or "")
+
+
+@pytest.mark.asyncio
+async def test_budget_tools_clinic_scoped(db_session, test_clinic) -> None:
+    from app.core.auth.models import Clinic
+
+    world = await _money_world(db_session, test_clinic.id)
+    other = Clinic(id=uuid4(), name="Other Clinic", tax_id="X66666666", settings={})
+    db_session.add(other)
+    await db_session.flush()
+    other_ctx = await _ctx(db_session, other.id, ["budget.read", "billing.read"])
+
+    res = await tool_registry.call(
+        other_ctx, "budget.get_budget", {"budget_id": str(world["budget"].id)}
+    )
+    assert res.ok and res.data["error"] == "not_found"
+    res = await tool_registry.call(
+        other_ctx, "billing.get_invoice", {"invoice_id": str(world["invoice"].id)}
+    )
+    assert res.ok and res.data["error"] == "not_found"
 
 
 def test_free_text_tools_excluded_under_redaction() -> None:

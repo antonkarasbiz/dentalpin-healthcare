@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- feat(agents): two new copilot tools — `record_payment` (WRITE, wraps
+  `workflow.record_payment`, allocation-sum errors surfaced structurally)
+  and `patient_payment_history` (READ, collection axis only: drops
+  `total_earned`/`patient_credit`/`clinic_receivable` from the ledger).
+
 - feat(agents): expose `tools.py` — `payments_summary`,
   `collections_by_method` (READ). Off-books: **collection-axis only**
   (gross collected/refunded; never receivable/credit/pending). Issue #81

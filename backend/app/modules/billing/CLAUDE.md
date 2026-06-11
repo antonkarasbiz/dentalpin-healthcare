@@ -14,6 +14,21 @@ Routes mounted at `/api/v1/billing/`.
 
 `billing.read`, `billing.write`, `billing.admin`.
 
+## Tools exposed
+
+Agent tools in `tools.py` — **READ ONLY** (no issuing/voiding: invoice
+emission stays manual; Veri*Factu chaining is irreversible).
+
+| Tool | Category | Wraps | Permission |
+|---|---|---|---|
+| `list_invoices` | READ | `InvoiceService.list_invoices` | `billing.read` |
+| `get_invoice` | READ | `InvoiceService.get_invoice(include_payments=False)` | `billing.read` |
+
+**Off-books boundary.** Invoice axis only: no paid/pending amounts, no
+payments join — `get_invoice` is hard-wired to
+`include_payments=False` so the two axes can't be juxtaposed. Enforced
+by tests in `tests/test_module_tools.py`.
+
 ## Events emitted
 
 - `invoice.issued`

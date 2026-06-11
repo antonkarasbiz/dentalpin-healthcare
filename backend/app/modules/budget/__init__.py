@@ -71,6 +71,11 @@ class BudgetModule(BaseModule):
     def get_models(self) -> list:
         return [Budget, BudgetItem, BudgetSignature, BudgetHistory, BudgetAccessLog]
 
+    def get_tools(self) -> list:
+        from . import tools
+
+        return tools.get_tools()
+
     def get_router(self) -> APIRouter:
         # Compose authenticated + public sub-routers under one mount.
         # Public endpoints sit under ``/public/budgets/...`` and are

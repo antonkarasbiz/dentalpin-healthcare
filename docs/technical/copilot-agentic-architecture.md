@@ -129,6 +129,11 @@ Additions since v1, newest last:
 | `patients` | `update_patient` (contact data only) | WRITE | `patients.write` |
 | `recalls` | `list_due_recalls`, `get_recall` (`exposes_free_text`) | READ | `recalls.read` |
 | `recalls` | `create_recall`, `log_contact_attempt`, `snooze_recall`, `complete_recall` | WRITE | `recalls.write` |
+| `budget` | `list_budgets`, `get_budget` | READ | `budget.read` |
+| `budget` | `send_budget` (emails the patient) | DESTRUCTIVE | `budget.write` |
+| `billing` | `list_invoices`, `get_invoice` (invoice axis only, `include_payments=False`) | READ | `billing.read` |
+| `payments` | `record_payment` | WRITE | `payments.record.write` |
+| `payments` | `patient_payment_history` (collection axis only) | READ | `payments.record.read` |
 
 ### 3.3 Contract elevation (so it never drifts)
 - **Root `CLAUDE.md`** "When adding X, do Y" — new row: *New agent-exposed capability* → declare a `Tool` in `<module>/tools.py`, wrap the existing service (no logic dup), set `permissions` to the gating RBAC string and `category` conservatively (DESTRUCTIVE for side-effects / deletes), mark `exposes_free_text=True` if it returns prose, document under "Tools exposed" in the module `CLAUDE.md`.
