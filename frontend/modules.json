@@ -7,6 +7,7 @@
     "/module_layers/budget/frontend",
     "/module_layers/payments/frontend",
     "/module_layers/billing/frontend",
+    "/module_layers/copilot/frontend",
     "/module_layers/media/frontend",
     "/module_layers/patients_clinical/frontend",
     "/module_layers/treatment_plan/frontend",
@@ -15,8 +16,7 @@
     "/module_layers/recalls/frontend",
     "/module_layers/notifications/frontend",
     "/module_layers/patient_timeline/frontend",
-    "/module_layers/reports/frontend",
-    "/module_layers/copilot/frontend"
+    "/module_layers/reports/frontend"
   ],
   "modules": [
     {
@@ -46,6 +46,10 @@
     {
       "name": "billing",
       "path": "/module_layers/billing/frontend"
+    },
+    {
+      "name": "copilot",
+      "path": "/module_layers/copilot/frontend"
     },
     {
       "name": "media",
@@ -82,10 +86,6 @@
     {
       "name": "reports",
       "path": "/module_layers/reports/frontend"
-    },
-    {
-      "name": "copilot",
-      "path": "/module_layers/copilot/frontend"
     }
   ],
   "version": 1

@@ -127,6 +127,8 @@ Additions since v1, newest last:
 | `catalog` | `list_catalog_items`, `get_catalog_item` | READ | `catalog.read` |
 | `agenda` | `reschedule_appointment`, `update_appointment_status` | WRITE | `agenda.appointments.write` |
 | `patients` | `update_patient` (contact data only) | WRITE | `patients.write` |
+| `recalls` | `list_due_recalls`, `get_recall` (`exposes_free_text`) | READ | `recalls.read` |
+| `recalls` | `create_recall`, `log_contact_attempt`, `snooze_recall`, `complete_recall` | WRITE | `recalls.write` |
 
 ### 3.3 Contract elevation (so it never drifts)
 - **Root `CLAUDE.md`** "When adding X, do Y" — new row: *New agent-exposed capability* → declare a `Tool` in `<module>/tools.py`, wrap the existing service (no logic dup), set `permissions` to the gating RBAC string and `category` conservatively (DESTRUCTIVE for side-effects / deletes), mark `exposes_free_text=True` if it returns prose, document under "Tools exposed" in the module `CLAUDE.md`.

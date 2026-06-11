@@ -47,6 +47,25 @@ NOT depend on treatment_plan or catalog: no imports, no FKs.
 mapping grants read+write to admin, dentist, hygienist, assistant,
 receptionist; only admin gets delete.
 
+## Tools exposed
+
+Agent tools in `tools.py` (wrap `RecallService`, no logic duplicated).
+
+| Tool | Category | Wraps | Permission |
+|---|---|---|---|
+| `list_due_recalls` | READ | `RecallService.list` | `recalls.read` |
+| `get_recall` | READ (`exposes_free_text`) | `RecallService.get_with_attempts` | `recalls.read` |
+| `create_recall` | WRITE | `RecallService.create` | `recalls.write` |
+| `log_contact_attempt` | WRITE | `RecallService.log_attempt` | `recalls.write` |
+| `snooze_recall` | WRITE | `RecallService.snooze` | `recalls.write` |
+| `complete_recall` | WRITE | `RecallService.mark_done` | `recalls.write` |
+
+`list_due_recalls` keeps the service defaults (archived + do_not_contact
+excluded) and omits `reason_note`, so it stays cloud-eligible under
+redaction. `get_recall` returns the free-text notes and attempt log —
+flagged `exposes_free_text=True`, the bridge drops it from the tool list
+when redaction is on.
+
 ## Events emitted
 
 | Event              | When                                                 |

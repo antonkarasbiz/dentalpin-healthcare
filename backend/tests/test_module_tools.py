@@ -28,7 +28,9 @@ async def _agent_session(db: AsyncSession, clinic_id) -> tuple:
     return agent, session
 
 
-async def _ctx(db: AsyncSession, clinic_id, permissions: list[str]) -> AgentContext:
+async def _ctx(
+    db: AsyncSession, clinic_id, permissions: list[str], supervisor_id=None
+) -> AgentContext:
     agent, session = await _agent_session(db, clinic_id)
     return AgentContext(
         agent_id=agent.id,
@@ -38,7 +40,26 @@ async def _ctx(db: AsyncSession, clinic_id, permissions: list[str]) -> AgentCont
         permissions=permissions,
         tools=tool_registry,
         db=db,
+        supervisor_id=supervisor_id,
     )
+
+
+async def _supervisor(db: AsyncSession):
+    """A real user row for tools whose audit columns are NOT NULL."""
+    from app.core.auth.models import User
+    from app.core.auth.service import hash_password
+
+    user = User(
+        id=uuid4(),
+        email=f"sup-{uuid4().hex[:8]}@test.clinic",
+        password_hash=hash_password("TestPass1234"),
+        first_name="Super",
+        last_name="Visor",
+        is_active=True,
+    )
+    db.add(user)
+    await db.flush()
+    return user
 
 
 def test_tools_are_registered() -> None:
@@ -504,6 +525,172 @@ async def test_update_patient_denied_without_write(db_session, test_clinic) -> N
     )
     assert res.ok is False
     assert "permission denied" in (res.error or "")
+
+
+def test_recall_tools_registered() -> None:
+    names = tool_registry.list()
+    for expected in (
+        "recalls.list_due_recalls",
+        "recalls.get_recall",
+        "recalls.create_recall",
+        "recalls.log_contact_attempt",
+        "recalls.snooze_recall",
+        "recalls.complete_recall",
+    ):
+        assert expected in names
+
+
+@pytest.mark.asyncio
+async def test_recall_create_list_and_duplicate_guard(db_session, test_clinic) -> None:
+    ctx = await _ctx(db_session, test_clinic.id, ["recalls.read", "recalls.write"])
+    patient = await PatientService.create_patient(
+        db_session, test_clinic.id, {"first_name": "Rita", "last_name": "Recall"}
+    )
+
+    created = await tool_registry.call(
+        ctx,
+        "recalls.create_recall",
+        {"patient_id": str(patient.id), "reason": "hygiene", "due_month": "2032-05-15"},
+    )
+    assert created.ok
+    assert created.data["created"] is True
+    assert created.data["due_month"] == "2032-05-01"  # normalised to day 1
+
+    # Duplicate guard: same patient+reason while active → updates, created=False.
+    dup = await tool_registry.call(
+        ctx,
+        "recalls.create_recall",
+        {"patient_id": str(patient.id), "reason": "hygiene", "due_month": "2032-07-01"},
+    )
+    assert dup.ok
+    assert dup.data["created"] is False
+    assert dup.data["id"] == created.data["id"]
+
+    listed = await tool_registry.call(
+        ctx, "recalls.list_due_recalls", {"month": "2032-07-20", "limit": 10}
+    )
+    assert listed.ok
+    assert listed.data["total"] == 1
+    row = listed.data["recalls"][0]
+    assert row["patient_name"] == "Rita Recall"
+    assert "reason_note" not in row  # free prose stays out of the list tool
+
+
+@pytest.mark.asyncio
+async def test_recall_list_excludes_do_not_contact(db_session, test_clinic) -> None:
+    ctx = await _ctx(db_session, test_clinic.id, ["recalls.read", "recalls.write"])
+    patient = await PatientService.create_patient(
+        db_session,
+        test_clinic.id,
+        {"first_name": "Nuria", "last_name": "NoLlamar", "do_not_contact": True},
+    )
+    await tool_registry.call(
+        ctx,
+        "recalls.create_recall",
+        {"patient_id": str(patient.id), "reason": "checkup", "due_month": "2032-09-01"},
+    )
+    listed = await tool_registry.call(ctx, "recalls.list_due_recalls", {"month": "2032-09-01"})
+    assert listed.ok
+    assert all(r["patient_name"] != "Nuria NoLlamar" for r in listed.data["recalls"])
+
+
+@pytest.mark.asyncio
+async def test_recall_attempt_snooze_complete(db_session, test_clinic) -> None:
+    supervisor = await _supervisor(db_session)
+    ctx = await _ctx(
+        db_session,
+        test_clinic.id,
+        ["recalls.read", "recalls.write"],
+        supervisor_id=supervisor.id,
+    )
+    patient = await PatientService.create_patient(
+        db_session, test_clinic.id, {"first_name": "Aldo", "last_name": "Llamado"}
+    )
+    created = await tool_registry.call(
+        ctx,
+        "recalls.create_recall",
+        {"patient_id": str(patient.id), "reason": "post_op", "due_month": "2032-03-01"},
+    )
+    recall_id = created.data["id"]
+
+    res = await tool_registry.call(
+        ctx,
+        "recalls.log_contact_attempt",
+        {"recall_id": recall_id, "channel": "phone", "outcome": "no_answer"},
+    )
+    assert res.ok
+    assert res.data["status"] == "contacted_no_answer"
+    assert res.data["contact_attempt_count"] == 1
+
+    res = await tool_registry.call(
+        ctx,
+        "recalls.log_contact_attempt",
+        {"recall_id": recall_id, "channel": "phone", "outcome": "scheduled"},
+    )
+    assert res.ok
+    assert res.data["status"] == "contacted_scheduled"
+
+    res = await tool_registry.call(
+        ctx, "recalls.snooze_recall", {"recall_id": recall_id, "months": 2}
+    )
+    assert res.ok
+    assert res.data["due_month"] == "2032-05-01"
+    assert res.data["status"] == "pending"
+
+    res = await tool_registry.call(ctx, "recalls.complete_recall", {"recall_id": recall_id})
+    assert res.ok
+    assert res.data["status"] == "done"
+
+    detail = await tool_registry.call(ctx, "recalls.get_recall", {"recall_id": recall_id})
+    assert detail.ok
+    assert len(detail.data["attempts"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_recall_write_denied_without_permission(db_session, test_clinic) -> None:
+    ctx = await _ctx(db_session, test_clinic.id, ["recalls.read"])
+    res = await tool_registry.call(
+        ctx,
+        "recalls.create_recall",
+        {"patient_id": str(uuid4()), "reason": "hygiene", "due_month": "2032-01-01"},
+    )
+    assert res.ok is False
+    assert "permission denied" in (res.error or "")
+
+
+@pytest.mark.asyncio
+async def test_recall_tools_clinic_scoped(db_session, test_clinic) -> None:
+    from app.core.auth.models import Clinic
+
+    other = Clinic(id=uuid4(), name="Other Clinic", tax_id="X77777777", settings={})
+    db_session.add(other)
+    await db_session.flush()
+    ctx = await _ctx(db_session, test_clinic.id, ["recalls.read", "recalls.write"])
+    other_ctx = await _ctx(db_session, other.id, ["recalls.read", "recalls.write"])
+
+    patient = await PatientService.create_patient(
+        db_session, test_clinic.id, {"first_name": "Iris", "last_name": "Aislada"}
+    )
+    created = await tool_registry.call(
+        ctx,
+        "recalls.create_recall",
+        {"patient_id": str(patient.id), "reason": "hygiene", "due_month": "2032-02-01"},
+    )
+    res = await tool_registry.call(
+        other_ctx, "recalls.get_recall", {"recall_id": created.data["id"]}
+    )
+    assert res.ok
+    assert res.data["error"] == "not_found"
+
+
+def test_free_text_tools_excluded_under_redaction() -> None:
+    from app.modules.copilot.bridge import _tool_names_for
+
+    with_free_text = _tool_names_for(["*"], include_free_text=True)
+    without = _tool_names_for(["*"], include_free_text=False)
+    assert "recalls.get_recall" in with_free_text
+    assert "recalls.get_recall" not in without
+    assert "recalls.list_due_recalls" in without
 
 
 @pytest.mark.asyncio

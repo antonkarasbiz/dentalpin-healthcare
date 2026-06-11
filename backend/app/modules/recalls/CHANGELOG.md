@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- feat(agents): expose `tools.py` for the copilot agentic layer —
+  `list_due_recalls`, `get_recall` (READ; the latter `exposes_free_text`),
+  `create_recall`, `log_contact_attempt`, `snooze_recall`,
+  `complete_recall` (WRITE). Thin wrappers over `RecallService`;
+  clinic-scoped; RBAC via existing `recalls.read`/`recalls.write`.
+
 - refactor(perms): migrate the hardcoded ``can('recalls.read')`` route guard on ``/recalls`` to ``PERMISSIONS.recalls.read`` (new entry in the host permissions config; also covers ``recalls.write`` / ``recalls.delete``).
 - perf(list): rewrite ``RecallService.list`` to count via a direct
   ``COUNT(Recall.id)`` over the joined ``recalls × patients`` filter

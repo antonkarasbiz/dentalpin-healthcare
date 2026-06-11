@@ -49,12 +49,19 @@ COPILOT_GUARDRAILS = GuardrailConfig(
 )
 
 
-def _tool_names_for(permissions: list[str]) -> list[str]:
-    """Registry tools the caller is allowed to use (AND of permissions)."""
+def _tool_names_for(permissions: list[str], *, include_free_text: bool = True) -> list[str]:
+    """Registry tools the caller is allowed to use (AND of permissions).
+
+    With ``include_free_text=False`` (redaction on), tools flagged
+    ``exposes_free_text`` are excluded — their prose results can't be
+    tokenized, so they never reach the cloud provider.
+    """
     out: list[str] = []
     for name in tool_registry.list():
         tool = tool_registry.get(name)
         if tool is None:
+            continue
+        if not include_free_text and tool.exposes_free_text:
             continue
         if all(
             any(permission_matches(req, granted) for granted in permissions)
@@ -140,7 +147,7 @@ async def drive_turn(
         provider=provider,
         system=SYSTEM_PROMPT,
         history=history,
-        tool_names=_tool_names_for(permissions),
+        tool_names=_tool_names_for(permissions, include_free_text=not redactor.enabled),
         redactor=redactor,
         model=conv.model,
         max_tokens=4096,
@@ -200,7 +207,7 @@ async def resume_turn(
         provider=provider,
         system=SYSTEM_PROMPT,
         history=history,
-        tool_names=_tool_names_for(permissions),
+        tool_names=_tool_names_for(permissions, include_free_text=not redactor.enabled),
         redactor=redactor,
         model=conv.model,
         max_tokens=4096,

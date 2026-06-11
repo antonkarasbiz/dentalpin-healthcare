@@ -180,6 +180,15 @@ These are the foundation for the future outreach module
   so booking from a recall row links the resulting appointment back
   on save.
 
+## Copilot
+
+The AI agent can work the call list conversationally: list due/overdue
+recalls, open a recall's detail (notes + attempt history), create
+recalls, log contact attempts (auto-linking the booked appointment with
+`outcome=scheduled`), snooze and complete. Same RBAC strings as the
+HTTP routes; do-not-contact and archived patients stay excluded. See
+`backend/app/modules/recalls/CLAUDE.md` § Tools exposed.
+
 ## What we don't build (out of scope)
 
 - Outbound automation (WhatsApp / SMS / email). A future module will

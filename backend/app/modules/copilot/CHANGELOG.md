@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- fix(bridge): `_tool_names_for` now actually excludes `exposes_free_text`
+  tools when redaction is enabled (the CLAUDE.md contract promised this but
+  no tool had the flag until `recalls.get_recall` landed).
+
 - chore(copilot): `auto_install=True` — the module now installs on every
   clinic by default instead of requiring manual activation from the module
   admin UI.
