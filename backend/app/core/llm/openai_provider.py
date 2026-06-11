@@ -54,9 +54,7 @@ class OpenAIProvider:
         # The GPT-5 / o-series models reject the legacy `max_tokens` param and
         # require `max_completion_tokens`. Older chat models still take
         # `max_tokens`.
-        token_param = (
-            "max_completion_tokens" if _uses_completion_tokens(model) else "max_tokens"
-        )
+        token_param = "max_completion_tokens" if _uses_completion_tokens(model) else "max_tokens"
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": wire_messages,

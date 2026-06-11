@@ -310,7 +310,7 @@ def main() -> None:
         hasher.update(f"_entities|{row[0]}|{row[1]}|{row[2]}\n".encode())
     for table in tables:
         for row in conn.execute(
-            f'SELECT canonical_uuid, source_id, source_system, payload, raw_source_data '
+            f"SELECT canonical_uuid, source_id, source_system, payload, raw_source_data "
             f'FROM "{table}" ORDER BY canonical_uuid'
         ):
             hasher.update(

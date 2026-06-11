@@ -19,6 +19,7 @@ Run::
 
 Mirrors the read-only posture of ``backend/scripts/generate_catalogs.py``.
 """
+
 from __future__ import annotations
 
 import argparse
