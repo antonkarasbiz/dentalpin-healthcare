@@ -55,6 +55,26 @@
         "agendaSummary": "Dame un resumen de la agenda de hoy"
       }
     },
+    "settings": {
+      "title": "Copilot",
+      "description": "Asistente de IA: briefing diario y motor",
+      "saved": "Ajustes guardados",
+      "digest": {
+        "title": "Briefing matinal por email",
+        "description": "Cada mañana: citas del día, rellamadas vencidas y presupuestos sin respuesta.",
+        "enabled": "Enviar briefing diario",
+        "hour": "Hora de envío",
+        "hourHelp": "Hora local del servidor."
+      },
+      "engine": {
+        "title": "Motor",
+        "provider": "Proveedor",
+        "model": "Modelo",
+        "redaction": "Anonimización de datos (PHI)",
+        "redactionOn": "Activada",
+        "redactionOff": "Desactivada"
+      }
+    },
     "tool": {
       "running": "Ejecutando {name}…",
       "done": "{name} completado",

@@ -66,6 +66,14 @@ se detiene y te muestra una tarjeta de confirmación antes de ejecutarse.
 Las acciones irreversibles (cancelar cita, enviar presupuesto) se marcan
 en rojo.
 
+## Briefing matinal por email
+
+En **Ajustes → Integraciones → Copilot** puedes activar un email diario
+automático ("Briefing del día") con las citas de hoy, las rellamadas
+vencidas y los presupuestos sin respuesta. Eliges la hora de envío; el
+destinatario es quien activa el interruptor. El briefing solo incluye
+las secciones que tu rol puede ver.
+
 ## Permisos
 
 El copiloto nunca ve ni hace nada que tu usuario no pueda hacer desde la

@@ -92,7 +92,21 @@ def init_scheduler() -> None:
             "Drop budget_access_logs older than 90 days (daily 04:00)",
         ),
     ]
-    for job_id, fn, trigger, name in _budget_jobs:
+    # Copilot morning digest — hourly; the task matches each clinic's
+    # digest_hour against the server-local hour and no-ops for clinics
+    # without digest_enabled (covers the uninstalled-module case too).
+    # Scheduler-imports-module tech debt recorded in the proactivity ADR.
+    from app.modules.copilot.tasks import send_morning_digests
+
+    _module_jobs = _budget_jobs + [
+        (
+            "copilot_morning_digests",
+            send_morning_digests,
+            CronTrigger(minute=0),
+            "Send the copilot morning digest to opted-in clinics (hourly gate)",
+        ),
+    ]
+    for job_id, fn, trigger, name in _module_jobs:
         if scheduler.get_job(job_id):
             logger.info("Scheduler job '%s' already exists, skipping", job_id)
             continue

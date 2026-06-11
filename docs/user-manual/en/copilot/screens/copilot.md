@@ -65,6 +65,14 @@ Every action that modifies data (create, move, cancel, charge, send)
 pauses and shows you a confirmation card before executing. Irreversible
 actions (cancel appointment, send budget) are highlighted in red.
 
+## Morning briefing email
+
+In **Settings → Integrations → Copilot** you can enable an automatic
+daily email ("Daily briefing") with today's appointments, overdue
+recalls and unanswered budgets. You pick the send hour; the recipient
+is whoever flips the switch. The briefing only includes the sections
+your role can see.
+
 ## Permissions
 
 The copilot never sees or does anything your user couldn't do through

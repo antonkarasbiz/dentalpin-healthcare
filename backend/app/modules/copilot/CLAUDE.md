@@ -43,6 +43,7 @@ None — copilot is a consumer, not a provider, of tools.
 |---|---|---|
 | `copilot.session.started` | new conversation | `clinic_id`, `conversation_id`, `user_id` |
 | `copilot.session.ended` | conversation closed | `clinic_id`, `conversation_id` |
+| `copilot.digest.sent` | morning digest emailed | `clinic_id`, `recipient_user_id`, `date`, `email_status` |
 
 (`copilot.tool.invoked` / `copilot.budget.threshold_reached` are reserved
 for the dashboards milestone.)
@@ -69,6 +70,14 @@ for the dashboards milestone.)
   Tools flagged `exposes_free_text` are excluded from the cloud path.
 - **SSE owns its DB session.** Streaming endpoints open their own
   `async_session_maker` session for the stream, not `Depends(get_db)`.
+- **Morning digest (proactivity v1).** `tasks.py::send_morning_digests`
+  runs hourly from `app/core/scheduler.py` and emails a deterministic
+  (no-LLM) briefing to opted-in clinics
+  (`copilot_settings.digest_enabled/digest_hour/digest_recipient_user_id`,
+  migration `cop_0002`). Data is gathered ONLY via `tool_registry.call()`
+  with the recipient's role permissions — never query other modules'
+  tables from the task. Config UI at `/settings/integrations/copilot`.
+  Design: `docs/technical/copilot/proactivity.md` + ADR 0014.
 
 ## Related ADRs / docs
 

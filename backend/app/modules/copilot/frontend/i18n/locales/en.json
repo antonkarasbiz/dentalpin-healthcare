@@ -55,6 +55,26 @@
         "agendaSummary": "Give me an overview of today's schedule"
       }
     },
+    "settings": {
+      "title": "Copilot",
+      "description": "AI assistant: daily briefing and engine",
+      "saved": "Settings saved",
+      "digest": {
+        "title": "Morning briefing email",
+        "description": "Every morning: today's appointments, overdue recalls and unanswered budgets.",
+        "enabled": "Send daily briefing",
+        "hour": "Send hour",
+        "hourHelp": "Server-local hour."
+      },
+      "engine": {
+        "title": "Engine",
+        "provider": "Provider",
+        "model": "Model",
+        "redaction": "PHI redaction",
+        "redactionOn": "Enabled",
+        "redactionOff": "Disabled"
+      }
+    },
     "tool": {
       "running": "Running {name}…",
       "done": "{name} done",

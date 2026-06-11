@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- feat(digest): opt-in morning digest email (proactivity v1, ADR 0014) —
+  deterministic daily briefing (today's agenda, overdue recalls, budgets
+  awaiting response) gathered through the tool registry with the
+  recipient's role permissions. New `copilot_settings` columns
+  (`cop_0002`), hourly scheduler job, ES/EN email templates, settings
+  page at `/settings/integrations/copilot`, `copilot.digest.sent` event.
+
 - feat(playbooks): system prompt now ships three multi-step playbooks
   (daily briefing, prepare visit, fill gap from recalls) and the
   empty-state suggestions gained `workflows`, `recalls` and `money`

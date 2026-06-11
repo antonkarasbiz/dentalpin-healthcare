@@ -20,7 +20,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -88,6 +88,12 @@ class CopilotSettings(Base):
     # NULL → no ceiling.
     monthly_token_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     monthly_cost_limit_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Morning digest (proactivity v1): opt-in deterministic daily email.
+    digest_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    digest_hour: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=8)
+    digest_recipient_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     period_output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
