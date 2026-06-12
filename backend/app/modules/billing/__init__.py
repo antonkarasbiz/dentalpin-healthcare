@@ -56,6 +56,11 @@ class BillingModule(BaseModule):
     def get_models(self) -> list:
         return [InvoiceSeries, Invoice, InvoiceItem, InvoicePayment, InvoiceHistory]
 
+    def get_tools(self) -> list:
+        from . import tools
+
+        return tools.get_tools()
+
     def get_router(self) -> APIRouter:
         return router
 

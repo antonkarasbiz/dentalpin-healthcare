@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- feat(agents): expose `tools.py` for the copilot agentic layer —
+  `list_invoices`, `get_invoice` (READ ONLY, `include_payments=False`).
+  Invoice axis only per the off-books boundary; no issuing/voiding tools.
+
 - refactor(invoices): dedup the ``toListItem`` builder (3 sites → 1 helper) in ``useInvoices``.
 - refactor(invoices): drop the hardcoded Spanish ``PAYMENT_METHOD_LABELS`` map and route ``getPaymentMethodLabel`` through the new shared ``paymentMethodLabel`` util (reads the canonical ``invoice.payments.methods.*`` i18n keys; adds the missing ``insurance`` translation).
 - refactor(types): drop the ``as unknown as Record<string, unknown>`` cast pattern (14 sites) in ``useInvoices`` now that ``useApi`` accepts ``object`` payloads.

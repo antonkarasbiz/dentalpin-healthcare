@@ -34,6 +34,20 @@ Public subset (no staff auth, 2-factor verification — ADR 0006) under
 `budget.read`, `budget.write`, `budget.admin`,
 `budget.renegotiate`, `budget.accept_in_clinic`.
 
+## Tools exposed
+
+Agent tools in `tools.py` (wrap `BudgetService` / `BudgetWorkflowService`).
+
+| Tool | Category | Wraps | Permission |
+|---|---|---|---|
+| `list_budgets` | READ | `BudgetService.list_budgets` | `budget.read` |
+| `get_budget` | READ | `BudgetService.get_budget` | `budget.read` |
+| `send_budget` | DESTRUCTIVE | `BudgetWorkflowService.send_budget` | `budget.write` |
+
+`send_budget` is DESTRUCTIVE because emailing the patient is an
+irreversible external side effect. Amounts here are the budget axis
+only — never combined with payments data.
+
 ## Events emitted
 
 - `budget.sent`

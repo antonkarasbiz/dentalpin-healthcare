@@ -52,12 +52,18 @@ Agent tools in `tools.py` (wrap `PaymentReportsService`, no logic duplicated).
 |---|---|---|---|
 | `payments_summary` | READ | `PaymentReportsService.summary` | `payments.reports.read` |
 | `collections_by_method` | READ | `PaymentReportsService.by_method` | `payments.reports.read` |
+| `record_payment` | WRITE | `workflow.record_payment` | `payments.record.write` |
+| `patient_payment_history` | READ | `LedgerService.get_patient_ledger` (filtered) | `payments.record.read` |
 
 **Off-books boundary.** These expose the **collection axis only** (gross
 collected / refunded). They drop `clinic_receivable_total` /
 `patient_credit_total` — "what's owed" is the invoiced-minus-collected
 diff this module must never surface (see the gotcha below). Aging /
-ledger-balance tools are deliberately NOT exposed to the agent.
+ledger-**balance** tools are deliberately NOT exposed to the agent:
+`patient_payment_history` strips the ledger down to payments + refunds
+(+ on-account balance, which is a subset of what was paid) and drops
+`total_earned` / `patient_credit` / `clinic_receivable` before
+returning. Enforced by tests in `tests/test_module_tools.py`.
 
 ## Events emitted
 

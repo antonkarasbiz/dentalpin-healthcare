@@ -27,7 +27,7 @@ from .models import CopilotConversation, CopilotSettings
 from .serde import message_from_row
 from .service import ClinicBudgetGuard, ConversationService
 
-SYSTEM_PROMPT = (
+_BASE_PROMPT = (
     "Eres el copiloto de DentalPin, asistente de una clínica dental. "
     "Respondes en español, con concisión y precisión. Usa las herramientas "
     "disponibles para consultar y actuar sobre los datos de la clínica; no "
@@ -40,6 +40,29 @@ SYSTEM_PROMPT = (
     "pendiente, morosidad). Informa cada eje por separado si te lo piden."
 )
 
+# Multi-step recipes the model chains with its own tool calls. The tool
+# list is already filtered per-user (RBAC) and per-redaction; if a step's
+# tool is missing, the model skips it and says so.
+_PLAYBOOKS = (
+    "\n\nGuiones habituales (encadena las herramientas tú mismo; si te "
+    "falta una herramienta para un paso, dilo y continúa con el resto):\n"
+    "- Briefing del día: get_day_overview(hoy) → list_due_recalls(overdue=true) → "
+    "list_budgets(status=['sent']). Resume en tres bloques: citas, llamadas "
+    "pendientes, presupuestos sin respuesta.\n"
+    "- Preparar visita de un paciente: get_patient → su cita (get_appointment "
+    "o get_day_overview) → list_due_recalls(patient_id) → "
+    "list_budgets(patient_id, status=['sent','accepted']) → "
+    "patient_payment_history. Devuelve un resumen de una pantalla. No hay "
+    "herramientas clínicas (odontograma, historia médica): dilo si te lo piden.\n"
+    "- Cubrir un hueco por cancelación: tras cancel_appointment (o si el "
+    "usuario menciona un hueco) → list_due_recalls(overdue=true), prioriza "
+    "priority=high → propón 2-3 candidatos con su teléfono → si el usuario "
+    "elige uno y confirma: book_appointment → log_contact_attempt("
+    "outcome='scheduled', linked_appointment_id=la cita creada)."
+)
+
+SYSTEM_PROMPT = _BASE_PROMPT + _PLAYBOOKS
+
 # Copilot gates writes via inline confirmation (a turn-level pause), so
 # the approval-queue triggers are disabled. Rate limits + denylist stay.
 COPILOT_GUARDRAILS = GuardrailConfig(
@@ -49,12 +72,19 @@ COPILOT_GUARDRAILS = GuardrailConfig(
 )
 
 
-def _tool_names_for(permissions: list[str]) -> list[str]:
-    """Registry tools the caller is allowed to use (AND of permissions)."""
+def _tool_names_for(permissions: list[str], *, include_free_text: bool = True) -> list[str]:
+    """Registry tools the caller is allowed to use (AND of permissions).
+
+    With ``include_free_text=False`` (redaction on), tools flagged
+    ``exposes_free_text`` are excluded — their prose results can't be
+    tokenized, so they never reach the cloud provider.
+    """
     out: list[str] = []
     for name in tool_registry.list():
         tool = tool_registry.get(name)
         if tool is None:
+            continue
+        if not include_free_text and tool.exposes_free_text:
             continue
         if all(
             any(permission_matches(req, granted) for granted in permissions)
@@ -140,7 +170,7 @@ async def drive_turn(
         provider=provider,
         system=SYSTEM_PROMPT,
         history=history,
-        tool_names=_tool_names_for(permissions),
+        tool_names=_tool_names_for(permissions, include_free_text=not redactor.enabled),
         redactor=redactor,
         model=conv.model,
         max_tokens=4096,
@@ -200,7 +230,7 @@ async def resume_turn(
         provider=provider,
         system=SYSTEM_PROMPT,
         history=history,
-        tool_names=_tool_names_for(permissions),
+        tool_names=_tool_names_for(permissions, include_free_text=not redactor.enabled),
         redactor=redactor,
         model=conv.model,
         max_tokens=4096,

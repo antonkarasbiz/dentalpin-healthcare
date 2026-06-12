@@ -218,3 +218,4 @@ class EventType:
     COPILOT_SESSION_ENDED = "copilot.session.ended"
     COPILOT_TOOL_INVOKED = "copilot.tool.invoked"
     COPILOT_BUDGET_THRESHOLD_REACHED = "copilot.budget.threshold_reached"
+    COPILOT_DIGEST_SENT = "copilot.digest.sent"

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- feat(agents): expose `tools.py` for the copilot agentic layer —
+  `list_budgets`, `get_budget` (READ), `send_budget` (DESTRUCTIVE; emails
+  the patient). Thin wrappers over `BudgetService`/`BudgetWorkflowService`;
+  clinic-scoped; RBAC via existing `budget.read`/`budget.write`.
+
 - feat(service): ``create_budget`` now accepts an optional pre-set
   ``budget_number`` in the ``data`` dict; absent/``None`` falls back
   to ``BudgetNumberService.generate_number`` as before. Used by the

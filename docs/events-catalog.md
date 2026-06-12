@@ -36,6 +36,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 | `clinical_notes.plan_created` | `EventType.CLINICAL_NOTE_PLAN_CREATED` | — | `patient_timeline` |
 | `clinical_notes.treatment_created` | `EventType.CLINICAL_NOTE_TREATMENT_CREATED` | — | `patient_timeline` |
 | `copilot.budget.threshold_reached` | `EventType.COPILOT_BUDGET_THRESHOLD_REACHED` | — | — |
+| `copilot.digest.sent` | `EventType.COPILOT_DIGEST_SENT` | `copilot` | — |
 | `copilot.session.ended` | `EventType.COPILOT_SESSION_ENDED` | `copilot` | — |
 | `copilot.session.started` | `EventType.COPILOT_SESSION_STARTED` | `copilot` | — |
 | `copilot.tool.invoked` | `EventType.COPILOT_TOOL_INVOKED` | — | — |
@@ -300,6 +301,13 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.COPILOT_BUDGET_THRESHOLD_REACHED`
 - **Publishers:** _none in tree — declared but unused_
+- **Subscribers:** —
+
+### `copilot.digest.sent`
+
+- **Constant:** `EventType.COPILOT_DIGEST_SENT`
+- **Publishers:**
+  - `copilot` — `backend/app/modules/copilot/tasks.py:152`
 - **Subscribers:** —
 
 ### `copilot.session.ended`

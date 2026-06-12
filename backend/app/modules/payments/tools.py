@@ -14,6 +14,9 @@ the copilot system prompt forbids surfacing the difference between them.
 from __future__ import annotations
 
 from datetime import date as date_cls
+from decimal import Decimal
+from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -21,12 +24,40 @@ from sqlalchemy import select
 from app.core.agents import AgentContext, Tool, ToolCategory
 from app.core.auth.models import Clinic
 
-from .service import PaymentReportsService
+from .schemas import PaymentMethod
+from .service import LedgerService, PaymentReportsService
+from .workflow import PaymentWorkflowError, record_payment
 
 
 class PeriodArgs(BaseModel):
     date_from: date_cls = Field(description="Inicio del periodo (YYYY-MM-DD).")
     date_to: date_cls = Field(description="Fin del periodo (YYYY-MM-DD).")
+
+
+class AllocationArg(BaseModel):
+    target_type: Literal["budget", "on_account"]
+    target_id: UUID | None = Field(
+        default=None, description="Id del presupuesto (solo target_type=budget)."
+    )
+    amount: Decimal = Field(gt=0)
+
+
+class RecordPaymentArgs(BaseModel):
+    patient_id: UUID
+    amount: Decimal = Field(gt=0)
+    method: PaymentMethod
+    payment_date: date_cls
+    allocations: list[AllocationArg] = Field(
+        min_length=1,
+        description="Reparto del cobro; la suma debe igualar amount.",
+    )
+    reference: str | None = Field(default=None, max_length=100)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class PatientPaymentHistoryArgs(BaseModel):
+    patient_id: UUID
+    limit: int = Field(default=20, ge=1, le=50, description="Últimos N movimientos.")
 
 
 async def _currency(ctx: AgentContext) -> str:
@@ -58,6 +89,60 @@ async def _collections_by_method(ctx: AgentContext, params: PeriodArgs) -> dict:
     return {"methods": [{"method": r.method, "total": r.total, "count": r.count} for r in rows]}
 
 
+async def _record_payment(ctx: AgentContext, params: RecordPaymentArgs) -> dict:
+    currency = await _currency(ctx)
+    try:
+        payment = await record_payment(
+            ctx.db,
+            clinic_id=ctx.clinic_id,
+            currency=currency,
+            patient_id=params.patient_id,
+            amount=params.amount,
+            method=params.method,
+            payment_date=params.payment_date,
+            recorded_by=ctx.supervisor_id,
+            allocations=[a.model_dump() for a in params.allocations],
+            reference=params.reference,
+            notes=params.notes,
+        )
+    except PaymentWorkflowError as e:
+        return {"error": "workflow_error", "detail": str(e)}
+    return {
+        "id": payment.id,
+        "amount": payment.amount,
+        "currency": payment.currency,
+        "method": payment.method,
+        "payment_date": payment.payment_date,
+    }
+
+
+async def _patient_payment_history(ctx: AgentContext, params: PatientPaymentHistoryArgs) -> dict:
+    currency = await _currency(ctx)
+    ledger = await LedgerService.get_patient_ledger(
+        ctx.db, ctx.clinic_id, params.patient_id, currency
+    )
+    # Collection axis only: payments + refunds. The ledger's earned /
+    # patient_credit / clinic_receivable figures are the paid-vs-earned
+    # diff this module never surfaces (off-books rule) — drop them.
+    movements = [e for e in ledger.timeline if e.entry_type in ("payment", "refund")]
+    movements.sort(key=lambda e: e.occurred_at, reverse=True)
+    return {
+        "patient_id": params.patient_id,
+        "currency": ledger.currency,
+        "total_paid": ledger.total_paid,
+        "on_account_balance": ledger.on_account_balance,
+        "movements": [
+            {
+                "entry_type": e.entry_type,
+                "occurred_at": e.occurred_at,
+                "amount": e.amount,
+                "method_or_reason": e.description,
+            }
+            for e in movements[: params.limit]
+        ],
+    }
+
+
 def get_tools() -> list[Tool]:
     return [
         Tool(
@@ -77,6 +162,30 @@ def get_tools() -> list[Tool]:
             parameters=PeriodArgs,
             handler=_collections_by_method,
             permissions=["payments.reports.read"],
+            category=ToolCategory.READ,
+        ),
+        Tool(
+            name="record_payment",
+            description=(
+                "Registrar un cobro de un paciente con su reparto "
+                "(presupuesto/s o a cuenta). La suma de allocations debe "
+                "igualar el importe. Requiere confirmación del usuario."
+            ),
+            parameters=RecordPaymentArgs,
+            handler=_record_payment,
+            permissions=["payments.record.write"],
+            category=ToolCategory.WRITE,
+        ),
+        Tool(
+            name="patient_payment_history",
+            description=(
+                "Historial de cobros y devoluciones de un paciente (eje "
+                "cobro: total pagado, saldo a cuenta y últimos movimientos). "
+                "No incluye facturación ni saldo pendiente."
+            ),
+            parameters=PatientPaymentHistoryArgs,
+            handler=_patient_payment_history,
+            permissions=["payments.record.read"],
             category=ToolCategory.READ,
         ),
     ]

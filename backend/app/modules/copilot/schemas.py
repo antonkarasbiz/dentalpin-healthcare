@@ -52,6 +52,9 @@ class SettingsResponse(BaseModel):
     redaction_enabled: bool
     monthly_token_limit: int | None
     monthly_cost_limit_cents: int | None
+    digest_enabled: bool
+    digest_hour: int
+    digest_recipient_user_id: UUID | None
     period_input_tokens: int
     period_output_tokens: int
 
@@ -62,3 +65,6 @@ class SettingsUpdate(BaseModel):
     redaction_enabled: bool | None = None
     monthly_token_limit: int | None = None
     monthly_cost_limit_cents: int | None = None
+    digest_enabled: bool | None = None
+    digest_hour: int | None = Field(default=None, ge=0, le=23)
+    digest_recipient_user_id: UUID | None = None

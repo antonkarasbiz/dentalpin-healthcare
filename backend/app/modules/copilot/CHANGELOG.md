@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- feat(digest): opt-in morning digest email (proactivity v1, ADR 0014) —
+  deterministic daily briefing (today's agenda, overdue recalls, budgets
+  awaiting response) gathered through the tool registry with the
+  recipient's role permissions. New `copilot_settings` columns
+  (`cop_0002`), hourly scheduler job, ES/EN email templates, settings
+  page at `/settings/integrations/copilot`, `copilot.digest.sent` event.
+
+- feat(playbooks): system prompt now ships three multi-step playbooks
+  (daily briefing, prepare visit, fill gap from recalls) and the
+  empty-state suggestions gained `workflows`, `recalls` and `money`
+  categories with six new permission-gated chips (ES+EN).
+
+- fix(bridge): `_tool_names_for` now actually excludes `exposes_free_text`
+  tools when redaction is enabled (the CLAUDE.md contract promised this but
+  no tool had the flag until `recalls.get_recall` landed).
+
 - chore(copilot): `auto_install=True` — the module now installs on every
   clinic by default instead of requiring manual activation from the module
   admin UI.

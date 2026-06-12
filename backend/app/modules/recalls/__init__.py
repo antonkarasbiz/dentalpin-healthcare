@@ -84,4 +84,6 @@ class RecallsModule(BaseModule):
         }
 
     def get_tools(self) -> list:
-        return []
+        from .tools import get_tools
+
+        return get_tools()

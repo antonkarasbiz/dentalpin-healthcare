@@ -47,7 +47,12 @@ class CopilotSettingsService:
         return row
 
     @staticmethod
-    async def update(db: AsyncSession, clinic_id: UUID, data: dict[str, Any]) -> CopilotSettings:
+    async def update(
+        db: AsyncSession,
+        clinic_id: UUID,
+        data: dict[str, Any],
+        acting_user_id: UUID | None = None,
+    ) -> CopilotSettings:
         row = await CopilotSettingsService.get_or_create(db, clinic_id)
         provider = data.get("provider", row.provider)
         if provider == "openai" and not app_settings.OPENAI_API_KEY:
@@ -58,9 +63,16 @@ class CopilotSettingsService:
             "redaction_enabled",
             "monthly_token_limit",
             "monthly_cost_limit_cents",
+            "digest_enabled",
+            "digest_hour",
+            "digest_recipient_user_id",
         ):
             if field in data and data[field] is not None:
                 setattr(row, field, data[field])
+        # Enabling the digest without naming a recipient defaults to the
+        # user flipping the switch (v1: single recipient).
+        if data.get("digest_enabled") and row.digest_recipient_user_id is None:
+            row.digest_recipient_user_id = acting_user_id
         await db.flush()
         return row
 

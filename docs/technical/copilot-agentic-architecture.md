@@ -112,6 +112,43 @@ def get_tools() -> list[Tool]:
 
 **Deferred:** `find_free_slots` (free-slot computation lives in `schedules`; it registers its own tool when its slice lands — no cross-module import from `agenda`). All other modules backfill incrementally under the same contract.
 
+#### Post-v1 backfill
+
+The live inventory is each module's `CLAUDE.md` "Tools exposed" table.
+Additions since v1, newest last:
+
+| Module | Tool | Category | Permission |
+|---|---|---|---|
+| `agenda` | `get_appointment`, `list_cabinets`, `list_professionals` | READ | `agenda.appointments.read` / `agenda.cabinets.read` |
+| `schedules` | `get_availability`, `find_free_slots` | READ | `schedules.availability.read` (+`agenda.appointments.read`) |
+| `payments` | `payments_summary`, `collections_by_method` | READ | `payments.reports.read` |
+| `reports` | `billing_report`, `top_clients_by_billing`, `scheduling_report` | READ | `reports.billing.read` / `reports.scheduling.read` |
+| `patient_timeline` | `get_patient_timeline` | READ | `patient_timeline.read` |
+| `catalog` | `list_catalog_items`, `get_catalog_item` | READ | `catalog.read` |
+| `agenda` | `reschedule_appointment`, `update_appointment_status` | WRITE | `agenda.appointments.write` |
+| `patients` | `update_patient` (contact data only) | WRITE | `patients.write` |
+| `recalls` | `list_due_recalls`, `get_recall` (`exposes_free_text`) | READ | `recalls.read` |
+| `recalls` | `create_recall`, `log_contact_attempt`, `snooze_recall`, `complete_recall` | WRITE | `recalls.write` |
+| `budget` | `list_budgets`, `get_budget` | READ | `budget.read` |
+| `budget` | `send_budget` (emails the patient) | DESTRUCTIVE | `budget.write` |
+| `billing` | `list_invoices`, `get_invoice` (invoice axis only, `include_payments=False`) | READ | `billing.read` |
+| `payments` | `record_payment` | WRITE | `payments.record.write` |
+| `payments` | `patient_payment_history` (collection axis only) | READ | `payments.record.read` |
+
+#### Playbooks (composite capabilities — decision record)
+
+Multi-step workflows (daily briefing, prepare-visit, fill-gap-from-
+recalls) are **prompt-level playbooks**, not composite tools: a
+`_PLAYBOOKS` block appended to the static system prompt in
+`copilot/bridge.py` plus permission-gated suggestion chips in
+`CopilotSuggestions.vue`. Rationale: the model already chains
+registered tools; every step still passes the registry chokepoint
+(RBAC, guardrails, audit, redaction). A composite tool inside copilot
+would need a synthetic context, its own partial-failure handling and a
+second orchestration path to maintain. Revisit only if observed chains
+prove unreliable in practice (repeated retry loops); record evidence
+before changing the approach.
+
 ### 3.3 Contract elevation (so it never drifts)
 - **Root `CLAUDE.md`** "When adding X, do Y" — new row: *New agent-exposed capability* → declare a `Tool` in `<module>/tools.py`, wrap the existing service (no logic dup), set `permissions` to the gating RBAC string and `category` conservatively (DESTRUCTIVE for side-effects / deletes), mark `exposes_free_text=True` if it returns prose, document under "Tools exposed" in the module `CLAUDE.md`.
 - **`docs/checklists/new-module.md`** — add a "Agent tools" section.
