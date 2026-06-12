@@ -54,8 +54,10 @@ class CopilotSettingsService:
         acting_user_id: UUID | None = None,
     ) -> CopilotSettings:
         row = await CopilotSettingsService.get_or_create(db, clinic_id)
-        provider = data.get("provider", row.provider)
-        if provider == "openai" and not app_settings.OPENAI_API_KEY:
+        # Validate only when the caller is changing the provider; otherwise a
+        # digest-only PATCH would fail on clinics whose stored provider is
+        # "openai" but whose deployment has no key (the digest is no-LLM).
+        if data.get("provider") == "openai" and not app_settings.OPENAI_API_KEY:
             raise ValueError("OpenAI provider selected but OPENAI_API_KEY is not configured")
         for field in (
             "provider",

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- fix(settings): `CopilotSettingsService.update` validated `OPENAI_API_KEY`
+  even when the PATCH did not touch `provider`, breaking digest-only opt-in
+  on deployments without a key (CI). Now validates only on provider change.
+
 - feat(digest): opt-in morning digest email (proactivity v1, ADR 0014) —
   deterministic daily briefing (today's agenda, overdue recalls, budgets
   awaiting response) gathered through the tool registry with the

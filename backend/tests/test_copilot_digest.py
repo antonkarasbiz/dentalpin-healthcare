@@ -59,6 +59,38 @@ async def test_settings_patch_enables_digest_and_defaults_recipient(
 
 
 @pytest.mark.asyncio
+async def test_settings_patch_digest_only_does_not_require_openai_key(
+    client: AsyncClient, auth_headers: dict, test_clinic, monkeypatch
+) -> None:
+    """Digest opt-in is no-LLM: must work even when OPENAI_API_KEY is unset."""
+    from app.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "OPENAI_API_KEY", "")
+    res = await client.patch(
+        "/api/v1/copilot/settings",
+        json={"digest_enabled": True},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200, res.text
+
+
+@pytest.mark.asyncio
+async def test_settings_patch_provider_change_requires_openai_key(
+    client: AsyncClient, auth_headers: dict, test_clinic, monkeypatch
+) -> None:
+    from app.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "OPENAI_API_KEY", "")
+    res = await client.patch(
+        "/api/v1/copilot/settings",
+        json={"provider": "openai"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 400
+    assert "OPENAI_API_KEY" in res.text
+
+
+@pytest.mark.asyncio
 async def test_settings_patch_rejects_bad_hour(
     client: AsyncClient, auth_headers: dict, test_clinic
 ) -> None:
