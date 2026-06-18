@@ -308,21 +308,21 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.COPILOT_DIGEST_SENT`
 - **Publishers:**
-  - `copilot` — `backend/app/modules/copilot/tasks.py:152`
+  - `copilot` — `backend/app/modules/copilot/tasks.py:174`
 - **Subscribers:** —
 
 ### `copilot.session.ended`
 
 - **Constant:** `EventType.COPILOT_SESSION_ENDED`
 - **Publishers:**
-  - `copilot` — `backend/app/modules/copilot/router.py:185`
+  - `copilot` — `backend/app/modules/copilot/router.py:194`
 - **Subscribers:** —
 
 ### `copilot.session.started`
 
 - **Constant:** `EventType.COPILOT_SESSION_STARTED`
 - **Publishers:**
-  - `copilot` — `backend/app/modules/copilot/router.py:125`
+  - `copilot` — `backend/app/modules/copilot/router.py:134`
 - **Subscribers:** —
 
 ### `copilot.tool.invoked`

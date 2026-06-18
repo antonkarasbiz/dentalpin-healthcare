@@ -44,9 +44,7 @@ def test_base_module_default_is_no_jobs() -> None:
 
 def test_build_trigger_maps_spec_to_apscheduler() -> None:
     cron = _build_trigger(
-        ScheduledJob(
-            id="x", func=lambda: None, trigger="cron", trigger_args={"hour": 2}, name="x"
-        )
+        ScheduledJob(id="x", func=lambda: None, trigger="cron", trigger_args={"hour": 2}, name="x")
     )
     assert isinstance(cron, CronTrigger)
 
