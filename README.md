@@ -4,7 +4,17 @@
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](./README.es.md)
 [![fr](https://img.shields.io/badge/lang-fr-blue.svg)](./README.fr.md)
 
-Open source dental clinic management software. Built with modular architecture for extensibility.
+**Open source dental clinic management software.** Patients, odontogram, scheduling,
+treatment plans, billing and a built-in AI copilot — modular, self-hosted, API-first.
+
+### ▶ [**Try the live demo**](https://demo.dentalpin.com)
+
+Sign in with `admin@demo.clinic` / `demo1234` — full admin access to a seeded clinic.
+Reset every night, so poke at anything.
+
+[![DentalPin — patient record with odontogram](docs/screenshots/patients.png)](https://demo.dentalpin.com)
+
+<sub>[Website](https://www.dentalpin.com) · [Docs](https://docs.dentalpin.com) · [Telegram](https://t.me/dentalpin) · [More screenshots ↓](#screenshots)</sub>
 
 ## Why DentalPin?
 
@@ -59,9 +69,6 @@ Visit [**dentalpin.com**](https://www.dentalpin.com) for product info, features,
 Join our [**Telegram channel**](https://t.me/dentalpin) for support, installation help, and questions.
 
 ## Screenshots
-
-### AI Copilot
-![AI Copilot](docs/screenshots/ia.png)
 
 ### Dashboard
 ![Dashboard](docs/screenshots/home.png)
