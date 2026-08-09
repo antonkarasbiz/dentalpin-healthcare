@@ -16,7 +16,8 @@
     "/module_layers/recalls/frontend",
     "/module_layers/notifications/frontend",
     "/module_layers/patient_timeline/frontend",
-    "/module_layers/reports/frontend"
+    "/module_layers/reports/frontend",
+    "/module_layers/whatsapp_kapso/frontend"
   ],
   "modules": [
     {
@@ -86,6 +87,10 @@
     {
       "name": "reports",
       "path": "/module_layers/reports/frontend"
+    },
+    {
+      "name": "whatsapp_kapso",
+      "path": "/module_layers/whatsapp_kapso/frontend"
     }
   ],
   "version": 1
