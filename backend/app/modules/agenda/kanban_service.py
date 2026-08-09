@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.models import ClinicMembership, User
 
 from .models import Appointment
+from .tz import get_clinic_tz
 
 
 async def _fetch_professionals(db: AsyncSession, clinic_id: UUID) -> list[tuple[UUID, str, str]]:
@@ -128,12 +129,15 @@ class KanbanDayService:
         target_date: date,
     ) -> dict:
         now = datetime.now(UTC)
-        # Day window in UTC (start/end).
+        # Day window in the clinic's timezone (issue #161) — a UTC window
+        # shifted early/late appointments into the wrong day for clinics
+        # west/east of Greenwich.
+        tz = await get_clinic_tz(db, clinic_id)
         day_start = datetime(
-            target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=UTC
+            target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=tz
         )
         day_end = datetime(
-            target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=UTC
+            target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=tz
         )
 
         pros = await _fetch_professionals(db, clinic_id)

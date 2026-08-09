@@ -44,8 +44,22 @@ from .service import (
     CabinetService,
     InvalidTransitionError,
 )
+from .tz import safe_zone
 
 router = APIRouter()
+
+
+def _localize(response: AppointmentResponse, ctx: ClinicContext) -> AppointmentResponse:
+    """Serialize start/end in the clinic timezone (issue #161).
+
+    Wall-clock consumers (the calendar grid slices the ISO string) and
+    instant consumers (``new Date()`` on the dashboard) then both render
+    the hour the receptionist picked. Audit timestamps stay UTC.
+    """
+    tz = safe_zone(ctx.clinic.timezone)
+    response.start_time = response.start_time.astimezone(tz)
+    response.end_time = response.end_time.astimezone(tz)
+    return response
 
 
 # --- Appointments -------------------------------------------------------
@@ -79,7 +93,7 @@ async def list_appointments(
         patient_id=patient_id,
     )
     return PaginatedApiResponse(
-        data=[AppointmentResponse.model_validate(a) for a in appointments],
+        data=[_localize(AppointmentResponse.model_validate(a), ctx) for a in appointments],
         total=total,
         page=page,
         page_size=page_size,
@@ -131,7 +145,7 @@ async def create_appointment(
             detail="Time slot is already occupied",
         ) from e
 
-    return ApiResponse(data=AppointmentResponse.model_validate(appointment))
+    return ApiResponse(data=_localize(AppointmentResponse.model_validate(appointment), ctx))
 
 
 @router.get("/appointments/{appointment_id}", response_model=ApiResponse[AppointmentResponse])
@@ -149,7 +163,7 @@ async def get_appointment(
             detail="Appointment not found",
         )
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
-    response = AppointmentResponse.model_validate(appointment)
+    response = _localize(AppointmentResponse.model_validate(appointment), ctx)
     response.history = [AppointmentStatusEventResponse.model_validate(e) for e in events]
     return ApiResponse(data=response)
 
@@ -204,7 +218,7 @@ async def update_appointment(
             detail="Time slot is already occupied",
         ) from e
 
-    return ApiResponse(data=AppointmentResponse.model_validate(appointment))
+    return ApiResponse(data=_localize(AppointmentResponse.model_validate(appointment), ctx))
 
 
 @router.delete("/appointments/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -273,7 +287,7 @@ async def transition_appointment(
         ) from e
 
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
-    response = AppointmentResponse.model_validate(appointment)
+    response = _localize(AppointmentResponse.model_validate(appointment), ctx)
     response.history = [AppointmentStatusEventResponse.model_validate(e) for e in events]
     return ApiResponse(data=response)
 
@@ -341,7 +355,7 @@ async def assign_appointment_cabinet(
         ) from e
 
     events = await AppointmentService.list_cabinet_events(db, ctx.clinic_id, appointment.id)
-    response = AppointmentResponse.model_validate(appointment)
+    response = _localize(AppointmentResponse.model_validate(appointment), ctx)
     response.cabinet_history = [AppointmentCabinetEventResponse.model_validate(e) for e in events]
     return ApiResponse(data=response)
 
@@ -381,11 +395,11 @@ async def get_kanban_day(
     target: date_type | None = Query(
         default=None,
         alias="date",
-        description="Day to snapshot (defaults to today, clinic UTC)",
+        description="Day to snapshot (defaults to today in the clinic timezone)",
     ),
 ) -> ApiResponse[KanbanDaySnapshot]:
     """Return the professionals strip state for the kanban board."""
-    target_date = target or datetime.utcnow().date()
+    target_date = target or datetime.now(safe_zone(ctx.clinic.timezone)).date()
     data = await KanbanDayService.snapshot(db, ctx.clinic_id, target_date)
     return ApiResponse(data=KanbanDaySnapshot(**data))
 

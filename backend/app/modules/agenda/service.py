@@ -28,6 +28,7 @@ from .models import (
     AppointmentTreatment,
     Cabinet,
 )
+from .tz import as_utc, get_clinic_tz
 
 # Canonical state machine. Mirrored in the frontend composable
 # ``useAppointmentStatus.ts`` and kept in sync via a parity test
@@ -160,7 +161,17 @@ class AppointmentService:
         *,
         patient_id: UUID | None = None,
     ) -> tuple[list[Appointment], int]:
-        """List appointments with filters."""
+        """List appointments with filters.
+
+        Naive ``start_date``/``end_date`` are clinic-local (issue #161).
+        """
+        if (start_date and start_date.tzinfo is None) or (end_date and end_date.tzinfo is None):
+            tz = await get_clinic_tz(db, clinic_id)
+            if start_date and start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=tz)
+            if end_date and end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=tz)
+
         page_size = min(max(page_size, 1), 500)
         page = max(page, 1)
         offset = (page - 1) * page_size
@@ -384,6 +395,21 @@ class AppointmentService:
             data["cabinet"] = None
 
     @staticmethod
+    async def _normalize_times(db: AsyncSession, clinic_id: UUID, data: dict) -> None:
+        """Normalize ``start_time``/``end_time`` in ``data`` to UTC instants.
+
+        Naive values are interpreted as clinic-local wall-clock (issue
+        #161); aware values keep their instant. No-op when neither field
+        is present (e.g. partial updates).
+        """
+        keys = [k for k in ("start_time", "end_time") if isinstance(data.get(k), datetime)]
+        if not keys:
+            return
+        tz = await get_clinic_tz(db, clinic_id)
+        for key in keys:
+            data[key] = as_utc(data[key], tz)
+
+    @staticmethod
     async def create_appointment(
         db: AsyncSession,
         clinic_id: UUID,
@@ -397,6 +423,8 @@ class AppointmentService:
         the history being complete from first principles.
         """
         planned_item_ids = data.pop("planned_item_ids", None)
+
+        await AppointmentService._normalize_times(db, clinic_id, data)
 
         await AppointmentService._resolve_cabinet(db, clinic_id, data)
 
@@ -509,6 +537,8 @@ class AppointmentService:
         requested_status = data.pop("status", None)
 
         planned_item_ids = data.pop("planned_item_ids", None)
+
+        await AppointmentService._normalize_times(db, appointment.clinic_id, data)
 
         # Cabinet changes go through assign_cabinet() so the audit trail
         # + bus event fire. Pop the fields here and apply after the core

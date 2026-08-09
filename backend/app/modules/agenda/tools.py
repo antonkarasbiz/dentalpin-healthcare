@@ -14,8 +14,8 @@ not reach across that boundary; the agent combines that tool with
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time
 from datetime import date as date_cls
+from datetime import datetime, time
 from typing import Literal
 from uuid import UUID
 
@@ -114,8 +114,10 @@ async def _list_professionals(ctx: AgentContext, params: NoArgs) -> dict:
 
 
 async def _get_day_overview(ctx: AgentContext, params: DayOverviewArgs) -> dict:
-    start = datetime.combine(params.date, time.min, tzinfo=UTC)
-    end = datetime.combine(params.date, time.max, tzinfo=UTC)
+    # Naive bounds — list_appointments interprets them as clinic-local
+    # wall-clock (issue #161), so "the day" matches the clinic, not UTC.
+    start = datetime.combine(params.date, time.min)
+    end = datetime.combine(params.date, time.max)
     items, total = await AppointmentService.list_appointments(
         ctx.db, ctx.clinic_id, start_date=start, end_date=end
     )

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- fix(timezones): appointment times entered as naive clinic-local
+  wall-clock were persisted unconverted as UTC, so the dashboard
+  (which parses instants with `new Date()`) showed them shifted by
+  the clinic's UTC offset — e.g. 11:00 → 06:00 in America/Lima
+  (issue #161). Naive datetimes (create/update payloads, list
+  filters, `get_day_overview` bounds) are now interpreted in
+  `clinics.timezone` and stored as UTC; API responses serialize
+  `start_time`/`end_time` with the clinic offset so both wall-clock
+  consumers (calendar string slicing) and instant consumers agree.
+  Kanban day windows are computed in the clinic timezone too. Data
+  migration `ag_0006` reinterprets existing rows per clinic.
+
 - style(lint): first ESLint pass over this module's frontend layer —
   module layers were outside the linter's base path until now, so
   CI had never checked them. Mostly auto-fixed formatting; see the

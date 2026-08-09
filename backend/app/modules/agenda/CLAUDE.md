@@ -65,6 +65,13 @@ None.
 
 ## Gotchas
 
+- **Datetime semantics (issue #161).** Naive `start_time`/`end_time`
+  entering the module (payloads, filters) are **clinic-local wall-clock**
+  (`clinics.timezone`); aware values are instants. Storage is UTC; API
+  responses serialize both fields **with the clinic offset** via
+  `router._localize` (audit timestamps stay UTC). Helpers in `tz.py` —
+  don't hand-roll conversions, and never compare naive vs stored values.
+
 - **Schedules must NOT be a dependency.** The `schedules` module depends
   on agenda; the data flow is one-way. Never declare
   `depends: ["schedules"]` here. See `schedules/CLAUDE.md`.
