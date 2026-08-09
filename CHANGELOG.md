@@ -9,6 +9,38 @@ architecture: the monolithic `clinical` module is gone, replaced by
 four purpose-built modules, and every official module now ships its
 frontend as a Nuxt layer under its own Python package.
 
+## [2.2.1] - 2026-08-09
+
+### Fixed
+
+- **Plan and quote lifecycles drifted apart on reject/resend/cancel**
+  (#162). Three sync gaps reported during functional testing of the
+  renegotiation workflow:
+  - Reactivating a rejected treatment plan and confirming it again
+    never generated a new quote — the plan stayed tied to the old
+    rejected one. Re-confirming now provisions a fresh quote and
+    relinks the plan (the documented renegotiation flow had the same
+    stale-link bug and is fixed too).
+  - Accepting a new quote version (the *Resend* flow) did not advance
+    the plan: the version chain never carried the plan link. The plan
+    now follows the new version, and a plan closed as *rejected by the
+    patient* returns to *In progress* automatically when the patient
+    accepts the resent quote.
+  - Cancelling a quote directly from the Quotes module left the plan
+    stuck in *Pending acceptance* forever. The linked plan now returns
+    to *Draft*, ready to edit and re-confirm.
+- **Reopening a plan whose quote had expired returned a 500.** The
+  invalid `expired → cancelled` budget transition is now skipped.
+- **Terminal quotes no longer freeze their plan.** Only *sent* or
+  *accepted* quotes lock the plan for editing; cancelled, rejected and
+  expired ones are history.
+
+### Added
+
+- **"Resend" button on the quote detail page** — clones a rejected,
+  expired or cancelled quote into a new draft version (with a fresh
+  public link) and navigates to it. Available in all four UI languages.
+
 ## [2.2.0] - 2026-08-01
 
 ### Added
