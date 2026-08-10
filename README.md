@@ -279,7 +279,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 
 Business Source License 1.1 (BSL 1.1)
 
-**Use Limitation:** You may not offer DentalPin as a commercial SaaS for dental clinic management.
+**Additional Use Grant:** You may use DentalPin in production, as long as you do not offer it as a commercial SaaS for dental clinic management.
 
 **Change Date:** 4 years from release
 
