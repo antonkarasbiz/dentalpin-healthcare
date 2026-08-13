@@ -545,7 +545,7 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
                 "es": "Obturación amalgama",
                 "en": "Amalgam filling",
                 "fr": "Obturation amalgame",
-                "name": "அமல்கம் பல் நிரப்புதல்",
+                "ta": "அமல்கம் பல் நிரப்புதல்",
             },
             "treatment_scope": "tooth",
             "requires_surfaces": True,

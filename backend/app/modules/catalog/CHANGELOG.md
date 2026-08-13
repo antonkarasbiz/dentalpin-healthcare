@@ -5,6 +5,9 @@
 - i18n: add `ta` fallback to the agent-tool catalog name resolver so
   Tamil-localized treatment names resolve.
 
+- fix(i18n): the REST-AMAL seed item had its Tamil name under a stray
+  `"name"` key instead of `"ta"` (#165 follow-up).
+
 - style(lint): first ESLint pass over this module's frontend layer —
   module layers were outside the linter's base path until now, so
   CI had never checked them. Mostly auto-fixed formatting; see the
