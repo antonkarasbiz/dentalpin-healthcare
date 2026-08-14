@@ -738,7 +738,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_BUDGET_SYNC_REQUESTED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1278`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1284`
 - **Subscribers:**
   - `budget`
 
@@ -746,7 +746,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_CLOSED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1760`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1766`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -754,7 +754,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_CONFIRMED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1620`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1626`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -770,7 +770,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_ITEM_COMPLETED_WITHOUT_NOTE`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:988`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:994`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -793,7 +793,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_REACTIVATED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1806`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1812`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -817,7 +817,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 - **Constant:** `EventType.TREATMENT_PLAN_TREATMENT_COMPLETED`
 - **Publishers:**
   - `treatment_plan` — `backend/app/modules/treatment_plan/events.py:87`
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:973`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:979`
 - **Subscribers:**
   - `patient_timeline`
   - `recalls`
