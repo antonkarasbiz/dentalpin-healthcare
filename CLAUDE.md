@@ -365,6 +365,7 @@ DATABASE_URL=postgresql+asyncpg://dental:dental_dev@db:5432/dental_clinic
 SECRET_KEY=your-secret-key-min-32-chars
 ENVIRONMENT=development   # development | test | production
 TESTING=false
+DEMO_MODE=false           # public demo: blocks user edits/removal + module lifecycle (see block_in_demo)
 ```
 
 ---

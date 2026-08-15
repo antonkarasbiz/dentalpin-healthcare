@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = "development"
+    # Public demo instance: blocks operations that would lock out or break
+    # the shared demo (user edits/removal, module install/uninstall/restart).
+    DEMO_MODE: bool = False
     ALLOWED_ORIGINS: str = ""
 
     # Rate limiting

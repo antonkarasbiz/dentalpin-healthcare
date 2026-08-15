@@ -17,7 +17,13 @@ from app.core.plugins import module_registry
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
-from .dependencies import ClinicContext, get_clinic_context, get_current_user, require_permission
+from .dependencies import (
+    ClinicContext,
+    block_in_demo,
+    get_clinic_context,
+    get_current_user,
+    require_permission,
+)
 from .models import Clinic, ClinicMembership, User
 from .permissions import (
     CORE_PERMISSIONS,
@@ -440,6 +446,7 @@ async def update_user(
     data: UserUpdate,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("admin.users.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[UserWithRoleResponse]:
     """Update a user in the current clinic (admin only)."""
@@ -569,6 +576,7 @@ async def delete_user(
     user_id: UUID,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("admin.users.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Remove a user from the current clinic (admin only).

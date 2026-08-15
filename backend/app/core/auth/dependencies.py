@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.core.log_context import set_request_context
 from app.database import get_db
 
@@ -127,6 +128,19 @@ async def get_clinic_context(
         clinic=membership.clinic,
         role=membership.role,
     )
+
+
+async def block_in_demo() -> None:
+    """Reject the request on the public demo instance (DEMO_MODE=true).
+
+    Guards operations that would lock out or break the shared demo for
+    other visitors; the rest of the app stays fully interactive.
+    """
+    if settings.DEMO_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action is disabled on the public demo.",
+        )
 
 
 def require_permission(permission: str) -> Callable:

@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import (
     ClinicContext,
+    block_in_demo,
     get_clinic_context,
     require_permission,
 )
@@ -162,6 +163,7 @@ async def install_module(
     name: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
     force: bool = False,
 ) -> ApiResponse[dict[str, Any]]:
     svc = ModuleService(db)
@@ -180,6 +182,7 @@ async def uninstall_module(
     name: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
     force: bool = False,
 ) -> ApiResponse[dict[str, Any]]:
     svc = ModuleService(db)
@@ -198,6 +201,7 @@ async def upgrade_module(
     name: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
 ) -> ApiResponse[dict[str, Any]]:
     svc = ModuleService(db)
     try:
@@ -218,6 +222,7 @@ async def upgrade_module(
 async def restart_backend(
     background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
 ) -> ApiResponse[dict[str, Any]]:
     """Send SIGTERM to container PID 1 so Docker respawns the process.
 
