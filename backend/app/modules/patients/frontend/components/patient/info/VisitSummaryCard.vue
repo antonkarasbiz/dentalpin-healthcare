@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
-import { formatPatientDate, nextAppointmentProximity } from '../../../utils/medicalSnapshot'
+import { parseWallClock } from '~~/app/utils/wallClock'
+import { nextAppointmentProximity } from '../../../utils/medicalSnapshot'
 
 interface Props {
   lastVisit: Appointment | null
@@ -12,14 +13,17 @@ const props = defineProps<Props>()
 const { t, locale } = useI18n()
 
 function appointmentDate(a: Appointment): string | null {
-  return formatPatientDate(a.start_time, locale.value === 'en' ? 'en-US' : 'es-ES')
+  if (!a.start_time) return null
+  return parseWallClock(a.start_time).toLocaleDateString(locale.value === 'en' ? 'en-US' : 'es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
 }
 
 function appointmentTime(a: Appointment): string | null {
   if (!a.start_time) return null
-  const d = new Date(a.start_time)
-  if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleTimeString(locale.value === 'en' ? 'en-US' : 'es-ES', {
+  return parseWallClock(a.start_time).toLocaleTimeString(locale.value === 'en' ? 'en-US' : 'es-ES', {
     hour: '2-digit',
     minute: '2-digit'
   })

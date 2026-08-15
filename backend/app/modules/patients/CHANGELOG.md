@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- fix(timezones): visit summary card renders appointment date/hour as
+  clinic wall-clock (`parseWallClock`) instead of the device timezone.
+
 - i18n: add Tamil translations for patient components and demo seed data
 
 - style(lint): first ESLint pass over this module's frontend layer —

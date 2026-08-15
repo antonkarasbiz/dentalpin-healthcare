@@ -8,6 +8,7 @@
  * with day-relative formatting.
  */
 import type { Appointment, PaginatedResponse, PatientExtended } from '~~/app/types'
+import { parseWallClock } from '~~/app/utils/wallClock'
 
 interface Ctx {
   patient: PatientExtended
@@ -55,7 +56,7 @@ const dayLabel = computed(() => {
 
 const timeLabel = computed(() => {
   if (!upcoming.value) return ''
-  return new Date(upcoming.value.start_time).toLocaleTimeString(locale.value, {
+  return parseWallClock(upcoming.value.start_time).toLocaleTimeString(locale.value, {
     hour: '2-digit',
     minute: '2-digit'
   })

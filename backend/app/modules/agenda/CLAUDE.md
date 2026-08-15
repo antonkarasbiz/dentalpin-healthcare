@@ -71,6 +71,13 @@ None.
   responses serialize both fields **with the clinic offset** via
   `router._localize` (audit timestamps stay UTC). Helpers in `tz.py` —
   don't hand-roll conversions, and never compare naive vs stored values.
+  **Frontend:** anything that shows an hour or buckets by day reads the
+  clinic wall-clock via `parseWallClock()` / `clinicNow()` from
+  `~~/app/utils/wallClock` (or slices the ISO string) — never
+  `new Date(iso).getHours()`/`toLocaleTimeString()`, which re-render the
+  instant in the *device's* timezone (mobile showed 13:00 for a 12:00
+  appointment on a phone one hour ahead of the clinic). Instant math
+  (sorting, overlap, "starts in N min", timers) keeps using `new Date`.
 
 - **Schedules must NOT be a dependency.** The `schedules` module depends
   on agenda; the data flow is one-way. Never declare

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- fix(timezones): the mobile day view (free-slot engine, timeline,
+  week-strip counts), kanban card labels, home tiles, next-appointment
+  card and list view formatted appointment hours with `new Date()`
+  — i.e. in the *device's* timezone — while the desktop grid renders
+  clinic wall-clock. On a phone in a different zone than the clinic
+  the same appointment showed a different hour (12:00 vs 13:00) and
+  tapping a free slot booked it at the shifted hour. All hour/day
+  rendering now goes through `parseWallClock()` / `clinicNow()`
+  (`frontend/app/utils/wallClock.ts`); instant math is unchanged.
+
 - fix(timezones): appointment times entered as naive clinic-local
   wall-clock were persisted unconverted as UTC, so the dashboard
   (which parses instants with `new Date()`) showed them shifted by

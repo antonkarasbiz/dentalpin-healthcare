@@ -4,6 +4,7 @@
  */
 
 import type { Appointment, PaginatedResponse } from '~~/app/types'
+import { parseWallClock } from '~~/app/utils/wallClock'
 
 const props = defineProps<{
   patientId: string
@@ -51,7 +52,7 @@ onMounted(loadAppointments)
 
 // Format date time
 function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString(locale.value, {
+  return parseWallClock(dateStr).toLocaleString(locale.value, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

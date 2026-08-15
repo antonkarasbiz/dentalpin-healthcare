@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
+import { parseWallClock } from '~~/app/utils/wallClock'
 import { PERMISSIONS } from '~~/app/config/permissions'
 import { errorDetail } from '~~/app/utils/error'
 
@@ -49,11 +50,11 @@ async function confirm(a: Appointment) {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
+  return parseWallClock(iso).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 }
 
 function isoDay(iso: string): string {
-  const d = new Date(iso)
+  const d = parseWallClock(iso)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')

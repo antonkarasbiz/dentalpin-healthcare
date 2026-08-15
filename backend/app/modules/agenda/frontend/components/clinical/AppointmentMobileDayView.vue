@@ -19,6 +19,7 @@ import type {
 import { useFreeSlots } from '../../composables/useFreeSlots'
 import type { AvailabilityPayload } from '../../composables/useScheduleAvailability'
 import { useScheduleAvailability } from '../../composables/useScheduleAvailability'
+import { parseWallClock } from '~~/app/utils/wallClock'
 
 interface ProfessionalWithColor extends Professional {
   color: string
@@ -198,8 +199,8 @@ const bounds = computed<DayBounds>(() => {
   let minHour = 24
   let maxHour = 0
   for (const r of open) {
-    const s = new Date(r.start)
-    const e = new Date(r.end)
+    const s = parseWallClock(r.start)
+    const e = parseWallClock(r.end)
     minHour = Math.min(minHour, s.getHours())
     const eh = e.getMinutes() > 0 || e.getSeconds() > 0 ? e.getHours() + 1 : e.getHours()
     maxHour = Math.max(maxHour, eh)
@@ -268,7 +269,7 @@ function formatHeaderDate(date: Date): string {
 
 function countForDay(day: Date): number {
   return props.appointments.filter((apt) => {
-    const d = new Date(apt.start_time)
+    const d = parseWallClock(apt.start_time)
     return isSameDay(d, day) && apt.status !== 'cancelled'
   }).length
 }

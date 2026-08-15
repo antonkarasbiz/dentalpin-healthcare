@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
+import { clinicNow, parseWallClock } from '~~/app/utils/wallClock'
 
 defineProps<{ ctx?: unknown }>()
 
 const { t, locale } = useI18n()
 const { todayAppointments, todayLoaded, fetchToday } = useHomeAgenda()
 const { professionals, fetchProfessionals, getProfessionalColor, getProfessionalFullName } = useProfessionals()
+const { currentClinic } = useClinic()
 
-const now = ref(new Date())
+// Clinic wall-clock, like the appointment times it is drawn against.
+const now = ref(clinicNow(currentClinic.value?.timezone))
 let intervalId: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
   if (professionals.value.length === 0) await fetchProfessionals()
   if (!todayLoaded.value) await fetchToday()
   intervalId = setInterval(() => {
-    now.value = new Date()
+    now.value = clinicNow(currentClinic.value?.timezone)
   }, 60_000)
 })
 
@@ -23,7 +26,7 @@ onBeforeUnmount(() => {
 })
 
 function hourFloat(iso: string): number {
-  const d = new Date(iso)
+  const d = parseWallClock(iso)
   return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600
 }
 
@@ -93,7 +96,7 @@ const professionalLanes = computed<Lane[]>(() => {
 })
 
 function formatApptTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
+  return parseWallClock(iso).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 }
 
 function statusIcon(a: Appointment): string | null {
@@ -114,7 +117,7 @@ function apptTitle(a: Appointment): string {
 }
 
 function isoDay(iso: string): string {
-  const d = new Date(iso)
+  const d = parseWallClock(iso)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')

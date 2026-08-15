@@ -7,6 +7,7 @@
  */
 import type { Appointment } from '~~/app/types'
 import type { AvailabilityPayload } from './useScheduleAvailability'
+import { clinicNow, parseWallClock } from '~~/app/utils/wallClock'
 
 export type ResourceKind = 'professional' | 'cabinet'
 
@@ -136,7 +137,7 @@ export function useFreeSlots(opts: {
     if (!res) return []
     return appointments.value.filter((apt) => {
       if (apt.status === 'cancelled') return false
-      const start = new Date(apt.start_time)
+      const start = parseWallClock(apt.start_time)
       if (!isSameDay(start, date.value)) return false
       if (res.kind === 'professional') return apt.professional_id === res.id
       // Cabinet: name-based match (Appointment.cabinet stores cabinet name).
@@ -163,7 +164,7 @@ export function useFreeSlots(opts: {
         if (r.professional_id && r.professional_id !== res.id) continue
       }
       const clamped = clamp(
-        { start: new Date(r.start), end: new Date(r.end) },
+        { start: parseWallClock(r.start), end: parseWallClock(r.end) },
         window_
       )
       if (!clamped) continue
@@ -179,7 +180,7 @@ export function useFreeSlots(opts: {
     const intervals: Interval[] = []
     for (const apt of resourceAppointments.value) {
       const clamped = clamp(
-        { start: new Date(apt.start_time), end: new Date(apt.end_time) },
+        { start: parseWallClock(apt.start_time), end: parseWallClock(apt.end_time) },
         window.value
       )
       if (clamped) intervals.push(clamped)
@@ -210,8 +211,8 @@ export function useFreeSlots(opts: {
     for (const apt of resourceAppointments.value) {
       out.push({
         type: 'busy',
-        start: new Date(apt.start_time),
-        end: new Date(apt.end_time),
+        start: parseWallClock(apt.start_time),
+        end: parseWallClock(apt.end_time),
         appointment: apt
       })
     }
@@ -230,7 +231,8 @@ export function useFreeSlots(opts: {
   const summary = computed<DaySummary>(() => {
     const slots = freeIntervals.value
     const min = minDurationMin.value
-    const now = new Date()
+    // Slots are clinic wall-clock, so compare against the clinic's clock.
+    const now = clinicNow(availability.value?.timezone)
     let totalFreeMin = 0
     let qualifyingGapsCount = 0
     let nextFreeStart: Date | null = null

@@ -10,6 +10,7 @@
 import type { Appointment, Professional } from '~~/app/types'
 import type { TimelineEntry, FreeSlotEntry, BusyEntry, BlockedEntry } from '../../composables/useFreeSlots'
 import { formatDuration } from '../../composables/useFreeSlots'
+import { parseWallClock } from '~~/app/utils/wallClock'
 
 interface ProfessionalWithColor extends Professional {
   color: string
@@ -60,7 +61,7 @@ function patientName(apt: Appointment): string {
 }
 
 function busyDurationMin(apt: Appointment): number {
-  return Math.round((new Date(apt.end_time).getTime() - new Date(apt.start_time).getTime()) / 60000)
+  return Math.round((parseWallClock(apt.end_time).getTime() - parseWallClock(apt.start_time).getTime()) / 60000)
 }
 
 function statusColor(s: Appointment['status']): 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info' {

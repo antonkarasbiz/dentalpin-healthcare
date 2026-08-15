@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Appointment, AppointmentStatus } from '~~/app/types'
+import { parseWallClock } from '~~/app/utils/wallClock'
 import { errorDetail } from '~~/app/utils/error'
 
 interface Cabinet {
@@ -118,7 +119,7 @@ function toggleCollapsed(id: string) {
 // Only keep appointments for the currently selected day. Uses local-date
 // comparison so timezone shifts don't lose edge-case cards.
 function isSameDay(iso: string, target: Date): boolean {
-  const d = new Date(iso)
+  const d = parseWallClock(iso)
   return (
     d.getFullYear() === target.getFullYear()
     && d.getMonth() === target.getMonth()

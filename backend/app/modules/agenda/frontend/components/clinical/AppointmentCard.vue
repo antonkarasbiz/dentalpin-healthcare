@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
+import { parseWallClock } from '~~/app/utils/wallClock'
 
 interface Cabinet {
   id?: string
@@ -69,12 +70,12 @@ const patientName = computed(() => {
 })
 
 const startLabel = computed(() => {
-  const d = new Date(props.appointment.start_time)
+  const d = parseWallClock(props.appointment.start_time)
   return d.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 })
 
 const endLabel = computed(() => {
-  const d = new Date(props.appointment.end_time)
+  const d = parseWallClock(props.appointment.end_time)
   return d.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 })
 
