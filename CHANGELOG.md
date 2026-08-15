@@ -9,6 +9,46 @@ architecture: the monolithic `clinical` module is gone, replaced by
 four purpose-built modules, and every official module now ships its
 frontend as a Nuxt layer under its own Python package.
 
+## [2.2.2] - 2026-08-15
+
+### Fixed
+
+- **Quote discounts now reach the treatment plan and the invoice**
+  (#167). Reported on the quote → plan → invoice path:
+  - Accepting a quote with line and/or global discounts rescales the
+    plan's pending sessions to the accepted amounts, so completing a
+    session books the discounted price into the patient's earned
+    ledger instead of the catalog price. The plan list shows the
+    catalog price struck through next to the effective one.
+  - Treatments and sessions can no longer be completed while the plan
+    is *Draft* or *Pending acceptance* — the API answers 400 and the
+    UI hides the action until the plan is *In progress*.
+  - Invoices created from a quote now carry the line discount **and**
+    the global discount (prorated per line, ex-tax) — the invoice bills
+    what the patient signed. Absolute discounts are prorated on partial
+    invoicing (no more double charge across two invoices) and can never
+    push a line below zero. The from-budget preview matches the
+    resulting invoice.
+- **Clearing a quote line's discount via the API was ignored.**
+  `PUT /budgets/{id}/items/{item_id}` now honours an explicit `null` on
+  nullable fields (discount, tooth, surfaces, notes).
+- **Appointment hours rendered in the device timezone on mobile.** The
+  mobile day view, kanban, home tiles and lists now show clinic
+  wall-clock hours on every device, like the desktop grid.
+
+### Added
+
+- **Tamil (ta) UI locale** across the app, email templates and demo
+  seeds (#165). Thanks @tresundios.
+- **`DEMO_MODE`** — the public demo blocks user edits/removal and module
+  install/uninstall/restart so one visitor cannot break it for everyone.
+
+### Changed
+
+- **License**: production use is granted via a standard BSL 1.1
+  *Additional Use Grant* (self-hosting and per-client deployments are
+  affirmatively permitted; the SaaS restriction is unchanged).
+
 ## [2.2.1] - 2026-08-09
 
 ### Fixed
