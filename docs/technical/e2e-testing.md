@@ -32,8 +32,25 @@ npx playwright install chromium
 The script waits for `http://localhost:3000/login` to respond before
 handing off to Playwright.
 
+`setup.spec.ts` (first-run wizard) needs an **uninitialized** database
+and is skipped unless `E2E_FRESH=1`. Run it through the dedicated
+script, which resets the dev DB, runs only that spec and re-seeds the
+demo afterwards:
+
+```bash
+./scripts/e2e-fresh.sh        # destroys the local dev DB — never point at prod
+```
+
 ## What's covered
 
+- `setup.spec.ts` — fresh install: `/setup` with country = Spain →
+  seeded series / cabinet / catalog visible through the API, the
+  getting-started card shows pending steps and *Omitir* persists
+  across a reload (server-side state). Fresh DB only (see above).
+- `invite-link.spec.ts` — admin creates a user without a password,
+  opens the access link in a clean context, sets a password, lands
+  signed in; the link is single-use. Also asserts a receptionist never
+  sees the getting-started card.
 - `smoke-navigation.spec.ts` — admin visits every route in the
   sidebar and asserts the page renders (status < 400 + a visible
   heading/link/button in main content). Catches broken

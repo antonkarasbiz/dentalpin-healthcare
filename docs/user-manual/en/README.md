@@ -5,6 +5,7 @@ End-user and administrator guides in English. See the
 
 ## General guides
 
+- [Getting started: first-run setup and the "Getting started" card](./getting-started.md)
 - [Demo data and login credentials](./demo.md)
 - [Self-hosting operations](./operations.md)
 

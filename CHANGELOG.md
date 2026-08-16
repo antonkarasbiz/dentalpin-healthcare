@@ -9,6 +9,34 @@ architecture: the monolithic `clinical` module is gone, replaced by
 four purpose-built modules, and every official module now ships its
 frontend as a Nuxt layer under its own Python package.
 
+## [Unreleased]
+
+### Added
+
+- **First-run onboarding redesign** (`/setup`, dashboard "Puesta en
+  marcha" card, guided mode, invite links). See
+  [`docs/features/onboarding.md`](docs/features/onboarding.md) and
+  [ADR 0018](docs/adr/0018-onboarding-seeding-and-state.md).
+  - `/setup` asks for the country and derives timezone, currency,
+    tax-id format and VAT preset (Spain full preset; generic fallback);
+    NIF/CIF checksum warning; UI language switcher in the wizard.
+  - `POST /auth/setup` publishes `clinic.created`; catalog, billing,
+    agenda and schedules seed their defaults (VAT + catalog, `FAC`/`RECT`
+    series, one cabinet, Mon–Fri hours) so the clinic is operative on
+    first login.
+  - Dashboard card for admins with progress, per-step *Configurar* /
+    *Omitir*, inline mini-modals (cabinets, hours, team), optional
+    group, *Modo guiado* sticky bar. State stored per clinic in
+    `clinic.settings.onboarding` (`PATCH /auth/clinic/settings/onboarding`);
+    localStorage dismissal removed.
+  - Module getting-started rules: catalog, invoice series, clinic
+    hours, SMTP (optional), first patient (optional), VeriFactu
+    suggestion for ES (optional).
+  - Team invite links without email: `POST /auth/users/{id}/invite-link`
+    + public `POST /auth/set-password`; `UserCreate.password` optional;
+    `/set-password` page; "access link" row action doubles as an
+    admin-driven password reset.
+
 ## [2.2.2] - 2026-08-15
 
 ### Fixed

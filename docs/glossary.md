@@ -95,6 +95,17 @@ ADRs) for the full story.
 | Sociedades | Spanish corporations — Veri\*Factu mandatory from 2027-01-01. |
 | Autónomos | Spanish self-employed (IRPF) — Veri\*Factu mandatory from 2027-07-01. |
 
+## Onboarding
+
+| EN (code) | ES (UI) | Definition |
+|---|---|---|
+| First-run setup | Configuración inicial | The pre-login `/setup` wizard that creates the first admin + clinic and applies the country preset. |
+| Country preset | Preset de país | Currency / timezone / language / tax-id format / VAT preset per ISO2 country (`core/auth/country_presets.py`). Only ES has fiscal logic in v1. |
+| Getting-started rule | Paso de puesta en marcha | A registry rule (`registerGettingStartedRule`) whose `when()` says whether a setup step is still pending; drives the dashboard card. |
+| Getting-started card | Tarjeta "Puesta en marcha" | Dashboard card (admins) listing pending steps with progress, mini-modals and guided mode. State in `clinic.settings.onboarding`. |
+| Guided mode | Modo guiado | `?onboarding=<ruleId>` on a settings page: sticky "Paso N de M" bar with next/exit. |
+| Invite link / access link | Enlace de acceso | One-time set-password link (`/set-password?token=…`, 7-day JWT bound to `token_version`) handed out by an admin instead of a password. |
+
 ## Module system
 
 | Term | Definition |
