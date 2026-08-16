@@ -1134,7 +1134,8 @@
       "emailExists": "O email já existe",
       "userNotFound": "Utilizador não encontrado",
       "operationNotAllowed": "Operação não permitida",
-      "invalidData": "Dados inválidos"
+      "invalidData": "Dados inválidos",
+      "inviteLink": "Não foi possível gerar a ligação de acesso"
     },
     "messages": {
       "userCreated": "Utilizador criado com sucesso",
@@ -1219,6 +1220,23 @@
         "scheduled": "Operação agendada. Aplique as alterações para concluir.",
         "applied": "Alterações aplicadas com sucesso."
       }
+    },
+    "invite": {
+      "linkTitle": "Ligação de acesso",
+      "linkHelp": "Envie esta ligação a {name} para escolher a palavra-passe. Expira a {date} e só funciona uma vez.",
+      "copy": "Copiar ligação",
+      "copied": "Ligação copiada",
+      "whatsapp": "Enviar por WhatsApp",
+      "shareText": "Olá {name}, aqui está o seu acesso ao DentalPin. Abra e escolha a sua palavra-passe: {url}",
+      "secretNote": "Trate-a como uma palavra-passe: quem tiver a ligação pode entrar nesta conta.",
+      "passwordOptionalHelp": "Deixe vazio para gerar uma ligação de acesso para enviar por WhatsApp ou email.",
+      "passwordOptionalPlaceholder": "Opcional",
+      "createAndLink": "Criar e gerar ligação",
+      "rowAction": "Ligação de acesso",
+      "setPasswordTitle": "Escolha a sua palavra-passe",
+      "setPasswordSubtitle": "Foi convidado para o DentalPin. Crie a sua palavra-passe para entrar.",
+      "setPasswordSubmit": "Guardar e entrar",
+      "invalidToken": "Esta ligação é inválida ou já foi usada. Peça uma nova ao administrador da sua clínica."
     }
   },
   "selector": {

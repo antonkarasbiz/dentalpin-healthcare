@@ -1134,7 +1134,8 @@
       "emailExists": "L'email existe déjà",
       "userNotFound": "Utilisateur introuvable",
       "operationNotAllowed": "Opération non autorisée",
-      "invalidData": "Données invalides"
+      "invalidData": "Données invalides",
+      "inviteLink": "Impossible de générer le lien d'accès"
     },
     "messages": {
       "userCreated": "Utilisateur créé avec succès",
@@ -1219,6 +1220,23 @@
         "scheduled": "Opération programmée. Appliquez les modifications pour finaliser.",
         "applied": "Modifications appliquées avec succès."
       }
+    },
+    "invite": {
+      "linkTitle": "Lien d'accès",
+      "linkHelp": "Envoyez ce lien à {name} pour qu'il choisisse son mot de passe. Expire le {date}, usage unique.",
+      "copy": "Copier le lien",
+      "copied": "Lien copié",
+      "whatsapp": "Envoyer par WhatsApp",
+      "shareText": "Bonjour {name}, voici votre accès à DentalPin. Ouvrez-le et choisissez votre mot de passe : {url}",
+      "secretNote": "À traiter comme un mot de passe : toute personne ayant le lien peut se connecter à ce compte.",
+      "passwordOptionalHelp": "Laissez vide pour générer un lien d'accès à envoyer par WhatsApp ou e-mail.",
+      "passwordOptionalPlaceholder": "Facultatif",
+      "createAndLink": "Créer et générer le lien",
+      "rowAction": "Lien d'accès",
+      "setPasswordTitle": "Choisissez votre mot de passe",
+      "setPasswordSubtitle": "Vous êtes invité sur DentalPin. Créez votre mot de passe pour vous connecter.",
+      "setPasswordSubmit": "Enregistrer et se connecter",
+      "invalidToken": "Ce lien est invalide ou déjà utilisé. Demandez-en un nouveau à l'administrateur de votre cabinet."
     }
   },
   "selector": {

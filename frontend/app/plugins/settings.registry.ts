@@ -176,6 +176,7 @@ export default defineNuxtPlugin(() => {
     to: '/settings/people/users',
     order: 40,
     severity: 'info',
+    modal: () => import('~/components/settings/users/UserCreateModal.vue'),
     load: async () => {
       const state = useState<{ loaded: boolean, professionals: number, others: number }>(
         'onboarding:team', () => ({ loaded: false, professionals: 0, others: 0 })

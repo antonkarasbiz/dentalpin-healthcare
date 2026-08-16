@@ -188,6 +188,25 @@ export function useUsers() {
     }
   }
 
+  /** Mint a one-time set-password link for a member (new account or admin reset). */
+  async function createInviteLink(userId: string): Promise<{ url: string, expiresAt: string } | null> {
+    try {
+      const response = await api.post<ApiResponse<{ token: string, expires_at: string }>>(
+        `/api/v1/auth/users/${userId}/invite-link`
+      )
+      const url = `${window.location.origin}/set-password?token=${encodeURIComponent(response.data.token)}`
+      return { url, expiresAt: response.data.expires_at }
+    } catch (e) {
+      toast.add({
+        title: t('common.error'),
+        description: t('settings.errors.inviteLink'),
+        color: 'error'
+      })
+      console.error('Failed to create invite link:', e)
+      return null
+    }
+  }
+
   return {
     users: readonly(users),
     isLoading: readonly(isLoading),
@@ -195,6 +214,7 @@ export function useUsers() {
     availableRoles,
     fetchUsers,
     createUser,
+    createInviteLink,
     updateUser,
     deleteUser
   }

@@ -1153,7 +1153,8 @@
       "emailExists": "El email ya existe",
       "userNotFound": "Usuario no encontrado",
       "operationNotAllowed": "Operación no permitida",
-      "invalidData": "Datos incorrectos"
+      "invalidData": "Datos incorrectos",
+      "inviteLink": "No se pudo generar el enlace de acceso"
     },
     "messages": {
       "userCreated": "Usuario creado correctamente",
@@ -1240,7 +1241,24 @@
       }
     },
     "navLabel": "Categorías de ajustes",
-    "attentionRequired": "Atención requerida"
+    "attentionRequired": "Atención requerida",
+    "invite": {
+      "linkTitle": "Enlace de acceso",
+      "linkHelp": "Envía este enlace a {name} para que elija su contraseña. Caduca el {date} y solo sirve una vez.",
+      "copy": "Copiar enlace",
+      "copied": "Enlace copiado",
+      "whatsapp": "Enviar por WhatsApp",
+      "shareText": "Hola {name}, aquí tienes tu acceso a DentalPin. Entra y elige tu contraseña: {url}",
+      "secretNote": "Trátalo como una contraseña: quien tenga el enlace puede entrar con esta cuenta.",
+      "passwordOptionalHelp": "Déjala vacía para generar un enlace de acceso que puedas enviar por WhatsApp o email.",
+      "passwordOptionalPlaceholder": "Opcional",
+      "createAndLink": "Crear y generar enlace",
+      "rowAction": "Enlace de acceso",
+      "setPasswordTitle": "Elige tu contraseña",
+      "setPasswordSubtitle": "Te han invitado a DentalPin. Crea tu contraseña para entrar.",
+      "setPasswordSubmit": "Guardar y entrar",
+      "invalidToken": "Este enlace no es válido o ya se ha usado. Pide uno nuevo al administrador de tu clínica."
+    }
   },
   "selector": {
     "recentPatients": "Pacientes recientes",

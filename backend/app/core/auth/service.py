@@ -68,6 +68,26 @@ def create_refresh_token(user_id: UUID, token_version: int = 0) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+INVITE_TOKEN_EXPIRE_DAYS = 7
+
+
+def create_invite_token(user_id: UUID, token_version: int = 0) -> tuple[str, datetime]:
+    """One-time "set your password" token handed out as a link.
+
+    Bound to ``token_version`` so consuming it (which bumps the version)
+    invalidates the link and every older session at once. Not accepted
+    as a bearer token — ``get_current_user`` requires ``type == "access"``.
+    """
+    expire = datetime.now(UTC) + timedelta(days=INVITE_TOKEN_EXPIRE_DAYS)
+    payload = {
+        "sub": str(user_id),
+        "exp": expire,
+        "type": "invite",
+        "token_version": token_version,
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM), expire
+
+
 def decode_token(token: str) -> dict[str, Any]:
     """Decode and validate a JWT token.
 

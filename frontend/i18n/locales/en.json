@@ -1134,7 +1134,8 @@
       "emailExists": "Email already exists",
       "userNotFound": "User not found",
       "operationNotAllowed": "Operation not allowed",
-      "invalidData": "Invalid data"
+      "invalidData": "Invalid data",
+      "inviteLink": "Could not generate the access link"
     },
     "messages": {
       "userCreated": "User created successfully",
@@ -1219,6 +1220,23 @@
         "scheduled": "Operation scheduled. Apply changes to complete.",
         "applied": "Changes applied successfully."
       }
+    },
+    "invite": {
+      "linkTitle": "Access link",
+      "linkHelp": "Send this link to {name} so they choose their password. Expires on {date} and works once.",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "whatsapp": "Send via WhatsApp",
+      "shareText": "Hi {name}, here is your DentalPin access. Open it and choose your password: {url}",
+      "secretNote": "Treat it like a password: anyone with the link can sign in to this account.",
+      "passwordOptionalHelp": "Leave empty to generate an access link you can send by WhatsApp or email.",
+      "passwordOptionalPlaceholder": "Optional",
+      "createAndLink": "Create and generate link",
+      "rowAction": "Access link",
+      "setPasswordTitle": "Choose your password",
+      "setPasswordSubtitle": "You've been invited to DentalPin. Create your password to sign in.",
+      "setPasswordSubmit": "Save and sign in",
+      "invalidToken": "This link is invalid or already used. Ask your clinic administrator for a new one."
     }
   },
   "selector": {

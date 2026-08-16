@@ -1,5 +1,6 @@
 """Pydantic schemas for authentication."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -151,7 +152,9 @@ class UserCreate(BaseModel):
     """Schema for admin creating a new user."""
 
     email: EmailStr
-    password: str = Field(min_length=8)
+    # Optional: without a password the account is created locked and the
+    # admin hands out an invite link (``POST /users/{id}/invite-link``).
+    password: str | None = Field(default=None, min_length=8)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     role: str = Field(description="Role: admin, dentist, hygienist, assistant, receptionist")
@@ -163,6 +166,20 @@ class UserCreate(BaseModel):
         description="Appears in the agenda / can be assigned treatments. "
         "Defaults to true for dentist/hygienist, false otherwise.",
     )
+
+
+class InviteLinkResponse(BaseModel):
+    """One-time set-password token for a user (the client builds the URL)."""
+
+    token: str
+    expires_at: datetime
+
+
+class SetPasswordRequest(BaseModel):
+    """Consume an invite token and set the account password."""
+
+    token: str
+    password: str = Field(min_length=8)
 
 
 class UserWithRoleResponse(BaseModel):

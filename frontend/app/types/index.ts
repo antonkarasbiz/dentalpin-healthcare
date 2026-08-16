@@ -125,7 +125,8 @@ export interface Professional {
 
 export interface UserCreate {
   email: string
-  password: string
+  // Omitted → account created locked; hand out an invite link instead
+  password?: string
   first_name: string
   last_name: string
   role: UserRole

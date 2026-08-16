@@ -53,10 +53,13 @@ export function useAuth() {
       }
     })
 
-    accessToken.value = response.access_token
-    refreshToken.value = response.refresh_token
+    await applyTokens(response.access_token, response.refresh_token)
+  }
 
-    // Fetch user info after login
+  /** Store a token pair obtained out-of-band (e.g. invite set-password) and load the user. */
+  async function applyTokens(access: string, refresh: string): Promise<void> {
+    accessToken.value = access
+    refreshToken.value = refresh
     await fetchUser()
   }
 
@@ -187,6 +190,7 @@ export function useAuth() {
     accessToken: readonly(accessToken),
     isAuthenticated,
     login,
+    applyTokens,
     logout,
     refresh,
     fetchUser,

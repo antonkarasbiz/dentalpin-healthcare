@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { UserCreate, UserRole, UserUpdate } from '~/types'
+import type { UserRole, UserUpdate } from '~/types'
 import type { ClinicUser } from '~/composables/useUsers'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuth()
 const { isAdmin } = usePermissions()
-const { users, isLoading, availableRoles, fetchUsers, createUser, updateUser, deleteUser } = useUsers()
+const { users, isLoading, availableRoles, fetchUsers, createInviteLink, updateUser, deleteUser } = useUsers()
 
 const translatedRoles = computed(() =>
   availableRoles.map(role => ({
@@ -35,10 +35,26 @@ const sortedUsers = computed(() => {
 })
 
 const showCreate = ref(false)
-const isCreating = ref(false)
-const newUser = ref({ email: '', password: '', first_name: '', last_name: '' })
-const selectedRole = ref<UserRole>('receptionist')
-const newIsProfessional = ref(false)
+
+// Admin-issued access link (new accounts without password, or a reset).
+const invite = ref<{ user: ClinicUser, url: string, expiresAt: string } | null>(null)
+const inviteCopied = ref(false)
+async function openInvite(user: ClinicUser) {
+  const link = await createInviteLink(user.id)
+  if (link) {
+    invite.value = { user, ...link }
+    inviteCopied.value = false
+  }
+}
+async function copyInvite() {
+  if (!invite.value) return
+  try {
+    await navigator.clipboard.writeText(invite.value.url)
+    inviteCopied.value = true
+  } catch {
+    // Clipboard blocked — the input stays selectable.
+  }
+}
 
 const showEdit = ref(false)
 const isUpdating = ref(false)
@@ -51,9 +67,6 @@ const editIsProfessional = ref(false)
 // the user can override it afterwards — that's the whole point: an
 // admin who also practises ticks it manually.
 const PROFESSIONAL_ROLES: UserRole[] = ['dentist', 'hygienist']
-watch(selectedRole, (role) => {
-  newIsProfessional.value = PROFESSIONAL_ROLES.includes(role)
-})
 watch(editSelectedRole, (role) => {
   // Only re-derive on an actual role change — not on the deferred
   // firing caused by openEdit() loading the user into the form.
@@ -96,22 +109,7 @@ function getRoleLabel(role: UserRole): string {
 }
 
 function openCreate() {
-  newUser.value = { email: '', password: '', first_name: '', last_name: '' }
-  selectedRole.value = 'receptionist'
-  newIsProfessional.value = false
   showCreate.value = true
-}
-
-async function handleCreate() {
-  isCreating.value = true
-  const data: UserCreate = {
-    ...newUser.value,
-    role: selectedRole.value,
-    is_professional: newIsProfessional.value
-  }
-  const result = await createUser(data)
-  isCreating.value = false
-  if (result) showCreate.value = false
 }
 
 function openEdit(user: ClinicUser) {
@@ -245,6 +243,16 @@ async function handleDelete() {
             {{ t('common.inactive') }}
           </UBadge>
           <UButton
+            v-if="user.is_active"
+            icon="i-lucide-link"
+            size="xs"
+            variant="ghost"
+            color="neutral"
+            :aria-label="t('settings.invite.rowAction')"
+            :title="t('settings.invite.rowAction')"
+            @click="openInvite(user)"
+          />
+          <UButton
             icon="i-lucide-pencil"
             size="xs"
             variant="ghost"
@@ -265,90 +273,71 @@ async function handleDelete() {
       </div>
     </div>
 
-    <!-- Create modal -->
-    <UModal v-model:open="showCreate">
+    <!-- Create modal (password optional → invite link) -->
+    <UserCreateModal
+      v-model:open="showCreate"
+      @saved="fetchUsers"
+    />
+
+    <!-- Invite link modal (existing user) -->
+    <UModal
+      :open="invite !== null"
+      @update:open="(v: boolean) => { if (!v) invite = null }"
+    >
       <template #content>
-        <UCard>
+        <UCard v-if="invite">
           <template #header>
             <div class="flex items-center gap-2">
               <UIcon
-                name="i-lucide-user-plus"
+                name="i-lucide-link"
                 class="w-5 h-5 text-primary-accent"
               />
               <h3 class="font-semibold text-default">
-                {{ t('settings.createUser') }}
+                {{ t('settings.invite.linkTitle') }}
               </h3>
             </div>
           </template>
-
-          <form
-            class="space-y-4"
-            @submit.prevent="handleCreate"
-          >
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <UFormField :label="t('common.firstName')">
-                <UInput
-                  v-model="newUser.first_name"
-                  required
-                />
-              </UFormField>
-              <UFormField :label="t('common.lastName')">
-                <UInput
-                  v-model="newUser.last_name"
-                  required
-                />
-              </UFormField>
-            </div>
-
-            <UFormField :label="t('common.email')">
-              <UInput
-                v-model="newUser.email"
-                type="email"
-                required
-              />
-            </UFormField>
-
-            <UFormField :label="t('common.password')">
-              <UInput
-                v-model="newUser.password"
-                type="password"
-                :placeholder="t('common.passwordPlaceholder')"
-                required
-              />
-            </UFormField>
-
-            <UFormField :label="t('common.role')">
-              <USelect
-                v-model="selectedRole"
-                :items="translatedRoles"
-                value-key="value"
-                label-key="label"
-                :placeholder="t('placeholders.selectRole')"
-              />
-            </UFormField>
-
-            <UFormField :help="t('settings.isProfessionalHelp')">
-              <div class="flex items-center gap-3">
-                <USwitch v-model="newIsProfessional" />
-                <span class="text-sm text-muted">{{ t('settings.isProfessional') }}</span>
-              </div>
-            </UFormField>
-
-            <div class="flex justify-end gap-2 pt-4">
+          <div class="space-y-4">
+            <p class="text-body text-muted">
+              {{ t('settings.invite.linkHelp', { name: `${invite.user.first_name} ${invite.user.last_name}`, date: new Date(invite.expiresAt).toLocaleDateString(locale) }) }}
+            </p>
+            <UInput
+              :model-value="invite.url"
+              readonly
+              class="w-full"
+              :ui="{ base: 'font-mono text-xs' }"
+              @focus="($event.target as HTMLInputElement).select()"
+            />
+            <div class="flex flex-col sm:flex-row gap-2">
               <UButton
-                variant="ghost"
-                @click="showCreate = false"
+                :icon="inviteCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                color="primary"
+                class="min-h-[44px] justify-center"
+                @click="copyInvite"
               >
-                {{ t('common.cancel') }}
+                {{ inviteCopied ? t('settings.invite.copied') : t('settings.invite.copy') }}
               </UButton>
               <UButton
-                type="submit"
-                :loading="isCreating"
+                icon="i-lucide-message-circle"
+                color="neutral"
+                variant="soft"
+                class="min-h-[44px] justify-center"
+                :to="`https://wa.me/?text=${encodeURIComponent(t('settings.invite.shareText', { name: invite.user.first_name, url: invite.url }))}`"
+                target="_blank"
+                rel="noopener"
               >
-                {{ t('settings.createUser') }}
+                {{ t('settings.invite.whatsapp') }}
               </UButton>
             </div>
-          </form>
+            <p class="text-caption text-subtle">
+              {{ t('settings.invite.secretNote') }}
+            </p>
+            <div class="flex justify-end pt-2">
+              <UButton @click="invite = null">
+                {{ t('common.close') }}
+              </UButton>
+            </div>
+          </div>
         </UCard>
       </template>
     </UModal>

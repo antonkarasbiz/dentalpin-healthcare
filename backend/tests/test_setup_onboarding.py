@@ -217,3 +217,94 @@ async def test_onboarding_state_requires_admin(
         "/api/v1/auth/clinic/settings/onboarding", json={"dismissed": True}, headers=auth_headers
     )
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Invite links
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_invite_link_flow(client: AsyncClient, auth_headers: dict, test_clinic) -> None:
+    # Create a professional without a password
+    r = await client.post(
+        "/api/v1/auth/users",
+        json={
+            "email": "dentist@example.com",
+            "first_name": "Dana",
+            "last_name": "Dent",
+            "role": "dentist",
+        },
+        headers=auth_headers,
+    )
+    assert r.status_code == 201, r.text
+    user_id = r.json()["data"]["id"]
+
+    # Cannot log in yet
+    r = await client.post(
+        "/api/v1/auth/login", data={"username": "dentist@example.com", "password": "anything1"}
+    )
+    assert r.status_code == 401
+
+    # Admin mints the link
+    r = await client.post(f"/api/v1/auth/users/{user_id}/invite-link", headers=auth_headers)
+    assert r.status_code == 200, r.text
+    token = r.json()["data"]["token"]
+
+    # The invite token is not a bearer token
+    r = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+    # Weak password rejected
+    r = await client.post("/api/v1/auth/set-password", json={"token": token, "password": "short"})
+    assert r.status_code == 422
+
+    # Consume → tokens back
+    r = await client.post(
+        "/api/v1/auth/set-password", json={"token": token, "password": "NewPass123"}
+    )
+    assert r.status_code == 200, r.text
+    access = r.json()["access_token"]
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"})
+    assert me.status_code == 200
+    assert me.json()["data"]["user"]["email"] == "dentist@example.com"
+
+    # Single use
+    r = await client.post(
+        "/api/v1/auth/set-password", json={"token": token, "password": "OtherPass123"}
+    )
+    assert r.status_code == 400
+
+    # New password works
+    r = await client.post(
+        "/api/v1/auth/login", data={"username": "dentist@example.com", "password": "NewPass123"}
+    )
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_invite_link_scoped_to_clinic_and_admin(
+    client: AsyncClient, auth_headers: dict, test_clinic, db_session
+) -> None:
+    from uuid import uuid4
+
+    r = await client.post(f"/api/v1/auth/users/{uuid4()}/invite-link", headers=auth_headers)
+    assert r.status_code == 404
+
+    from app.core.auth.models import ClinicMembership
+
+    membership = (await db_session.execute(select(ClinicMembership))).scalar_one()
+    membership.role = "dentist"
+    await db_session.commit()
+    r = await client.post(
+        f"/api/v1/auth/users/{membership.user_id}/invite-link", headers=auth_headers
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_set_password_rejects_garbage_token(client: AsyncClient) -> None:
+    r = await client.post(
+        "/api/v1/auth/set-password", json={"token": "not-a-jwt", "password": "NewPass123"}
+    )
+    assert r.status_code == 400
