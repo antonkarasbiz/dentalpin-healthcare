@@ -49,7 +49,7 @@
   },
   "setup": {
     "title": "Configuração inicial",
-    "subtitle": "Crie a conta de administrador e a sua clínica para começar",
+    "subtitle": "Crie a sua conta e a sua clínica. Em dois minutos está a trabalhar.",
     "stepAccount": "Conta de administrador",
     "stepClinic": "Dados da clínica",
     "firstName": "Nome",
@@ -62,7 +62,7 @@
     "taxId": "NIF",
     "next": "Seguinte",
     "back": "Voltar",
-    "submit": "Criar e começar",
+    "submit": "Criar a minha clínica",
     "success": "Tudo pronto! Bem-vindo ao DentalPin",
     "firstNameRequired": "Introduza o nome",
     "lastNameRequired": "Introduza o apelido",
@@ -75,7 +75,48 @@
     "clinicNameRequired": "Introduza o nome da clínica",
     "taxIdRequired": "Introduza o NIF",
     "alreadyInitialized": "O sistema já está configurado. Inicie sessão.",
-    "error": "Não foi possível concluir a configuração. Tente novamente"
+    "error": "Não foi possível concluir a configuração. Tente novamente",
+    "stepOf": "Passo {current} de {total}",
+    "country": "País",
+    "countryHelp": "Define impostos, moeda e fuso horário por si",
+    "countryRequired": "Selecione o país",
+    "taxIdGeneric": "Identificação fiscal",
+    "taxIdLooksInvalid": "Não parece um NIF/CIF válido. Verifique antes de faturar.",
+    "taxIdFormat": "Formato inválido (exemplo: {example})",
+    "timezoneRequired": "Selecione o fuso horário",
+    "currencyRequired": "Selecione a moeda",
+    "derivedSettings": "Fuso horário e moeda",
+    "willSeed": "Criaremos por si o catálogo de tratamentos, os tipos de IVA, uma série de faturas, um gabinete e um horário de segunda a sexta. Tudo pode ser alterado depois.",
+    "willSuggestVerifactu": "Depois sugeriremos ativar o VeriFactu.",
+    "invalidData": "Reveja os dados: algum campo é inválido."
+  },
+  "onboarding": {
+    "title": "Primeiros passos",
+    "progress": "{done} de {total} passos concluídos",
+    "configure": "Configurar",
+    "skip": "Ignorar",
+    "unskip": "Anular",
+    "dismiss": "Ocultar",
+    "guidedMode": "Modo guiado",
+    "optional": "Opcional ({count})",
+    "stepOf": "Passo {current} de {total}",
+    "next": "Seguinte",
+    "finish": "Terminar",
+    "exit": "Sair",
+    "completedTitle": "A sua clínica está pronta!",
+    "completedDescription": "A configuração inicial está concluída. Já pode trabalhar normalmente.",
+    "guidedDoneTitle": "Percurso terminado",
+    "guidedDoneDescription": "Não há passos pendentes.",
+    "items": {
+      "team": {
+        "label": "A sua equipa",
+        "description": "Adicione os profissionais que atendem consultas, ou marque-se como profissional se trabalha sozinho."
+      },
+      "verifactu": {
+        "label": "Ativar VeriFactu",
+        "description": "Obrigatório em Espanha para emitir faturas válidas perante a AEAT."
+      }
+    }
   },
   "actions": {
     "edit": "Editar",
@@ -339,6 +380,10 @@
     },
     "quickActions": {
       "ariaLabel": "Ações rápidas do paciente"
+    },
+    "onboarding": {
+      "label": "Crie o seu primeiro paciente",
+      "description": "A forma mais rápida de ver a ficha, a agenda e os orçamentos em ação."
     }
   },
   "patientDetail": {
@@ -1089,7 +1134,8 @@
       "emailExists": "O email já existe",
       "userNotFound": "Utilizador não encontrado",
       "operationNotAllowed": "Operação não permitida",
-      "invalidData": "Dados inválidos"
+      "invalidData": "Dados inválidos",
+      "inviteLink": "Não foi possível gerar a ligação de acesso"
     },
     "messages": {
       "userCreated": "Utilizador criado com sucesso",
@@ -1174,6 +1220,23 @@
         "scheduled": "Operação agendada. Aplique as alterações para concluir.",
         "applied": "Alterações aplicadas com sucesso."
       }
+    },
+    "invite": {
+      "linkTitle": "Ligação de acesso",
+      "linkHelp": "Envie esta ligação a {name} para escolher a palavra-passe. Expira a {date} e só funciona uma vez.",
+      "copy": "Copiar ligação",
+      "copied": "Ligação copiada",
+      "whatsapp": "Enviar por WhatsApp",
+      "shareText": "Olá {name}, aqui está o seu acesso ao DentalPin. Abra e escolha a sua palavra-passe: {url}",
+      "secretNote": "Trate-a como uma palavra-passe: quem tiver a ligação pode entrar nesta conta.",
+      "passwordOptionalHelp": "Deixe vazio para gerar uma ligação de acesso para enviar por WhatsApp ou email.",
+      "passwordOptionalPlaceholder": "Opcional",
+      "createAndLink": "Criar e gerar ligação",
+      "rowAction": "Ligação de acesso",
+      "setPasswordTitle": "Escolha a sua palavra-passe",
+      "setPasswordSubtitle": "Foi convidado para o DentalPin. Crie a sua palavra-passe para entrar.",
+      "setPasswordSubmit": "Guardar e entrar",
+      "invalidToken": "Esta ligação é inválida ou já foi usada. Peça uma nova ao administrador da sua clínica."
     }
   },
   "selector": {
@@ -1486,6 +1549,10 @@
       "pricing": "Preços",
       "scheduling": "Agendamento",
       "clinical": "Clínico"
+    },
+    "onboarding": {
+      "label": "Catálogo de tratamentos",
+      "description": "Sem tratamentos não há orçamentos nem planos. Carregue o catálogo por defeito ou crie os seus."
     }
   },
   "placeholders": {
@@ -2246,6 +2313,10 @@
         "save_failed": "Erro ao guardar as definições SMTP",
         "test_failed": "Erro ao testar a ligação SMTP"
       }
+    },
+    "onboarding": {
+      "label": "Envio de emails",
+      "description": "Configure o remetente para enviar confirmações de consulta e orçamentos."
     }
   },
   "invoice": {
@@ -2793,7 +2864,11 @@
     "confirmReset": "Reiniciar contador",
     "created": "Série criada com sucesso",
     "saved": "Série atualizada com sucesso",
-    "resetSuccess": "Contador reiniciado com sucesso"
+    "resetSuccess": "Contador reiniciado com sucesso",
+    "onboarding": {
+      "label": "Série de faturas",
+      "description": "Necessária para emitir a primeira fatura (ex.: FAC-2026-0001)."
+    }
   },
   "documents": {
     "title": "Documentos",

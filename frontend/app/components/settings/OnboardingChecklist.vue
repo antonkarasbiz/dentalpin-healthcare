@@ -38,7 +38,7 @@ function severityColor(sev?: string): string {
       <div class="flex items-center gap-2 min-w-0">
         <UIcon
           name="i-lucide-rocket"
-          class="w-5 h-5 text-(--color-primary-accent) shrink-0"
+          class="w-5 h-5 text-(--color-primary) shrink-0"
         />
         <div class="min-w-0">
           <h2 class="text-h3 text-default">

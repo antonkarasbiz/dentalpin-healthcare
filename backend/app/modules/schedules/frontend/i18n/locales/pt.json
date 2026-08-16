@@ -77,6 +77,12 @@
       "confirmOutside": "Este horário está fora do horário de trabalho. Criar a consulta mesmo assim?",
       "confirm": "Criar mesmo assim",
       "cancel": "Cancelar"
+    },
+    "onboarding": {
+      "hoursLabel": "Horário da clínica",
+      "hoursDescription": "Neste momento a agenda está aberta 24 h. Defina o seu horário real.",
+      "presetSplit": "Seg–Sex 9–14 e 16–20",
+      "presetContinuous": "Seg–Sex 9–18"
     }
   }
 }

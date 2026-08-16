@@ -36,7 +36,9 @@ Payloads carry `clinic_id`, `appointment_id`, and (where relevant)
 
 ## Subscribed
 
-_This module does not subscribe to any events._
+| Event | Handler | Effect |
+|-------|---------|--------|
+| `clinic.created` | `events.py:on_clinic_created` | Create one default cabinet ("Gabinete 1" / "Room 1" by clinic language) when the clinic has none. |
 
 ## Adding a new event
 

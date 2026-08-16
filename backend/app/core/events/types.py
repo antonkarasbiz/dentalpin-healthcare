@@ -11,6 +11,14 @@ class EventType:
     # arrives in Fase 2a when the resolver is wired into `get_db`).
     TENANT_RESOLVED = "tenant.resolved"
 
+    # Clinic lifecycle. Published by ``POST /auth/setup`` after the clinic,
+    # its admin and the membership are committed. Payload: (clinic_id,
+    # country, currency, timezone, language, vat_preset, created_by,
+    # source). Modules react by seeding their defaults (catalog, billing
+    # series, cabinet, hours) — handlers must be idempotent and open their
+    # own DB session.
+    CLINIC_CREATED = "clinic.created"
+
     # Patient events
     PATIENT_CREATED = "patient.created"
     PATIENT_UPDATED = "patient.updated"

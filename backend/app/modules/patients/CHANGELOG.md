@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): optional getting-started rule `first-patient` — suggests creating the first patient.
+
 - fix(timezones): visit summary card renders appointment date/hour as
   clinic wall-clock (`parseWallClock`) instead of the device timezone.
 

@@ -1,5 +1,17 @@
 import type { Cabinet, CabinetCreate, CabinetUpdate, Clinic, ClinicMembership, ClinicUpdate, PaginatedResponse, ApiResponse } from '~/types'
 
+/**
+ * Context-free access to the clinic state (only ``useState``). Use from
+ * code that may run outside a component setup — e.g. getting-started
+ * rule predicates evaluated inside computeds/watchers — where
+ * ``useClinic()`` (``useI18n``, ``useToast``) would throw.
+ */
+export function useClinicState() {
+  return {
+    currentClinic: useState<Clinic | null>('clinic:current', () => null)
+  }
+}
+
 export function useClinic() {
   const api = useApi()
   const auth = useAuth()
@@ -7,7 +19,7 @@ export function useClinic() {
   const { t } = useI18n()
 
   // State
-  const currentClinic = useState<Clinic | null>('clinic:current', () => null)
+  const { currentClinic } = useClinicState()
   const membership = useState<ClinicMembership | null>('clinic:membership', () => null)
   const isLoading = useState<boolean>('clinic:loading', () => false)
 
@@ -55,6 +67,14 @@ export function useClinic() {
       console.error('Failed to update clinic:', e)
       return null
     }
+  }
+
+  // Merge a partial settings object into the local Clinic state (after a
+  // settings PATCH) without re-fetching the whole clinic payload.
+  function patchSettings(partial: Partial<Clinic['settings']>): void {
+    const clinic = currentClinic.value
+    if (!clinic) return
+    currentClinic.value = { ...clinic, settings: { ...(clinic.settings ?? {}), ...partial } }
   }
 
   // Mutate the cabinets array on the local Clinic state without re-fetching
@@ -156,6 +176,7 @@ export function useClinic() {
     slotDuration,
     fetchClinic,
     updateClinic,
+    patchSettings,
     createCabinet,
     updateCabinet,
     deleteCabinet

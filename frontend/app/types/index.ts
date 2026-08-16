@@ -60,6 +60,12 @@ export interface ClinicUpdate {
   currency?: string
 }
 
+export interface OnboardingState {
+  dismissed_at?: string | null
+  completed_at?: string | null
+  skipped?: Record<string, string>
+}
+
 export interface Clinic {
   id: string
   name: string
@@ -72,6 +78,9 @@ export interface Clinic {
   currency: string
   settings: {
     slot_duration_min?: number
+    country?: string
+    communication_language?: string
+    onboarding?: OnboardingState
   }
   cabinets: Cabinet[]
   created_at: string
@@ -116,7 +125,8 @@ export interface Professional {
 
 export interface UserCreate {
   email: string
-  password: string
+  // Omitted → account created locked; hand out an invite link instead
+  password?: string
   first_name: string
   last_name: string
   role: UserRole

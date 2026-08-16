@@ -1,5 +1,6 @@
 """Pydantic schemas for authentication."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -151,7 +152,9 @@ class UserCreate(BaseModel):
     """Schema for admin creating a new user."""
 
     email: EmailStr
-    password: str = Field(min_length=8)
+    # Optional: without a password the account is created locked and the
+    # admin hands out an invite link (``POST /users/{id}/invite-link``).
+    password: str | None = Field(default=None, min_length=8)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     role: str = Field(description="Role: admin, dentist, hygienist, assistant, receptionist")
@@ -163,6 +166,20 @@ class UserCreate(BaseModel):
         description="Appears in the agenda / can be assigned treatments. "
         "Defaults to true for dentist/hygienist, false otherwise.",
     )
+
+
+class InviteLinkResponse(BaseModel):
+    """One-time set-password token for a user (the client builds the URL)."""
+
+    token: str
+    expires_at: datetime
+
+
+class SetPasswordRequest(BaseModel):
+    """Consume an invite token and set the account password."""
+
+    token: str
+    password: str = Field(min_length=8)
 
 
 class UserWithRoleResponse(BaseModel):
@@ -229,8 +246,39 @@ class SystemSetup(BaseModel):
     clinic_tax_id: str = Field(min_length=1, max_length=20)
     timezone: str | None = Field(default=None, max_length=64)
     currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
+    # ISO-3166 alpha-2. Drives the country preset (tz/currency defaults,
+    # tax-id format, VAT preset seeded by catalog). None keeps the legacy
+    # Europe/Madrid + EUR defaults so pre-existing callers don't change.
+    country: str | None = Field(default=None, pattern="^[A-Za-z]{2}$")
+    # Communication language for the clinic (patient-facing). Defaults from
+    # the country preset.
+    language: str | None = Field(default=None, pattern="^(es|en|fr|pt|ta)$")
 
     @field_validator("timezone")
     @classmethod
     def validate_timezone(cls, value: str | None) -> str | None:
         return _validate_iana_timezone(value)
+
+    @field_validator("country")
+    @classmethod
+    def upper_country(cls, value: str | None) -> str | None:
+        return value.upper() if value else value
+
+
+class CountryPresetResponse(BaseModel):
+    code: str
+    currency: str
+    timezone: str
+    language: str
+    vat_preset: str
+    tax_id_label: str
+    tax_id_pattern: str | None
+    tax_id_example: str | None
+    suggested_modules: list[str]
+
+
+class SetupPresetsResponse(BaseModel):
+    """Country presets the first-run wizard offers (public, pre-auth)."""
+
+    countries: list[CountryPresetResponse]
+    fallback: CountryPresetResponse

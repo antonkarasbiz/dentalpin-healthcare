@@ -49,7 +49,7 @@
   },
   "setup": {
     "title": "Configuración inicial",
-    "subtitle": "Crea la cuenta de administrador y tu clínica para empezar",
+    "subtitle": "Crea tu cuenta y tu clínica. En dos minutos estás trabajando.",
     "stepAccount": "Cuenta de administrador",
     "stepClinic": "Datos de la clínica",
     "firstName": "Nombre",
@@ -62,7 +62,7 @@
     "taxId": "CIF / NIF",
     "next": "Siguiente",
     "back": "Atrás",
-    "submit": "Crear y empezar",
+    "submit": "Crear mi clínica",
     "success": "¡Todo listo! Bienvenido a DentalPin",
     "firstNameRequired": "Introduce el nombre",
     "lastNameRequired": "Introduce los apellidos",
@@ -75,7 +75,48 @@
     "clinicNameRequired": "Introduce el nombre de la clínica",
     "taxIdRequired": "Introduce el CIF / NIF",
     "alreadyInitialized": "El sistema ya está configurado. Inicia sesión.",
-    "error": "No se pudo completar la configuración. Inténtalo de nuevo"
+    "error": "No se pudo completar la configuración. Inténtalo de nuevo",
+    "stepOf": "Paso {current} de {total}",
+    "country": "País",
+    "countryHelp": "Ajusta impuestos, moneda y zona horaria por ti",
+    "countryRequired": "Selecciona el país",
+    "taxIdGeneric": "Identificación fiscal",
+    "taxIdLooksInvalid": "No parece un NIF/CIF válido. Revísalo antes de facturar.",
+    "taxIdFormat": "Formato no válido (ejemplo: {example})",
+    "timezoneRequired": "Selecciona la zona horaria",
+    "currencyRequired": "Selecciona la moneda",
+    "derivedSettings": "Zona horaria y moneda",
+    "willSeed": "Crearemos por ti el catálogo de tratamientos, los tipos de IVA, la serie de facturas, un gabinete y un horario de lunes a viernes. Todo se puede cambiar después.",
+    "willSuggestVerifactu": "Después te sugeriremos activar VeriFactu.",
+    "invalidData": "Revisa los datos: hay algún campo no válido."
+  },
+  "onboarding": {
+    "title": "Puesta en marcha",
+    "progress": "{done} de {total} pasos completados",
+    "configure": "Configurar",
+    "skip": "Omitir",
+    "unskip": "Deshacer",
+    "dismiss": "Ocultar",
+    "guidedMode": "Modo guiado",
+    "optional": "Opcional ({count})",
+    "stepOf": "Paso {current} de {total}",
+    "next": "Siguiente",
+    "finish": "Finalizar",
+    "exit": "Salir",
+    "completedTitle": "¡Clínica lista!",
+    "completedDescription": "Has completado la puesta en marcha. Ya puedes trabajar con normalidad.",
+    "guidedDoneTitle": "Recorrido terminado",
+    "guidedDoneDescription": "No quedan pasos pendientes.",
+    "items": {
+      "team": {
+        "label": "Tu equipo",
+        "description": "Añade a los profesionales que atienden citas, o márcate como profesional si trabajas solo."
+      },
+      "verifactu": {
+        "label": "Activa VeriFactu",
+        "description": "Obligatorio en España para emitir facturas con validez ante la AEAT."
+      }
+    }
   },
   "actions": {
     "edit": "Editar",
@@ -367,6 +408,10 @@
     },
     "quickActions": {
       "ariaLabel": "Acciones rápidas del paciente"
+    },
+    "onboarding": {
+      "label": "Crea tu primer paciente",
+      "description": "La forma más rápida de ver la ficha, la agenda y los presupuestos en acción."
     }
   },
   "patientDetail": {
@@ -1108,7 +1153,8 @@
       "emailExists": "El email ya existe",
       "userNotFound": "Usuario no encontrado",
       "operationNotAllowed": "Operación no permitida",
-      "invalidData": "Datos incorrectos"
+      "invalidData": "Datos incorrectos",
+      "inviteLink": "No se pudo generar el enlace de acceso"
     },
     "messages": {
       "userCreated": "Usuario creado correctamente",
@@ -1195,7 +1241,24 @@
       }
     },
     "navLabel": "Categorías de ajustes",
-    "attentionRequired": "Atención requerida"
+    "attentionRequired": "Atención requerida",
+    "invite": {
+      "linkTitle": "Enlace de acceso",
+      "linkHelp": "Envía este enlace a {name} para que elija su contraseña. Caduca el {date} y solo sirve una vez.",
+      "copy": "Copiar enlace",
+      "copied": "Enlace copiado",
+      "whatsapp": "Enviar por WhatsApp",
+      "shareText": "Hola {name}, aquí tienes tu acceso a DentalPin. Entra y elige tu contraseña: {url}",
+      "secretNote": "Trátalo como una contraseña: quien tenga el enlace puede entrar con esta cuenta.",
+      "passwordOptionalHelp": "Déjala vacía para generar un enlace de acceso que puedas enviar por WhatsApp o email.",
+      "passwordOptionalPlaceholder": "Opcional",
+      "createAndLink": "Crear y generar enlace",
+      "rowAction": "Enlace de acceso",
+      "setPasswordTitle": "Elige tu contraseña",
+      "setPasswordSubtitle": "Te han invitado a DentalPin. Crea tu contraseña para entrar.",
+      "setPasswordSubmit": "Guardar y entrar",
+      "invalidToken": "Este enlace no es válido o ya se ha usado. Pide uno nuevo al administrador de tu clínica."
+    }
   },
   "selector": {
     "recentPatients": "Pacientes recientes",
@@ -1508,6 +1571,10 @@
       "pricing": "Precio",
       "scheduling": "Agenda",
       "clinical": "Clínico"
+    },
+    "onboarding": {
+      "label": "Catálogo de tratamientos",
+      "description": "Sin tratamientos no se pueden crear presupuestos ni planes. Carga el catálogo por defecto o crea los tuyos."
     }
   },
   "placeholders": {
@@ -2796,6 +2863,10 @@
         "save_failed": "Error al guardar configuración SMTP",
         "test_failed": "Error al probar conexión SMTP"
       }
+    },
+    "onboarding": {
+      "label": "Envío de emails",
+      "description": "Configura el remitente para enviar confirmaciones de cita y presupuestos."
     }
   },
   "invoiceSeries": {
@@ -2828,7 +2899,11 @@
     "confirmReset": "Reiniciar contador",
     "created": "Serie creada correctamente",
     "saved": "Serie actualizada correctamente",
-    "resetSuccess": "Contador reiniciado correctamente"
+    "resetSuccess": "Contador reiniciado correctamente",
+    "onboarding": {
+      "label": "Serie de facturas",
+      "description": "Necesaria para emitir la primera factura (p. ej. FAC-2026-0001)."
+    }
   },
   "documents": {
     "title": "Documentos",

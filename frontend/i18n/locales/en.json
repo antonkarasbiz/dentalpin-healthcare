@@ -49,7 +49,7 @@
   },
   "setup": {
     "title": "First-time setup",
-    "subtitle": "Create the administrator account and your clinic to get started",
+    "subtitle": "Create your account and your clinic. You'll be working in two minutes.",
     "stepAccount": "Administrator account",
     "stepClinic": "Clinic details",
     "firstName": "First name",
@@ -62,7 +62,7 @@
     "taxId": "Tax ID",
     "next": "Next",
     "back": "Back",
-    "submit": "Create and start",
+    "submit": "Create my clinic",
     "success": "All set! Welcome to DentalPin",
     "firstNameRequired": "Enter the first name",
     "lastNameRequired": "Enter the last name",
@@ -75,7 +75,48 @@
     "clinicNameRequired": "Enter the clinic name",
     "taxIdRequired": "Enter the Tax ID",
     "alreadyInitialized": "The system is already set up. Please log in.",
-    "error": "Setup could not be completed. Please try again"
+    "error": "Setup could not be completed. Please try again",
+    "stepOf": "Step {current} of {total}",
+    "country": "Country",
+    "countryHelp": "Sets taxes, currency and timezone for you",
+    "countryRequired": "Select a country",
+    "taxIdGeneric": "Tax ID",
+    "taxIdLooksInvalid": "This doesn't look like a valid NIF/CIF. Double-check it before invoicing.",
+    "taxIdFormat": "Invalid format (example: {example})",
+    "timezoneRequired": "Select a timezone",
+    "currencyRequired": "Select a currency",
+    "derivedSettings": "Timezone and currency",
+    "willSeed": "We'll create the treatment catalog, VAT types, an invoice series, one room and a Monday–Friday schedule for you. Everything can be changed later.",
+    "willSuggestVerifactu": "We'll suggest enabling VeriFactu afterwards.",
+    "invalidData": "Please review the data: some field is invalid."
+  },
+  "onboarding": {
+    "title": "Getting started",
+    "progress": "{done} of {total} steps done",
+    "configure": "Set up",
+    "skip": "Skip",
+    "unskip": "Undo",
+    "dismiss": "Hide",
+    "guidedMode": "Guided mode",
+    "optional": "Optional ({count})",
+    "stepOf": "Step {current} of {total}",
+    "next": "Next",
+    "finish": "Finish",
+    "exit": "Exit",
+    "completedTitle": "Your clinic is ready!",
+    "completedDescription": "Setup is complete. You can work normally now.",
+    "guidedDoneTitle": "Tour finished",
+    "guidedDoneDescription": "No pending steps left.",
+    "items": {
+      "team": {
+        "label": "Your team",
+        "description": "Add the professionals who see patients, or flag yourself as professional if you work alone."
+      },
+      "verifactu": {
+        "label": "Enable VeriFactu",
+        "description": "Required in Spain to issue invoices valid for the tax agency (AEAT)."
+      }
+    }
   },
   "actions": {
     "edit": "Edit",
@@ -339,6 +380,10 @@
     },
     "quickActions": {
       "ariaLabel": "Patient quick actions"
+    },
+    "onboarding": {
+      "label": "Create your first patient",
+      "description": "The quickest way to see the record, agenda and budgets in action."
     }
   },
   "patientDetail": {
@@ -1089,7 +1134,8 @@
       "emailExists": "Email already exists",
       "userNotFound": "User not found",
       "operationNotAllowed": "Operation not allowed",
-      "invalidData": "Invalid data"
+      "invalidData": "Invalid data",
+      "inviteLink": "Could not generate the access link"
     },
     "messages": {
       "userCreated": "User created successfully",
@@ -1174,6 +1220,23 @@
         "scheduled": "Operation scheduled. Apply changes to complete.",
         "applied": "Changes applied successfully."
       }
+    },
+    "invite": {
+      "linkTitle": "Access link",
+      "linkHelp": "Send this link to {name} so they choose their password. Expires on {date} and works once.",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "whatsapp": "Send via WhatsApp",
+      "shareText": "Hi {name}, here is your DentalPin access. Open it and choose your password: {url}",
+      "secretNote": "Treat it like a password: anyone with the link can sign in to this account.",
+      "passwordOptionalHelp": "Leave empty to generate an access link you can send by WhatsApp or email.",
+      "passwordOptionalPlaceholder": "Optional",
+      "createAndLink": "Create and generate link",
+      "rowAction": "Access link",
+      "setPasswordTitle": "Choose your password",
+      "setPasswordSubtitle": "You've been invited to DentalPin. Create your password to sign in.",
+      "setPasswordSubmit": "Save and sign in",
+      "invalidToken": "This link is invalid or already used. Ask your clinic administrator for a new one."
     }
   },
   "selector": {
@@ -1486,6 +1549,10 @@
       "pricing": "Pricing",
       "scheduling": "Scheduling",
       "clinical": "Clinical"
+    },
+    "onboarding": {
+      "label": "Treatment catalog",
+      "description": "Without treatments there are no budgets or plans. Load the default catalog or create your own."
     }
   },
   "placeholders": {
@@ -2246,6 +2313,10 @@
         "save_failed": "Error saving SMTP settings",
         "test_failed": "Error testing SMTP connection"
       }
+    },
+    "onboarding": {
+      "label": "Email sending",
+      "description": "Set the sender to email appointment confirmations and budgets."
     }
   },
   "invoice": {
@@ -2793,7 +2864,11 @@
     "confirmReset": "Reset counter",
     "created": "Series created successfully",
     "saved": "Series updated successfully",
-    "resetSuccess": "Counter reset successfully"
+    "resetSuccess": "Counter reset successfully",
+    "onboarding": {
+      "label": "Invoice series",
+      "description": "Required to issue the first invoice (e.g. FAC-2026-0001)."
+    }
   },
   "documents": {
     "title": "Documents",

@@ -6,6 +6,7 @@ existe en ambos idiomas).
 
 ## Guías generales
 
+- [Primeros pasos: configuración inicial y tarjeta "Puesta en marcha"](./getting-started.md)
 - _Demo data y credenciales — pendiente de traducir desde `../en/demo.md`._
 - _Operaciones de auto-hospedaje — pendiente de traducir desde
   `../en/operations.md`._

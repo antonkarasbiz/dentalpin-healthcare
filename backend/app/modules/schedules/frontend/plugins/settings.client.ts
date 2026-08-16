@@ -7,7 +7,25 @@
  * used by the existing slot system. No cross-module import: schedules
  * only depends on the host shell, not on other modules.
  */
-import { registerSettingsPage } from '~~/app/composables/useSettingsRegistry'
+import {
+  registerGettingStartedRule,
+  registerSettingsPage
+} from '~~/app/composables/useSettingsRegistry'
+import type { ClinicHours } from '../composables/useClinicHours'
+
+interface HoursOnboardingState { loaded: boolean, alwaysOpen: boolean }
+
+const useHoursOnboardingState = () =>
+  useState<HoursOnboardingState>('schedules:onboarding-hours', () => ({ loaded: false, alwaysOpen: false }))
+
+/** True for the legacy 24/7 template (every weekday 00:00–23:59). */
+function isAlwaysOpen(hours: ClinicHours): boolean {
+  const days = hours.days ?? []
+  if (days.length < 7) return false
+  return days.every(d => d.shifts.length === 1
+    && d.shifts[0]!.start_time.startsWith('00:00')
+    && d.shifts[0]!.end_time.startsWith('23:59'))
+}
 
 export default defineNuxtPlugin(() => {
   registerSettingsPage({
@@ -34,5 +52,27 @@ export default defineNuxtPlugin(() => {
     component: () => import('../components/settings/ProfessionalSchedulesPage.vue'),
     searchKeywords: ['profesional', 'professional', 'doctor', 'dentista', 'horario', 'turnos'],
     order: 30
+  })
+
+  // Getting-started: a clinic still on the 24/7 default has not set its
+  // real opening hours — the agenda would offer slots around the clock.
+  registerGettingStartedRule({
+    id: 'clinic-hours',
+    labelKey: 'schedules.onboarding.hoursLabel',
+    descriptionKey: 'schedules.onboarding.hoursDescription',
+    icon: 'i-lucide-clock',
+    to: '/settings/workspace/clinic-hours',
+    order: 30,
+    severity: 'info',
+    modal: () => import('../components/settings/ClinicHoursQuickModal.vue'),
+    load: async (api) => {
+      const state = useHoursOnboardingState()
+      const res = await api.get<{ data: ClinicHours }>('/api/v1/schedules/clinic-hours')
+      state.value = { loaded: true, alwaysOpen: isAlwaysOpen(res.data) }
+    },
+    when: () => {
+      const s = useHoursOnboardingState().value
+      return s.loaded && s.alwaysOpen
+    }
   })
 })

@@ -85,6 +85,47 @@ class ClinicHoursService:
         return weekly
 
     @staticmethod
+    async def create_default_weekly(
+        db: AsyncSession, clinic_id: UUID, split_shift: bool = False
+    ) -> ClinicWeeklySchedule | None:
+        """Create a Mon–Fri weekly template for a brand-new clinic.
+
+        ``split_shift=True`` → 09:00–14:00 + 16:00–20:00 (Spanish pattern);
+        otherwise 09:00–18:00. Returns None (no-op) when the clinic already
+        has a weekly schedule — the 24/7 ``get_or_create_weekly`` fallback
+        keeps serving legacy clinics.
+        """
+        from datetime import time as _time
+
+        existing = await db.execute(
+            select(ClinicWeeklySchedule.id).where(ClinicWeeklySchedule.clinic_id == clinic_id)
+        )
+        if existing.scalar_one_or_none() is not None:
+            return None
+
+        shifts = (
+            [(_time(9, 0), _time(14, 0)), (_time(16, 0), _time(20, 0))]
+            if split_shift
+            else [(_time(9, 0), _time(18, 0))]
+        )
+        weekly = ClinicWeeklySchedule(clinic_id=clinic_id, is_active=True)
+        db.add(weekly)
+        await db.flush()
+        for weekday in range(5):  # Mon–Fri
+            for start, end in shifts:
+                db.add(
+                    ScheduleShift(
+                        clinic_weekly_id=weekly.id,
+                        weekday=weekday,
+                        start_time=start,
+                        end_time=end,
+                    )
+                )
+        await db.flush()
+        await db.refresh(weekly, ["shifts"])
+        return weekly
+
+    @staticmethod
     async def replace_weekly_shifts(
         db: AsyncSession,
         weekly: ClinicWeeklySchedule,

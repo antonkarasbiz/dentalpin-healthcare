@@ -145,6 +145,7 @@ All payload keys are strings. UUIDs are serialized as strings.
 
 | Event | Payload keys |
 |-------|--------------|
+| `clinic.created` | `clinic_id`, `country`, `currency`, `timezone`, `language`, `vat_preset`, `created_by`, `source` — published by `POST /auth/setup` after commit; subscribers seed defaults idempotently in their own session (ADR 0018) |
 | `patient.created` | `patient_id`, `clinic_id` |
 | `patient.updated` | `patient_id`, `clinic_id`, `changes` |
 | `patient.archived` | `patient_id`, `clinic_id` |

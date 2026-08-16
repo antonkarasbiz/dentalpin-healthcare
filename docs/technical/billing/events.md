@@ -5,8 +5,6 @@ last_verified_commit: 0000000
 
 # Billing — events
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
-
 Per-module slice of [`docs/events-catalog.md`](../../events-catalog.md)
 (auto-generated). Update both files when adding or removing events.
 
@@ -18,7 +16,8 @@ _This module does not publish any events._
 
 | Event | Handler | Effect |
 |-------|---------|--------|
-| `payment.refunded` | _Handler module path._ | _What it does in response._ |
+| `payment.refunded` | `events.py:on_payment_refunded` | Recompute status of invoices whose `invoice_payments` link the refunded payment (`paid → partial`, `partial → issued`). |
+| `clinic.created` | `events.py:on_clinic_created` | Create the default `FAC` (invoice) and `RECT` (credit note) series when the clinic has none. |
 
 ## Adding a new event
 

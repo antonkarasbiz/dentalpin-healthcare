@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- feat(onboarding): getting-started rule `catalog-empty` (frontend plugin) — flags a clinic with no catalog items on the dashboard card.
+
+- feat(onboarding): subscribe to `clinic.created` — seed VAT types by country preset (`VAT_PRESETS`: `es` | `generic`), categories and the default catalog for every new clinic; `seed_catalog(..., vat_preset, with_prices)` (non-EUR → prices 0).
+
 - i18n: add `ta` fallback to the agent-tool catalog name resolver so
   Tamil-localized treatment names resolve.
 

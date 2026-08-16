@@ -49,7 +49,7 @@
   },
   "setup": {
     "title": "Configuration initiale",
-    "subtitle": "Créez le compte administrateur et votre clinique pour commencer",
+    "subtitle": "Créez votre compte et votre cabinet. Opérationnel en deux minutes.",
     "stepAccount": "Compte administrateur",
     "stepClinic": "Informations de la clinique",
     "firstName": "Prénom",
@@ -62,7 +62,7 @@
     "taxId": "Identifiant fiscal",
     "next": "Suivant",
     "back": "Retour",
-    "submit": "Créer et démarrer",
+    "submit": "Créer mon cabinet",
     "success": "Tout est prêt ! Bienvenue sur DentalPin",
     "firstNameRequired": "Saisissez le prénom",
     "lastNameRequired": "Saisissez le nom",
@@ -75,7 +75,48 @@
     "clinicNameRequired": "Saisissez le nom de la clinique",
     "taxIdRequired": "Saisissez l'identifiant fiscal",
     "alreadyInitialized": "Le système est déjà configuré. Veuillez vous connecter.",
-    "error": "La configuration n'a pas pu être terminée. Veuillez réessayer"
+    "error": "La configuration n'a pas pu être terminée. Veuillez réessayer",
+    "stepOf": "Étape {current} sur {total}",
+    "country": "Pays",
+    "countryHelp": "Règle les taxes, la devise et le fuseau horaire pour vous",
+    "countryRequired": "Sélectionnez le pays",
+    "taxIdGeneric": "Identifiant fiscal",
+    "taxIdLooksInvalid": "Ce NIF/CIF ne semble pas valide. Vérifiez-le avant de facturer.",
+    "taxIdFormat": "Format invalide (exemple : {example})",
+    "timezoneRequired": "Sélectionnez le fuseau horaire",
+    "currencyRequired": "Sélectionnez la devise",
+    "derivedSettings": "Fuseau horaire et devise",
+    "willSeed": "Nous créerons pour vous le catalogue de soins, les taux de TVA, une série de factures, un cabinet et un horaire du lundi au vendredi. Tout est modifiable ensuite.",
+    "willSuggestVerifactu": "Nous vous proposerons ensuite d'activer VeriFactu.",
+    "invalidData": "Vérifiez les données : un champ est invalide."
+  },
+  "onboarding": {
+    "title": "Mise en route",
+    "progress": "{done} étapes sur {total} terminées",
+    "configure": "Configurer",
+    "skip": "Ignorer",
+    "unskip": "Annuler",
+    "dismiss": "Masquer",
+    "guidedMode": "Mode guidé",
+    "optional": "Optionnel ({count})",
+    "stepOf": "Étape {current} sur {total}",
+    "next": "Suivant",
+    "finish": "Terminer",
+    "exit": "Quitter",
+    "completedTitle": "Votre cabinet est prêt !",
+    "completedDescription": "La mise en route est terminée. Vous pouvez travailler normalement.",
+    "guidedDoneTitle": "Parcours terminé",
+    "guidedDoneDescription": "Plus aucune étape en attente.",
+    "items": {
+      "team": {
+        "label": "Votre équipe",
+        "description": "Ajoutez les praticiens qui reçoivent des patients, ou marquez-vous comme praticien si vous exercez seul."
+      },
+      "verifactu": {
+        "label": "Activer VeriFactu",
+        "description": "Obligatoire en Espagne pour émettre des factures valides auprès de l'AEAT."
+      }
+    }
   },
   "actions": {
     "edit": "Modifier",
@@ -339,6 +380,10 @@
     },
     "quickActions": {
       "ariaLabel": "Actions rapides du patient"
+    },
+    "onboarding": {
+      "label": "Créez votre premier patient",
+      "description": "Le moyen le plus rapide de voir le dossier, l'agenda et les devis en action."
     }
   },
   "patientDetail": {
@@ -1089,7 +1134,8 @@
       "emailExists": "L'email existe déjà",
       "userNotFound": "Utilisateur introuvable",
       "operationNotAllowed": "Opération non autorisée",
-      "invalidData": "Données invalides"
+      "invalidData": "Données invalides",
+      "inviteLink": "Impossible de générer le lien d'accès"
     },
     "messages": {
       "userCreated": "Utilisateur créé avec succès",
@@ -1174,6 +1220,23 @@
         "scheduled": "Opération programmée. Appliquez les modifications pour finaliser.",
         "applied": "Modifications appliquées avec succès."
       }
+    },
+    "invite": {
+      "linkTitle": "Lien d'accès",
+      "linkHelp": "Envoyez ce lien à {name} pour qu'il choisisse son mot de passe. Expire le {date}, usage unique.",
+      "copy": "Copier le lien",
+      "copied": "Lien copié",
+      "whatsapp": "Envoyer par WhatsApp",
+      "shareText": "Bonjour {name}, voici votre accès à DentalPin. Ouvrez-le et choisissez votre mot de passe : {url}",
+      "secretNote": "À traiter comme un mot de passe : toute personne ayant le lien peut se connecter à ce compte.",
+      "passwordOptionalHelp": "Laissez vide pour générer un lien d'accès à envoyer par WhatsApp ou e-mail.",
+      "passwordOptionalPlaceholder": "Facultatif",
+      "createAndLink": "Créer et générer le lien",
+      "rowAction": "Lien d'accès",
+      "setPasswordTitle": "Choisissez votre mot de passe",
+      "setPasswordSubtitle": "Vous êtes invité sur DentalPin. Créez votre mot de passe pour vous connecter.",
+      "setPasswordSubmit": "Enregistrer et se connecter",
+      "invalidToken": "Ce lien est invalide ou déjà utilisé. Demandez-en un nouveau à l'administrateur de votre cabinet."
     }
   },
   "selector": {
@@ -1486,6 +1549,10 @@
       "pricing": "Tarification",
       "scheduling": "Planification",
       "clinical": "Clinique"
+    },
+    "onboarding": {
+      "label": "Catalogue de soins",
+      "description": "Sans soins, pas de devis ni de plans. Chargez le catalogue par défaut ou créez les vôtres."
     }
   },
   "placeholders": {
@@ -2246,6 +2313,10 @@
         "save_failed": "Erreur lors de l'enregistrement des paramètres SMTP",
         "test_failed": "Erreur lors du test de connexion SMTP"
       }
+    },
+    "onboarding": {
+      "label": "Envoi d'e-mails",
+      "description": "Configurez l'expéditeur pour envoyer confirmations de rendez-vous et devis."
     }
   },
   "invoice": {
@@ -2793,7 +2864,11 @@
     "confirmReset": "Réinitialiser le compteur",
     "created": "Série créée avec succès",
     "saved": "Série mise à jour avec succès",
-    "resetSuccess": "Compteur réinitialisé avec succès"
+    "resetSuccess": "Compteur réinitialisé avec succès",
+    "onboarding": {
+      "label": "Série de factures",
+      "description": "Nécessaire pour émettre la première facture (ex. FAC-2026-0001)."
+    }
   },
   "documents": {
     "title": "Documents",

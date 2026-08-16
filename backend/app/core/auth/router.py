@@ -1,5 +1,7 @@
 """Authentication router with rate limiting."""
 
+import secrets
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -13,10 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.core.events import EventType, event_bus
 from app.core.plugins import module_registry
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .country_presets import COUNTRY_PRESETS, GENERIC, get_preset, tax_id_matches
 from .dependencies import (
     ClinicContext,
     block_in_demo,
@@ -37,8 +41,11 @@ from .schemas import (
     ClinicMetadataResponse,
     ClinicMetadataUpdate,
     ClinicResponse,
+    InviteLinkResponse,
     MeResponse,
     ProfessionalResponse,
+    SetPasswordRequest,
+    SetupPresetsResponse,
     SetupStatusResponse,
     SystemSetup,
     TokenRefresh,
@@ -50,6 +57,7 @@ from .schemas import (
 )
 from .service import (
     create_access_token,
+    create_invite_token,
     create_refresh_token,
     decode_token,
     hash_password,
@@ -96,6 +104,17 @@ async def setup_status(
     return ApiResponse(data=SetupStatusResponse(initialized=bool(count)))
 
 
+@router.get("/setup/presets", response_model=ApiResponse[SetupPresetsResponse])
+async def setup_presets() -> ApiResponse[SetupPresetsResponse]:
+    """Country presets for the first-run wizard (public — the wizard runs pre-auth)."""
+    return ApiResponse(
+        data=SetupPresetsResponse(
+            countries=[p.to_dict() for p in COUNTRY_PRESETS.values()],
+            fallback=GENERIC.to_dict(),
+        )
+    )
+
+
 @router.post("/setup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/hour")
 async def setup(
@@ -125,11 +144,29 @@ async def setup(
             detail=error_msg,
         )
 
+    preset = get_preset(data.country)
+    if data.country and not tax_id_matches(preset, data.clinic_tax_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid tax id format for {data.country} ({preset.tax_id_label})",
+        )
+
+    # No country → keep the historical defaults; an unknown country → GENERIC
+    # (currency/timezone come from the client, which lets the user pick them).
+    timezone = data.timezone or (preset.timezone if data.country else "Europe/Madrid")
+    currency = data.currency or (preset.currency if data.country else "EUR")
+    language = data.language or preset.language
+    clinic_settings: dict = {"communication_language": language}
+    if data.country:
+        clinic_settings["country"] = data.country
+
     clinic = Clinic(
         name=data.clinic_name,
         tax_id=data.clinic_tax_id,
-        timezone=data.timezone or "Europe/Madrid",
-        currency=data.currency or "EUR",
+        timezone=timezone,
+        currency=currency,
+        address={"country": data.country} if data.country else {},
+        settings=clinic_settings,
     )
     db.add(clinic)
     await db.flush()
@@ -145,6 +182,23 @@ async def setup(
 
     db.add(ClinicMembership(user_id=user.id, clinic_id=clinic.id, role="admin"))
     await db.commit()
+
+    # Modules seed their defaults (catalog + VAT preset, invoice series,
+    # cabinet, weekly hours) in their own sessions. Awaited so the clinic is
+    # ready on first login; handler failures are logged, never raised.
+    await event_bus.publish(
+        EventType.CLINIC_CREATED,
+        {
+            "clinic_id": str(clinic.id),
+            "country": data.country,
+            "currency": currency,
+            "timezone": timezone,
+            "language": language,
+            "vat_preset": preset.vat_preset,
+            "created_by": str(user.id),
+            "source": "setup",
+        },
+    )
 
     access_token = create_access_token(
         user.id, clinic_id=clinic.id, token_version=user.token_version
@@ -378,13 +432,15 @@ async def create_user(
             detail=f"Invalid role. Must be one of: {', '.join(ROLES)}",
         )
 
-    # Validate password strength
-    is_valid, error_msg = validate_password_strength(data.password)
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=error_msg,
-        )
+    # Validate password strength (when given). Without a password the
+    # account gets an unusable random hash until an invite link is consumed.
+    if data.password is not None:
+        is_valid, error_msg = validate_password_strength(data.password)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error_msg,
+            )
 
     # Resolve the target clinic. A caller may only create a membership in
     # a clinic they administer themselves — otherwise an admin of clinic A
@@ -415,7 +471,7 @@ async def create_user(
     # Create user
     user = User(
         email=data.email,
-        password_hash=hash_password(data.password),
+        password_hash=hash_password(data.password or secrets.token_urlsafe(32)),
         first_name=data.first_name,
         last_name=data.last_name,
     )
@@ -438,6 +494,80 @@ async def create_user(
     await db.commit()
 
     return ApiResponse(data=UserResponse.model_validate(user))
+
+
+@router.post("/users/{user_id}/invite-link", response_model=ApiResponse[InviteLinkResponse])
+async def create_user_invite_link(
+    user_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.users.write"))],
+    __: Annotated[None, Depends(block_in_demo)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[InviteLinkResponse]:
+    """Mint a one-time set-password token for a member of this clinic.
+
+    Works for brand-new accounts (created without a password) and as an
+    admin-driven password reset for existing ones. The link is a bearer
+    secret: the client shows it once for the admin to copy / share.
+    """
+    result = await db.execute(
+        select(User)
+        .join(ClinicMembership, ClinicMembership.user_id == User.id)
+        .where(User.id == user_id, ClinicMembership.clinic_id == ctx.clinic_id)
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is inactive")
+
+    token, expires_at = create_invite_token(user.id, token_version=user.token_version)
+    return ApiResponse(data=InviteLinkResponse(token=token, expires_at=expires_at))
+
+
+@router.post("/set-password", response_model=TokenResponse)
+@limiter.limit("10/hour")
+async def set_password_from_invite(
+    request: Request,
+    data: SetPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenResponse:
+    """Consume an invite token: set the password and log the user in.
+
+    Single use — bumping ``token_version`` invalidates the token (and any
+    older session). Public endpoint, rate limited.
+    """
+    try:
+        payload = decode_token(data.token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired link"
+        ) from None
+    if payload.get("type") != "invite" or not payload.get("sub"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid link")
+
+    result = await db.execute(
+        select(User).options(selectinload(User.memberships)).where(User.id == UUID(payload["sub"]))
+    )
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active or payload.get("token_version", 0) != user.token_version:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or used link")
+
+    is_valid, error_msg = validate_password_strength(data.password)
+    if not is_valid:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg)
+
+    user.password_hash = hash_password(data.password)
+    user.token_version += 1
+    await db.commit()
+
+    clinic_id = user.memberships[0].clinic_id if user.memberships else None
+    return TokenResponse(
+        access_token=create_access_token(
+            user.id, clinic_id=clinic_id, token_version=user.token_version
+        ),
+        refresh_token=create_refresh_token(user.id, token_version=user.token_version),
+    )
 
 
 @router.put("/users/{user_id}", response_model=ApiResponse[UserWithRoleResponse])
@@ -663,6 +793,11 @@ async def update_clinic_metadata(
         existing_address = clinic.address or {}
         new_address = data.address.model_dump(exclude_unset=True)
         clinic.address = {**existing_address, **new_address}
+        # ``settings.country`` (ISO2) is what billing hooks / verifactu read;
+        # keep it in sync with the address country when it is a valid code.
+        country = (new_address.get("country") or "").upper()
+        if len(country) == 2 and country.isalpha():
+            clinic.settings = {**(clinic.settings or {}), "country": country}
     if data.timezone is not None:
         clinic.timezone = data.timezone
     if data.currency is not None:
@@ -808,3 +943,57 @@ async def update_communications_settings(
     await db.commit()
     await db.refresh(clinic)
     return ApiResponse(data=_read_communications_settings(clinic.settings))
+
+
+# ---------------------------------------------------------------------------
+# Onboarding state (clinic-wide). Step completion is *derived* client-side
+# from real data (getting-started rules); only skip / dismiss / completion
+# markers are stored, under ``clinic.settings.onboarding``.
+# ---------------------------------------------------------------------------
+
+
+class _OnboardingPatch(BaseModel):
+    dismissed: bool | None = None
+    completed: bool | None = None
+    skip: list[str] | None = Field(default=None, max_length=50)
+    unskip: list[str] | None = Field(default=None, max_length=50)
+    reset: bool = False
+
+
+class _OnboardingState(BaseModel):
+    dismissed_at: datetime | None = None
+    completed_at: datetime | None = None
+    skipped: dict[str, datetime] = Field(default_factory=dict)
+
+
+def _read_onboarding(raw: dict | None) -> _OnboardingState:
+    return _OnboardingState.model_validate((raw or {}).get("onboarding") or {})
+
+
+@router.patch("/clinic/settings/onboarding", response_model=ApiResponse[_OnboardingState])
+async def update_onboarding_state(
+    data: _OnboardingPatch,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[_OnboardingState]:
+    """Merge skip / dismiss / completion markers into ``settings.onboarding``."""
+    clinic = ctx.clinic
+    current = dict(clinic.settings or {})
+    state = {} if data.reset else dict(current.get("onboarding") or {})
+    now = datetime.now(UTC).isoformat()
+    if data.dismissed is not None:
+        state["dismissed_at"] = now if data.dismissed else None
+    if data.completed is not None:
+        state["completed_at"] = now if data.completed else None
+    skipped = dict(state.get("skipped") or {})
+    for rule_id in data.skip or []:
+        skipped[rule_id] = now
+    for rule_id in data.unskip or []:
+        skipped.pop(rule_id, None)
+    state["skipped"] = skipped
+    current["onboarding"] = state
+    clinic.settings = current
+    await db.commit()
+    await db.refresh(clinic)
+    return ApiResponse(data=_read_onboarding(clinic.settings))

@@ -359,6 +359,7 @@ function isActive(to: string): boolean {
           their banners via `useModuleSlots`; the layout knows nothing
           about them.
         -->
+        <OnboardingGuideBar />
         <ModuleSlot
           name="app.banners"
           :ctx="{}"
