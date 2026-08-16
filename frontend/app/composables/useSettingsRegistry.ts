@@ -14,7 +14,7 @@
  */
 
 import type { Component } from 'vue'
-import { STORAGE_KEYS } from '~/constants/storage'
+import type { ApiResponse, OnboardingState } from '~/types'
 
 export type SettingsCategoryId
   = | 'general'
@@ -90,18 +90,35 @@ export interface SearchEntry {
   icon: string
 }
 
+/**
+ * A "getting started" rule. Completion is *derived*: ``when()`` returns
+ * true while the step is still pending, reading state that ``load()``
+ * (optional) fetched into rule-owned ``useState``. Skip / dismiss are the
+ * only stored bits (``clinic.settings.onboarding``, server-side).
+ */
 export interface GettingStartedRule {
   id: string
   labelKey: string
   descriptionKey?: string
   icon?: string
+  /** Settings page (or any route) that resolves the step. */
   to: string
+  /** True while the step is still pending. Must be sync and cheap. */
   when: () => boolean
+  /** Fetch whatever ``when`` needs. Called by the dashboard card on mount / refresh. */
+  load?: () => Promise<void>
+  /** Guided-mode sequence. Lower first; ties resolve in registration order. */
+  order?: number
+  /** Optional steps are listed apart and don't count towards progress. */
+  optional?: boolean
+  /** Lazy mini-modal that resolves the step inline (module-owned component). */
+  modal?: () => Promise<Component | { default: Component }>
   severity?: 'info' | 'warning' | 'critical'
 }
 
 export interface GettingStartedItem extends GettingStartedRule {
   resolved: boolean
+  skipped: boolean
 }
 
 const DEFAULT_CATEGORIES: readonly SettingsCategory[] = [
@@ -184,10 +201,6 @@ function useRegistryVersion() {
   return useState<number>('settings:registry-version', () => 0)
 }
 
-function useDismissedState() {
-  return useState<Record<string, boolean>>('settings:onboarding-dismissed', () => ({}))
-}
-
 function bumpVersion(): void {
   // Only bump on client — on server `useState` is per-request, so calling
   // it inside a plugin-time register is fine; on client the bump triggers
@@ -231,10 +244,8 @@ export function unregisterGettingStartedRule(id: string): void {
 export function useSettingsRegistry() {
   const { t } = useI18n()
   const { can, canAny } = usePermissions()
-  const auth = useAuth()
 
   const version = useRegistryVersion()
-  const dismissed = useDismissedState()
 
   function isPageVisible(page: SettingsPageEntry): boolean {
     if (!page.permission) return true
@@ -335,48 +346,72 @@ export function useSettingsRegistry() {
   }
 
   // ---- Onboarding ------------------------------------------------------
+  // State lives on the clinic (``settings.onboarding``) so it is shared by
+  // every admin device; ``useClinic`` already carries it.
 
   const clinic = useClinic()
+  const api = useApi()
+  const nuxtApp = useNuxtApp()
 
-  function dismissalKey(): string {
-    const clinicId = clinic.currentClinic.value?.id ?? auth.user.value?.id ?? 'unknown'
-    return STORAGE_KEYS.onboardingDismissed(clinicId)
-  }
+  const onboardingState = computed<OnboardingState>(
+    () => clinic.currentClinic.value?.settings?.onboarding ?? {}
+  )
 
-  function loadDismissed(): boolean {
-    if (!import.meta.client) return false
-    const key = dismissalKey()
-    const raw = localStorage.getItem(key)
-    return raw === '1'
-  }
-
-  function saveDismissed(value: boolean): void {
-    if (!import.meta.client) return
-    const key = dismissalKey()
-    if (value) localStorage.setItem(key, '1')
-    else localStorage.removeItem(key)
-    dismissed.value = { ...dismissed.value, [key]: value }
-  }
-
-  const gettingStarted = computed<GettingStartedItem[]>(() => {
+  /** Every rule (visible to this user), ordered, with derived flags. Never filtered — the card decides. */
+  const gettingStartedAll = computed<GettingStartedItem[]>(() => {
     void version.value
-    return _rules
-      .map(rule => ({ ...rule, resolved: !rule.when() }))
-      .filter(item => !item.resolved)
+    const skipped = onboardingState.value.skipped ?? {}
+    return [..._rules]
+      .map((rule, idx) => ({ rule, idx }))
+      .sort((a, b) => (a.rule.order ?? 0) - (b.rule.order ?? 0) || a.idx - b.idx)
+      .map(({ rule }) => ({
+        ...rule,
+        // Computeds may re-evaluate outside a component (watcher flush after
+        // an async load) — give predicates the Nuxt context so `useState`
+        // works. Predicates must not call setup-only composables (`useI18n`).
+        resolved: !nuxtApp.runWithContext(() => rule.when()),
+        skipped: rule.id in skipped
+      }))
   })
 
-  const isOnboardingDismissed = computed(() => {
-    const key = dismissalKey()
-    if (key in dismissed.value) return dismissed.value[key]
-    return loadDismissed()
-  })
+  /** Pending, non-skipped rules — what the settings checklist lists. */
+  const gettingStarted = computed<GettingStartedItem[]>(() =>
+    gettingStartedAll.value.filter(item => !item.resolved && !item.skipped)
+  )
 
-  function dismissOnboarding(): void {
-    saveDismissed(true)
+  const isOnboardingDismissed = computed(() =>
+    !!onboardingState.value.dismissed_at || !!onboardingState.value.completed_at
+  )
+
+  async function patchOnboarding(body: {
+    dismissed?: boolean
+    completed?: boolean
+    skip?: string[]
+    unskip?: string[]
+    reset?: boolean
+  }): Promise<void> {
+    try {
+      const res = await api.patch<ApiResponse<OnboardingState>>(
+        '/api/v1/auth/clinic/settings/onboarding', body
+      )
+      clinic.patchSettings({ onboarding: res.data })
+    } catch (e) {
+      console.error('Failed to update onboarding state:', e)
+    }
   }
 
-  function resetOnboarding(): void {
-    saveDismissed(false)
+  const dismissOnboarding = () => patchOnboarding({ dismissed: true })
+  const resetOnboarding = () => patchOnboarding({ reset: true })
+  const completeOnboarding = () => patchOnboarding({ completed: true })
+  const skipRule = (id: string) => patchOnboarding({ skip: [id] })
+  const unskipRule = (id: string) => patchOnboarding({ unskip: [id] })
+
+  /** Run every rule's ``load`` (best effort, in parallel) so ``when`` sees fresh data. */
+  async function loadGettingStarted(): Promise<void> {
+    // `version` is captured synchronously (Nuxt context) — after the await
+    // `useState` would be unavailable and the bump silently lost.
+    await Promise.allSettled(_rules.map(r => r.load?.()))
+    version.value = version.value + 1
   }
 
   return {
@@ -389,9 +424,15 @@ export function useSettingsRegistry() {
     searchIndex,
     search,
     gettingStarted,
+    gettingStartedAll,
+    loadGettingStarted,
+    onboardingState,
     isOnboardingDismissed,
     dismissOnboarding,
     resetOnboarding,
+    completeOnboarding,
+    skipRule,
+    unskipRule,
     register: registerSettingsPage,
     unregister: unregisterSettingsPage,
     registerGettingStartedRule,

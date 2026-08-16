@@ -31,13 +31,18 @@ const HOST_NAV: NavigationItem[] = [
   }
 ]
 
+/** Context-free read of the active-module list (only ``useState``). */
+export function useActiveModulesState() {
+  return useState<ActiveModule[] | null>('modules:active', () => null)
+}
+
 export function useModules() {
   const { t } = useI18n()
   const { can } = usePermissions()
   const auth = useAuth()
   const api = useApi()
 
-  const active = useState<ActiveModule[] | null>('modules:active', () => null)
+  const active = useActiveModulesState()
   const loading = useState<boolean>('modules:active:loading', () => false)
   const error = useState<string | null>('modules:active:error', () => null)
   const lastLoadedAt = useState<number>('modules:active:at', () => 0)

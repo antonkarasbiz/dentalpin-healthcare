@@ -133,18 +133,20 @@ export default defineNuxtPlugin(() => {
   })
 
   // ---- Onboarding rules ---------------------------------------------
-  // Rules read state lazily inside the predicate to stay reactive
-  // across login transitions.
+  // The dashboard card itself is registered by `onboarding.slots.client.ts`
+  // (slot entries hold components — client only). Rules read state lazily
+  // inside `when` to stay reactive across login transitions; module
+  // plugins register their own rules.
   registerGettingStartedRule({
     id: 'clinic-info-incomplete',
     labelKey: 'settings.onboarding.items.clinicInfo.label',
     descriptionKey: 'settings.onboarding.items.clinicInfo.description',
     icon: 'i-lucide-building-2',
     to: '/settings/general/clinic',
+    order: 10,
     severity: 'warning',
     when: () => {
-      const clinic = useClinic()
-      const c = clinic.currentClinic.value
+      const c = useClinicState().currentClinic.value
       if (!c) return false
       return !c.name || !c.tax_id || !c.address?.street
     }
@@ -156,10 +158,64 @@ export default defineNuxtPlugin(() => {
     descriptionKey: 'settings.onboarding.items.cabinets.description',
     icon: 'i-lucide-door-open',
     to: '/settings/workspace/cabinets',
+    order: 20,
     severity: 'info',
     when: () => {
-      const clinic = useClinic()
-      return clinic.cabinets.value.length === 0
+      const c = useClinicState().currentClinic.value
+      return !!c && (c.cabinets ?? []).length === 0
+    }
+  })
+
+  // Team: at least one professional who can be booked — another active
+  // member, or the admin flagged as professional (solo practice).
+  registerGettingStartedRule({
+    id: 'team',
+    labelKey: 'onboarding.items.team.label',
+    descriptionKey: 'onboarding.items.team.description',
+    icon: 'i-lucide-users',
+    to: '/settings/people/users',
+    order: 40,
+    severity: 'info',
+    load: async () => {
+      const state = useState<{ loaded: boolean, professionals: number, others: number }>(
+        'onboarding:team', () => ({ loaded: false, professionals: 0, others: 0 })
+      )
+      const users = useUsers()
+      await users.fetchUsers()
+      const list = users.users.value.filter(u => u.is_active)
+      state.value = {
+        loaded: true,
+        professionals: list.filter(u => u.is_professional).length,
+        others: list.length - 1
+      }
+    },
+    when: () => {
+      const state = useState<{ loaded: boolean, professionals: number, others: number }>(
+        'onboarding:team', () => ({ loaded: false, professionals: 0, others: 0 })
+      )
+      if (!state.value.loaded) return false
+      return state.value.professionals === 0 && state.value.others === 0
+    }
+  })
+
+  // Spain: VeriFactu is the legal invoicing record system — suggest it
+  // when the module isn't active. Optional (skippable).
+  registerGettingStartedRule({
+    id: 'verifactu',
+    labelKey: 'onboarding.items.verifactu.label',
+    descriptionKey: 'onboarding.items.verifactu.description',
+    icon: 'i-lucide-shield-check',
+    to: '/settings/modules',
+    order: 70,
+    optional: true,
+    severity: 'info',
+    load: async () => { await useModules().ensureLoaded() },
+    when: () => {
+      const c = useClinicState().currentClinic.value
+      if (c?.settings?.country !== 'ES') return false
+      const active = useActiveModulesState().value
+      if (!active) return false
+      return !active.some(m => m.name === 'verifactu')
     }
   })
 })

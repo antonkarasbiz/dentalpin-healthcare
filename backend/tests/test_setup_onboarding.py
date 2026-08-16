@@ -173,3 +173,47 @@ async def test_clinic_created_handlers_are_idempotent(client: AsyncClient, db_se
         await _count(db_session, ClinicWeeklySchedule, clinic_id),
     )
     assert before == after
+
+
+@pytest.mark.asyncio
+async def test_onboarding_state_patch(client: AsyncClient, auth_headers: dict, test_clinic) -> None:
+    r = await client.patch(
+        "/api/v1/auth/clinic/settings/onboarding",
+        json={"skip": ["smtp", "verifactu"]},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert set(r.json()["data"]["skipped"]) == {"smtp", "verifactu"}
+    assert r.json()["data"]["dismissed_at"] is None
+
+    r = await client.patch(
+        "/api/v1/auth/clinic/settings/onboarding",
+        json={"unskip": ["smtp"], "dismissed": True},
+        headers=auth_headers,
+    )
+    data = r.json()["data"]
+    assert set(data["skipped"]) == {"verifactu"} and data["dismissed_at"]
+
+    # state travels with the clinic metadata
+    r = await client.get("/api/v1/auth/clinics", headers=auth_headers)
+    assert "verifactu" in r.json()["data"][0]["settings"]["onboarding"]["skipped"]
+
+    r = await client.patch(
+        "/api/v1/auth/clinic/settings/onboarding", json={"reset": True}, headers=auth_headers
+    )
+    assert r.json()["data"] == {"dismissed_at": None, "completed_at": None, "skipped": {}}
+
+
+@pytest.mark.asyncio
+async def test_onboarding_state_requires_admin(
+    client: AsyncClient, auth_headers: dict, db_session, test_clinic
+):
+    from app.core.auth.models import ClinicMembership
+
+    membership = (await db_session.execute(select(ClinicMembership))).scalar_one()
+    membership.role = "receptionist"
+    await db_session.commit()
+    r = await client.patch(
+        "/api/v1/auth/clinic/settings/onboarding", json={"dismissed": True}, headers=auth_headers
+    )
+    assert r.status_code == 403

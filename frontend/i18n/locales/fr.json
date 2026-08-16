@@ -90,6 +90,34 @@
     "willSuggestVerifactu": "Nous vous proposerons ensuite d'activer VeriFactu.",
     "invalidData": "Vérifiez les données : un champ est invalide."
   },
+  "onboarding": {
+    "title": "Mise en route",
+    "progress": "{done} étapes sur {total} terminées",
+    "configure": "Configurer",
+    "skip": "Ignorer",
+    "unskip": "Annuler",
+    "dismiss": "Masquer",
+    "guidedMode": "Mode guidé",
+    "optional": "Optionnel ({count})",
+    "stepOf": "Étape {current} sur {total}",
+    "next": "Suivant",
+    "finish": "Terminer",
+    "exit": "Quitter",
+    "completedTitle": "Votre cabinet est prêt !",
+    "completedDescription": "La mise en route est terminée. Vous pouvez travailler normalement.",
+    "guidedDoneTitle": "Parcours terminé",
+    "guidedDoneDescription": "Plus aucune étape en attente.",
+    "items": {
+      "team": {
+        "label": "Votre équipe",
+        "description": "Ajoutez les praticiens qui reçoivent des patients, ou marquez-vous comme praticien si vous exercez seul."
+      },
+      "verifactu": {
+        "label": "Activer VeriFactu",
+        "description": "Obligatoire en Espagne pour émettre des factures valides auprès de l'AEAT."
+      }
+    }
+  },
   "actions": {
     "edit": "Modifier",
     "cancel": "Annuler",

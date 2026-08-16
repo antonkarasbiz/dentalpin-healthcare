@@ -1,5 +1,6 @@
 """Authentication router with rate limiting."""
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -862,3 +863,57 @@ async def update_communications_settings(
     await db.commit()
     await db.refresh(clinic)
     return ApiResponse(data=_read_communications_settings(clinic.settings))
+
+
+# ---------------------------------------------------------------------------
+# Onboarding state (clinic-wide). Step completion is *derived* client-side
+# from real data (getting-started rules); only skip / dismiss / completion
+# markers are stored, under ``clinic.settings.onboarding``.
+# ---------------------------------------------------------------------------
+
+
+class _OnboardingPatch(BaseModel):
+    dismissed: bool | None = None
+    completed: bool | None = None
+    skip: list[str] | None = Field(default=None, max_length=50)
+    unskip: list[str] | None = Field(default=None, max_length=50)
+    reset: bool = False
+
+
+class _OnboardingState(BaseModel):
+    dismissed_at: datetime | None = None
+    completed_at: datetime | None = None
+    skipped: dict[str, datetime] = Field(default_factory=dict)
+
+
+def _read_onboarding(raw: dict | None) -> _OnboardingState:
+    return _OnboardingState.model_validate((raw or {}).get("onboarding") or {})
+
+
+@router.patch("/clinic/settings/onboarding", response_model=ApiResponse[_OnboardingState])
+async def update_onboarding_state(
+    data: _OnboardingPatch,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[_OnboardingState]:
+    """Merge skip / dismiss / completion markers into ``settings.onboarding``."""
+    clinic = ctx.clinic
+    current = dict(clinic.settings or {})
+    state = {} if data.reset else dict(current.get("onboarding") or {})
+    now = datetime.now(UTC).isoformat()
+    if data.dismissed is not None:
+        state["dismissed_at"] = now if data.dismissed else None
+    if data.completed is not None:
+        state["completed_at"] = now if data.completed else None
+    skipped = dict(state.get("skipped") or {})
+    for rule_id in data.skip or []:
+        skipped[rule_id] = now
+    for rule_id in data.unskip or []:
+        skipped.pop(rule_id, None)
+    state["skipped"] = skipped
+    current["onboarding"] = state
+    clinic.settings = current
+    await db.commit()
+    await db.refresh(clinic)
+    return ApiResponse(data=_read_onboarding(clinic.settings))

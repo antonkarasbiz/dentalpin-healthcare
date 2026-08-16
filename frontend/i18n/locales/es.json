@@ -90,6 +90,34 @@
     "willSuggestVerifactu": "Después te sugeriremos activar VeriFactu.",
     "invalidData": "Revisa los datos: hay algún campo no válido."
   },
+  "onboarding": {
+    "title": "Puesta en marcha",
+    "progress": "{done} de {total} pasos completados",
+    "configure": "Configurar",
+    "skip": "Omitir",
+    "unskip": "Deshacer",
+    "dismiss": "Ocultar",
+    "guidedMode": "Modo guiado",
+    "optional": "Opcional ({count})",
+    "stepOf": "Paso {current} de {total}",
+    "next": "Siguiente",
+    "finish": "Finalizar",
+    "exit": "Salir",
+    "completedTitle": "¡Clínica lista!",
+    "completedDescription": "Has completado la puesta en marcha. Ya puedes trabajar con normalidad.",
+    "guidedDoneTitle": "Recorrido terminado",
+    "guidedDoneDescription": "No quedan pasos pendientes.",
+    "items": {
+      "team": {
+        "label": "Tu equipo",
+        "description": "Añade a los profesionales que atienden citas, o márcate como profesional si trabajas solo."
+      },
+      "verifactu": {
+        "label": "Activa VeriFactu",
+        "description": "Obligatorio en España para emitir facturas con validez ante la AEAT."
+      }
+    }
+  },
   "actions": {
     "edit": "Editar",
     "cancel": "Cancelar",

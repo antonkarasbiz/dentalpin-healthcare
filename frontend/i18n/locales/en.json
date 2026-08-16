@@ -90,6 +90,34 @@
     "willSuggestVerifactu": "We'll suggest enabling VeriFactu afterwards.",
     "invalidData": "Please review the data: some field is invalid."
   },
+  "onboarding": {
+    "title": "Getting started",
+    "progress": "{done} of {total} steps done",
+    "configure": "Set up",
+    "skip": "Skip",
+    "unskip": "Undo",
+    "dismiss": "Hide",
+    "guidedMode": "Guided mode",
+    "optional": "Optional ({count})",
+    "stepOf": "Step {current} of {total}",
+    "next": "Next",
+    "finish": "Finish",
+    "exit": "Exit",
+    "completedTitle": "Your clinic is ready!",
+    "completedDescription": "Setup is complete. You can work normally now.",
+    "guidedDoneTitle": "Tour finished",
+    "guidedDoneDescription": "No pending steps left.",
+    "items": {
+      "team": {
+        "label": "Your team",
+        "description": "Add the professionals who see patients, or flag yourself as professional if you work alone."
+      },
+      "verifactu": {
+        "label": "Enable VeriFactu",
+        "description": "Required in Spain to issue invoices valid for the tax agency (AEAT)."
+      }
+    }
+  },
   "actions": {
     "edit": "Edit",
     "cancel": "Cancel",
