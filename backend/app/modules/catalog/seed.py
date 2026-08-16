@@ -66,6 +66,16 @@ VAT_TYPES: list[dict[str, Any]] = [
     },
 ]
 
+# Country VAT presets consumed by ``on_clinic_created``. "es" is the Spanish
+# trio above; "generic" is a single 0% default the clinic edits under
+# /settings/vat-types. Dental care is VAT-exempt in most jurisdictions, so
+# exempt-by-default is the safe generic choice.
+VAT_PRESETS: dict[str, list[dict[str, Any]]] = {
+    "es": VAT_TYPES,
+    "generic": [VAT_TYPES[0]],
+}
+
+
 # ============================================================================
 # Categories
 # ============================================================================
@@ -2479,9 +2489,11 @@ TREATMENTS: dict[str, list[dict[str, Any]]] = {
 # ============================================================================
 
 
-async def _ensure_vat_types(db: AsyncSession, clinic_id: UUID) -> dict[str, UUID]:
+async def _ensure_vat_types(
+    db: AsyncSession, clinic_id: UUID, vat_preset: str = "es"
+) -> dict[str, UUID]:
     vat_type_map: dict[str, UUID] = {}
-    for vat_data in VAT_TYPES:
+    for vat_data in VAT_PRESETS.get(vat_preset, VAT_PRESETS["generic"]):
         existing = await db.execute(
             select(VatType).where(
                 VatType.clinic_id == clinic_id,
@@ -2503,9 +2515,29 @@ async def _ensure_vat_types(db: AsyncSession, clinic_id: UUID) -> dict[str, UUID
     return vat_type_map
 
 
-async def seed_catalog(db: AsyncSession, clinic_id: UUID) -> dict:
-    """Seed catalog items for a clinic. Idempotent (skips existing internal_codes)."""
-    vat_type_map = await _ensure_vat_types(db, clinic_id)
+def _zero_pricing_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Zero the numeric values of a pricing_config (per_role / pillar-pontic prices)."""
+    # ponytail: configs are flat {key: number}; recurse if a nested shape ever appears.
+    return {
+        k: 0 if isinstance(v, (int, float, Decimal)) and not isinstance(v, bool) else v
+        for k, v in config.items()
+    }
+
+
+async def seed_catalog(
+    db: AsyncSession,
+    clinic_id: UUID,
+    vat_preset: str = "es",
+    with_prices: bool = True,
+) -> dict:
+    """Seed catalog items for a clinic. Idempotent (skips existing internal_codes).
+
+    ``vat_preset`` picks the VAT types (see ``VAT_PRESETS``); items whose
+    ``vat_type`` key is missing from the preset fall back to the exempt one.
+    ``with_prices=False`` seeds every price as 0 — used for non-EUR clinics
+    where the Spanish reference prices would be meaningless.
+    """
+    vat_type_map = await _ensure_vat_types(db, clinic_id, vat_preset)
 
     categories_created = 0
     items_created = 0
@@ -2550,6 +2582,19 @@ async def seed_catalog(db: AsyncSession, clinic_id: UUID) -> dict:
             if existing.scalar_one_or_none():
                 continue
 
+            if not with_prices:
+                for price_key in ("default_price", "cost_price"):
+                    if treatment_data.get(price_key) is not None:
+                        treatment_data[price_key] = Decimal("0")
+                if treatment_data.get("surface_prices"):
+                    treatment_data["surface_prices"] = dict.fromkeys(
+                        treatment_data["surface_prices"], 0
+                    )
+                if treatment_data.get("pricing_config"):
+                    treatment_data["pricing_config"] = _zero_pricing_config(
+                        treatment_data["pricing_config"]
+                    )
+
             item = TreatmentCatalogItem(
                 clinic_id=clinic_id,
                 category_id=category_id,
@@ -2580,7 +2625,9 @@ async def seed_catalog(db: AsyncSession, clinic_id: UUID) -> dict:
                             catalog_item_id=item.id,
                             sequence=session_data.get("sequence") or idx,
                             labels=session_data.get("labels") or {},
-                            default_price=session_data["default_price"],
+                            default_price=session_data["default_price"]
+                            if with_prices
+                            else Decimal("0"),
                         )
                     )
 

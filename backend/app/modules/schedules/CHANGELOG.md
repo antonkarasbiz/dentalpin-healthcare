@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): subscribe to `clinic.created` — seed a Mon–Fri weekly template (`ClinicHoursService.create_default_weekly`, ES split shift) instead of 24/7.
+
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.
 
 - style(lint): first ESLint pass over this module's frontend layer —

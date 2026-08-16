@@ -229,8 +229,39 @@ class SystemSetup(BaseModel):
     clinic_tax_id: str = Field(min_length=1, max_length=20)
     timezone: str | None = Field(default=None, max_length=64)
     currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
+    # ISO-3166 alpha-2. Drives the country preset (tz/currency defaults,
+    # tax-id format, VAT preset seeded by catalog). None keeps the legacy
+    # Europe/Madrid + EUR defaults so pre-existing callers don't change.
+    country: str | None = Field(default=None, pattern="^[A-Za-z]{2}$")
+    # Communication language for the clinic (patient-facing). Defaults from
+    # the country preset.
+    language: str | None = Field(default=None, pattern="^(es|en|fr|pt|ta)$")
 
     @field_validator("timezone")
     @classmethod
     def validate_timezone(cls, value: str | None) -> str | None:
         return _validate_iana_timezone(value)
+
+    @field_validator("country")
+    @classmethod
+    def upper_country(cls, value: str | None) -> str | None:
+        return value.upper() if value else value
+
+
+class CountryPresetResponse(BaseModel):
+    code: str
+    currency: str
+    timezone: str
+    language: str
+    vat_preset: str
+    tax_id_label: str
+    tax_id_pattern: str | None
+    tax_id_example: str | None
+    suggested_modules: list[str]
+
+
+class SetupPresetsResponse(BaseModel):
+    """Country presets the first-run wizard offers (public, pre-auth)."""
+
+    countries: list[CountryPresetResponse]
+    fallback: CountryPresetResponse

@@ -1,9 +1,9 @@
 ---
-module: billing
+module: catalog
 last_verified_commit: 0000000
 ---
 
-# Billing — events
+# Catalog — events
 
 Per-module slice of [`docs/events-catalog.md`](../../events-catalog.md)
 (auto-generated). Update both files when adding or removing events.
@@ -16,8 +16,7 @@ _This module does not publish any events._
 
 | Event | Handler | Effect |
 |-------|---------|--------|
-| `payment.refunded` | `events.py:on_payment_refunded` | Recompute status of invoices whose `invoice_payments` link the refunded payment (`paid → partial`, `partial → issued`). |
-| `clinic.created` | `events.py:on_clinic_created` | Create the default `FAC` (invoice) and `RECT` (credit note) series when the clinic has none. |
+| `clinic.created` | `events.py:on_clinic_created` | Seed VAT types by country preset (`es` → exento/10/21, `generic` → exento only), categories and the default treatment catalog. Non-EUR clinics get every price at 0. Idempotent (skips existing rates / category keys / internal codes). |
 
 ## Adding a new event
 

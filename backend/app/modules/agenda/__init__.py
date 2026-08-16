@@ -85,3 +85,10 @@ class AgendaModule(BaseModule):
         from . import tools
 
         return tools.get_tools()
+
+    def get_event_handlers(self) -> dict:
+        from app.core.events import EventType
+
+        from .events import on_clinic_created
+
+        return {EventType.CLINIC_CREATED: on_clinic_created}

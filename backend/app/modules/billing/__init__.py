@@ -78,11 +78,13 @@ class BillingModule(BaseModule):
         # to budget lifecycle events again.
         from app.core.events import EventType
 
-        from .events import on_payment_refunded
+        from .events import on_clinic_created, on_payment_refunded
 
         return {
             # When a Payment is refunded, recompute affected invoices'
             # status so paid → partial / partial → issued transitions
             # happen without billing owning the payment row.
             EventType.PAYMENT_REFUNDED: on_payment_refunded,
+            # Fresh clinic → default FAC/RECT series.
+            EventType.CLINIC_CREATED: on_clinic_created,
         }

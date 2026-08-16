@@ -13,10 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.core.events import EventType, event_bus
 from app.core.plugins import module_registry
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .country_presets import COUNTRY_PRESETS, GENERIC, get_preset, tax_id_matches
 from .dependencies import (
     ClinicContext,
     block_in_demo,
@@ -39,6 +41,7 @@ from .schemas import (
     ClinicResponse,
     MeResponse,
     ProfessionalResponse,
+    SetupPresetsResponse,
     SetupStatusResponse,
     SystemSetup,
     TokenRefresh,
@@ -96,6 +99,17 @@ async def setup_status(
     return ApiResponse(data=SetupStatusResponse(initialized=bool(count)))
 
 
+@router.get("/setup/presets", response_model=ApiResponse[SetupPresetsResponse])
+async def setup_presets() -> ApiResponse[SetupPresetsResponse]:
+    """Country presets for the first-run wizard (public — the wizard runs pre-auth)."""
+    return ApiResponse(
+        data=SetupPresetsResponse(
+            countries=[p.to_dict() for p in COUNTRY_PRESETS.values()],
+            fallback=GENERIC.to_dict(),
+        )
+    )
+
+
 @router.post("/setup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/hour")
 async def setup(
@@ -125,11 +139,29 @@ async def setup(
             detail=error_msg,
         )
 
+    preset = get_preset(data.country)
+    if data.country and not tax_id_matches(preset, data.clinic_tax_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid tax id format for {data.country} ({preset.tax_id_label})",
+        )
+
+    # No country → keep the historical defaults; an unknown country → GENERIC
+    # (currency/timezone come from the client, which lets the user pick them).
+    timezone = data.timezone or (preset.timezone if data.country else "Europe/Madrid")
+    currency = data.currency or (preset.currency if data.country else "EUR")
+    language = data.language or preset.language
+    clinic_settings: dict = {"communication_language": language}
+    if data.country:
+        clinic_settings["country"] = data.country
+
     clinic = Clinic(
         name=data.clinic_name,
         tax_id=data.clinic_tax_id,
-        timezone=data.timezone or "Europe/Madrid",
-        currency=data.currency or "EUR",
+        timezone=timezone,
+        currency=currency,
+        address={"country": data.country} if data.country else {},
+        settings=clinic_settings,
     )
     db.add(clinic)
     await db.flush()
@@ -145,6 +177,23 @@ async def setup(
 
     db.add(ClinicMembership(user_id=user.id, clinic_id=clinic.id, role="admin"))
     await db.commit()
+
+    # Modules seed their defaults (catalog + VAT preset, invoice series,
+    # cabinet, weekly hours) in their own sessions. Awaited so the clinic is
+    # ready on first login; handler failures are logged, never raised.
+    await event_bus.publish(
+        EventType.CLINIC_CREATED,
+        {
+            "clinic_id": str(clinic.id),
+            "country": data.country,
+            "currency": currency,
+            "timezone": timezone,
+            "language": language,
+            "vat_preset": preset.vat_preset,
+            "created_by": str(user.id),
+            "source": "setup",
+        },
+    )
 
     access_token = create_access_token(
         user.id, clinic_id=clinic.id, token_version=user.token_version

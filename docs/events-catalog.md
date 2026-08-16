@@ -31,6 +31,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 | `budget.sent` | `EventType.BUDGET_SENT` | `budget` | `notifications`, `patient_timeline` |
 | `budget.superseded` | `EventType.BUDGET_SUPERSEDED` | `budget` | `treatment_plan` |
 | `budget.viewed` | `EventType.BUDGET_VIEWED` | `budget` | `patient_timeline` |
+| `clinic.created` | `EventType.CLINIC_CREATED` | `core:core` | `agenda`, `billing`, `catalog`, `schedules` |
 | `clinical_notes.administrative_created` | `EventType.CLINICAL_NOTE_ADMINISTRATIVE_CREATED` | `clinical_notes` | `patient_timeline` |
 | `clinical_notes.appointment_administrative_created` | `EventType.CLINICAL_NOTE_APPOINTMENT_ADMINISTRATIVE_CREATED` | `clinical_notes` | — |
 | `clinical_notes.appointment_clinical_created` | `EventType.CLINICAL_NOTE_APPOINTMENT_CLINICAL_CREATED` | `clinical_notes` | — |
@@ -286,6 +287,17 @@ Maintained by `backend/scripts/generate_catalogs.py`.
   - `budget` — `backend/app/modules/budget/workflow.py:628`
 - **Subscribers:**
   - `patient_timeline`
+
+### `clinic.created`
+
+- **Constant:** `EventType.CLINIC_CREATED`
+- **Publishers:**
+  - `core:core` — `backend/app/core/auth/router.py:184`
+- **Subscribers:**
+  - `agenda`
+  - `billing`
+  - `catalog`
+  - `schedules`
 
 ### `clinical_notes.administrative_created`
 

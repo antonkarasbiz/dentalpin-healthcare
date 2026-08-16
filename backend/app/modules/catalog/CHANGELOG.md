@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): subscribe to `clinic.created` — seed VAT types by country preset (`VAT_PRESETS`: `es` | `generic`), categories and the default catalog for every new clinic; `seed_catalog(..., vat_preset, with_prices)` (non-EUR → prices 0).
+
 - i18n: add `ta` fallback to the agent-tool catalog name resolver so
   Tamil-localized treatment names resolve.
 

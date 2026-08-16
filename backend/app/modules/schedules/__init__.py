@@ -22,6 +22,7 @@ from .events import (
     on_appointment_cancelled,
     on_appointment_scheduled,
     on_appointment_updated,
+    on_clinic_created,
 )
 from .models import (
     ClinicOverride,
@@ -115,4 +116,5 @@ class SchedulesModule(BaseModule):
             "appointment.scheduled": on_appointment_scheduled,
             "appointment.updated": on_appointment_updated,
             "appointment.cancelled": on_appointment_cancelled,
+            "clinic.created": on_clinic_created,
         }

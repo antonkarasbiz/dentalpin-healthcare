@@ -1,9 +1,10 @@
 """Billing event handlers.
 
-Currently only consumes ``payment.refunded`` to recompute the status of
-any invoices whose ``invoice_payments`` link the refunded Payment —
-``paid → partial`` or ``partial → issued`` happen here rather than
-inside payments (which has no view of invoices).
+* ``payment.refunded`` — recompute the status of any invoices whose
+  ``invoice_payments`` link the refunded Payment (``paid → partial`` /
+  ``partial → issued``) here rather than inside payments.
+* ``clinic.created`` — create the default invoice / credit-note series so
+  the first invoice can be issued without visiting settings.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from sqlalchemy import select
 from app.database import async_session_maker
 
 from .models import Invoice, InvoicePayment
+from .service import InvoiceSeriesService
 from .workflow import InvoiceWorkflowService
 
 logger = logging.getLogger(__name__)
@@ -68,4 +70,38 @@ async def on_payment_refunded(data: dict[str, Any]) -> None:
             await db.commit()
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("billing.on_payment_refunded failed: %s", exc, exc_info=True)
+            await db.rollback()
+
+
+async def on_clinic_created(data: dict[str, Any]) -> None:
+    """Seed ``FAC`` (invoice) + ``RECT`` (credit note) default series.
+
+    Idempotent: skipped when the clinic already has any series.
+    """
+    clinic_id_raw = data.get("clinic_id")
+    if not clinic_id_raw:
+        return
+    try:
+        clinic_id = UUID(str(clinic_id_raw))
+    except (ValueError, TypeError):
+        return
+
+    async with async_session_maker() as db:
+        try:
+            existing = await InvoiceSeriesService.list_series(db, clinic_id, active_only=False)
+            if existing:
+                return
+            await InvoiceSeriesService.create_series(
+                db,
+                clinic_id,
+                {"prefix": "FAC", "series_type": "invoice", "is_default": True},
+            )
+            await InvoiceSeriesService.create_series(
+                db,
+                clinic_id,
+                {"prefix": "RECT", "series_type": "credit_note", "is_default": True},
+            )
+            await db.commit()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error("billing.on_clinic_created failed: %s", exc, exc_info=True)
             await db.rollback()

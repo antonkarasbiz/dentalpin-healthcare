@@ -11,10 +11,10 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 | Module | Version | Category | Depends | Install | Removable | Permissions | Emits | Consumes | FE layer |
 |--------|---------|----------|---------|---------|-----------|-------------|-------|----------|----------|
 | `accounting_export` | 0.1.0 | official | billing, payments | manual | yes | 2 | 0 | 0 | yes |
-| `agenda` | 0.4.0 | official | patients, catalog, odontogram | auto | no | 4 | 11 | 0 | yes |
-| `billing` | 0.1.0 | official | patients, catalog, budget, payments | auto | no | 3 | 3 | 1 | yes |
+| `agenda` | 0.4.0 | official | patients, catalog, odontogram | auto | no | 4 | 11 | 1 | yes |
+| `billing` | 0.1.0 | official | patients, catalog, budget, payments | auto | no | 3 | 3 | 2 | yes |
 | `budget` | 0.1.0 | official | patients, catalog, odontogram | auto | no | 5 | 9 | 4 | yes |
-| `catalog` | 0.1.0 | official | — | auto | no | 3 | 0 | 0 | yes |
+| `catalog` | 0.1.0 | official | — | auto | no | 3 | 0 | 1 | yes |
 | `clinical_notes` | 0.2.0 | official | patients, odontogram, treatment_plan, media, agenda | auto | no | 2 | 6 | 0 | yes |
 | `copilot` | 0.1.0 | official | — | auto | yes | 5 | 3 | 1 | yes |
 | `media` | 0.2.0 | official | patients | auto | no | 4 | 7 | 1 | yes |
@@ -28,7 +28,7 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 | `periodontogram` | 0.1.0 | official | patients, odontogram | manual | yes | 2 | 1 | 2 | yes |
 | `recalls` | 0.1.0 | official | patients, agenda | auto | yes | 3 | 4 | 5 | yes |
 | `reports` | 0.1.0 | official | patients, agenda, catalog, budget, billing, payments | auto | no | 3 | 0 | 0 | yes |
-| `schedules` | 0.1.0 | official | agenda | auto | yes | 8 | 0 | 3 | yes |
+| `schedules` | 0.1.0 | official | agenda | auto | yes | 8 | 0 | 4 | yes |
 | `treatment_plan` | 0.1.0 | official | patients, agenda, odontogram, catalog, budget, media | auto | no | 5 | 13 | 7 | yes |
 | `verifactu` | 0.1.0 | official | billing, catalog | manual | yes | 5 | 1 | 1 | yes |
 | `whatsapp_kapso` | 0.1.0 | community | notifications, patients | manual | yes | 2 | 0 | 0 | yes |
@@ -79,7 +79,8 @@ Appointments, scheduling, cabinets.
   - `appointment.scheduled`
   - `appointment.status_changed`
   - `appointment.updated`
-- **Events consumed:** —
+- **Events consumed:**
+  - `clinic.created`
 - **Module CLAUDE.md:** [`backend/app/modules/agenda/CLAUDE.md`](../backend/app/modules/agenda/CLAUDE.md)
 
 ### `billing` — v0.1.0
@@ -101,6 +102,7 @@ Invoices, payments, credit notes, PDF billing.
   - `invoice.paid`
   - `invoice.sent`
 - **Events consumed:**
+  - `clinic.created`
   - `payment.refunded`
 - **Module CLAUDE.md:** [`backend/app/modules/billing/CLAUDE.md`](../backend/app/modules/billing/CLAUDE.md)
 
@@ -152,7 +154,8 @@ Treatment catalog, categories, VAT types.
   - `catalog.read`
   - `catalog.write`
 - **Events emitted:** —
-- **Events consumed:** —
+- **Events consumed:**
+  - `clinic.created`
 - **Module CLAUDE.md:** [`backend/app/modules/catalog/CLAUDE.md`](../backend/app/modules/catalog/CLAUDE.md)
 
 ### `clinical_notes` — v0.2.0
@@ -519,6 +522,7 @@ Clinic + professional operating hours, overrides, availability, and occupancy an
   - `appointment.cancelled`
   - `appointment.scheduled`
   - `appointment.updated`
+  - `clinic.created`
 - **Module CLAUDE.md:** [`backend/app/modules/schedules/CLAUDE.md`](../backend/app/modules/schedules/CLAUDE.md)
 
 ### `treatment_plan` — v0.1.0

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): subscribe to `clinic.created` — auto-create default `FAC`/`RECT` series so the first invoice can be issued without visiting settings.
+
 - fix(from-budget): invoices created from a quote now carry the quote's
   global discount (prorated per line, ex-tax) on top of the line
   discount; absolute line discounts are prorated by invoiced quantity

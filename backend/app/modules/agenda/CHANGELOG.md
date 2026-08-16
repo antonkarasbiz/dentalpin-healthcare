@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): subscribe to `clinic.created` — create one default cabinet for a new clinic.
+
 - fix(timezones): the mobile day view (free-slot engine, timeline,
   week-strip counts), kanban card labels, home tiles, next-appointment
   card and list view formatted appointment hours with `new Date()`
