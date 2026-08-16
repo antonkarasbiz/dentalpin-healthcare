@@ -291,6 +291,19 @@ jobs:
       - name: Seed demo data
         run: ./scripts/seed-demo.sh --lang es
 
+      - name: Install optional modules covered by e2e
+        # `periodontogram` ships `auto_install=False`; its spec assumes an
+        # operator installed it. Pending installs apply on backend boot.
+        run: |
+          docker compose exec -T backend python -m app.cli modules install periodontogram
+          docker compose restart backend
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "backend ready"; break
+            fi
+            sleep 2
+          done
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:

@@ -12,6 +12,16 @@ COPY backend/app/modules /module_layers
 
 COPY frontend/ ./
 
+# Bake every module layer. The committed modules.json only mirrors the
+# dev checkout's installed set; a prod image can't rebuild when a module
+# is installed later, so ship all layers and let the backend's
+# `/modules/-/active` decide what is visible at runtime.
+RUN node -e 'const fs=require("fs");\
+  const names=fs.readdirSync("/module_layers").filter(n=>fs.existsSync(`/module_layers/${n}/frontend/nuxt.config.ts`)).sort();\
+  const modules=names.map(name=>({name,path:`/module_layers/${name}/frontend`}));\
+  fs.writeFileSync("modules.json",JSON.stringify({layers:modules.map(m=>m.path),modules,version:1},null,2));\
+  console.log("modules.json:",names.join(", "))'
+
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
