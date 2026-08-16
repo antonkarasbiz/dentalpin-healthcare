@@ -77,6 +77,10 @@
       "confirmOutside": "Ce créneau est en dehors des heures de travail. Créer le rendez-vous quand même ?",
       "confirm": "Créer quand même",
       "cancel": "Annuler"
+    },
+    "onboarding": {
+      "hoursLabel": "Horaires du cabinet",
+      "hoursDescription": "L'agenda est ouvert 24 h/24 pour l'instant. Définissez vos horaires réels."
     }
   }
 }

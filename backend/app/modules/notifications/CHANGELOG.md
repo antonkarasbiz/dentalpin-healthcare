@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): optional getting-started rule `smtp` — suggests configuring the email sender.
+
 - i18n: add Tamil locale (`notifications-ta.json`) with full UI coverage.
 
 - style(lint): first ESLint pass over this module's frontend layer —

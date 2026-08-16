@@ -6,7 +6,15 @@
  * Imports the registry from the host (``~~``) and never from another
  * module, keeping ``manifest.depends`` clean.
  */
-import { registerSettingsPage } from '~~/app/composables/useSettingsRegistry'
+import {
+  registerGettingStartedRule,
+  registerSettingsPage
+} from '~~/app/composables/useSettingsRegistry'
+
+interface SmtpOnboardingState { loaded: boolean, configured: boolean }
+
+const useSmtpOnboardingState = () =>
+  useState<SmtpOnboardingState>('notifications:onboarding-smtp', () => ({ loaded: false, configured: true }))
 
 export default defineNuxtPlugin(() => {
   registerSettingsPage({
@@ -26,5 +34,35 @@ export default defineNuxtPlugin(() => {
       'paciente'
     ],
     order: 10
+  })
+
+  // Getting-started (optional): without an email sender the clinic can't
+  // send confirmations / budgets. Global env SMTP counts as configured
+  // only through the clinic-level override, so this stays advisory.
+  registerGettingStartedRule({
+    id: 'smtp',
+    labelKey: 'notifications.onboarding.label',
+    descriptionKey: 'notifications.onboarding.description',
+    icon: 'i-lucide-mail',
+    to: '/settings/notifications',
+    order: 80,
+    optional: true,
+    severity: 'info',
+    load: async () => {
+      const state = useSmtpOnboardingState()
+      const api = useApi()
+      const res = await api.get<{ data: { provider: string, from_email: string | null, has_password: boolean } }>(
+        '/api/v1/notifications/smtp-settings'
+      )
+      const d = res.data
+      state.value = {
+        loaded: true,
+        configured: d.provider !== 'smtp' ? d.provider !== 'disabled' : !!(d.from_email && d.has_password)
+      }
+    },
+    when: () => {
+      const s = useSmtpOnboardingState().value
+      return s.loaded && !s.configured
+    }
   })
 })

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(onboarding): getting-started rule `clinic-hours` — flags clinics still on the 24/7 default template.
+
 - feat(onboarding): subscribe to `clinic.created` — seed a Mon–Fri weekly template (`ClinicHoursService.create_default_weekly`, ES split shift) instead of 24/7.
 
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.

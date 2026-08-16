@@ -380,6 +380,10 @@
     },
     "quickActions": {
       "ariaLabel": "Patient quick actions"
+    },
+    "onboarding": {
+      "label": "Create your first patient",
+      "description": "The quickest way to see the record, agenda and budgets in action."
     }
   },
   "patientDetail": {
@@ -1527,6 +1531,10 @@
       "pricing": "Pricing",
       "scheduling": "Scheduling",
       "clinical": "Clinical"
+    },
+    "onboarding": {
+      "label": "Treatment catalog",
+      "description": "Without treatments there are no budgets or plans. Load the default catalog or create your own."
     }
   },
   "placeholders": {
@@ -2287,6 +2295,10 @@
         "save_failed": "Error saving SMTP settings",
         "test_failed": "Error testing SMTP connection"
       }
+    },
+    "onboarding": {
+      "label": "Email sending",
+      "description": "Set the sender to email appointment confirmations and budgets."
     }
   },
   "invoice": {
@@ -2834,7 +2846,11 @@
     "confirmReset": "Reset counter",
     "created": "Series created successfully",
     "saved": "Series updated successfully",
-    "resetSuccess": "Counter reset successfully"
+    "resetSuccess": "Counter reset successfully",
+    "onboarding": {
+      "label": "Invoice series",
+      "description": "Required to issue the first invoice (e.g. FAC-2026-0001)."
+    }
   },
   "documents": {
     "title": "Documents",

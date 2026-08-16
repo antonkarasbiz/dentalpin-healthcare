@@ -77,6 +77,10 @@
       "confirmOutside": "Este slot está fuera del horario. ¿Crear la cita de todos modos?",
       "confirm": "Crear de todos modos",
       "cancel": "Cancelar"
+    },
+    "onboarding": {
+      "hoursLabel": "Horario de la clínica",
+      "hoursDescription": "Ahora mismo la agenda está abierta 24 h. Define tus horas de apertura."
     }
   }
 }

@@ -380,6 +380,10 @@
     },
     "quickActions": {
       "ariaLabel": "Ações rápidas do paciente"
+    },
+    "onboarding": {
+      "label": "Crie o seu primeiro paciente",
+      "description": "A forma mais rápida de ver a ficha, a agenda e os orçamentos em ação."
     }
   },
   "patientDetail": {
@@ -1527,6 +1531,10 @@
       "pricing": "Preços",
       "scheduling": "Agendamento",
       "clinical": "Clínico"
+    },
+    "onboarding": {
+      "label": "Catálogo de tratamentos",
+      "description": "Sem tratamentos não há orçamentos nem planos. Carregue o catálogo por defeito ou crie os seus."
     }
   },
   "placeholders": {
@@ -2287,6 +2295,10 @@
         "save_failed": "Erro ao guardar as definições SMTP",
         "test_failed": "Erro ao testar a ligação SMTP"
       }
+    },
+    "onboarding": {
+      "label": "Envio de emails",
+      "description": "Configure o remetente para enviar confirmações de consulta e orçamentos."
     }
   },
   "invoice": {
@@ -2834,7 +2846,11 @@
     "confirmReset": "Reiniciar contador",
     "created": "Série criada com sucesso",
     "saved": "Série atualizada com sucesso",
-    "resetSuccess": "Contador reiniciado com sucesso"
+    "resetSuccess": "Contador reiniciado com sucesso",
+    "onboarding": {
+      "label": "Série de faturas",
+      "description": "Necessária para emitir a primeira fatura (ex.: FAC-2026-0001)."
+    }
   },
   "documents": {
     "title": "Documentos",

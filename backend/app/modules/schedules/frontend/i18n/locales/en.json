@@ -77,6 +77,10 @@
       "confirmOutside": "This slot is outside working hours. Create the appointment anyway?",
       "confirm": "Create anyway",
       "cancel": "Cancel"
+    },
+    "onboarding": {
+      "hoursLabel": "Clinic hours",
+      "hoursDescription": "The agenda is currently open 24/7. Set your real opening hours."
     }
   }
 }
