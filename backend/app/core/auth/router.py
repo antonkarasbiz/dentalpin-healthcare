@@ -712,6 +712,11 @@ async def update_clinic_metadata(
         existing_address = clinic.address or {}
         new_address = data.address.model_dump(exclude_unset=True)
         clinic.address = {**existing_address, **new_address}
+        # ``settings.country`` (ISO2) is what billing hooks / verifactu read;
+        # keep it in sync with the address country when it is a valid code.
+        country = (new_address.get("country") or "").upper()
+        if len(country) == 2 and country.isalpha():
+            clinic.settings = {**(clinic.settings or {}), "country": country}
     if data.timezone is not None:
         clinic.timezone = data.timezone
     if data.currency is not None:

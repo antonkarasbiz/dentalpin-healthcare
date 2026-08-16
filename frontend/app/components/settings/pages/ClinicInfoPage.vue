@@ -1,90 +1,24 @@
 <script setup lang="ts">
 import type { ClinicAddress, ClinicUpdate } from '~/types'
 import { PERMISSIONS } from '~/config/permissions'
+import {
+  countryOptions as buildCountryOptions,
+  currencyOptions as buildCurrencyOptions,
+  timezoneOptions as buildTimezoneOptions,
+  translateCountry as translateCountryName
+} from '~/utils/countries'
 
 const { t } = useI18n()
 const clinic = useClinic()
 const { can } = usePermissions()
 const canEdit = computed(() => can(PERMISSIONS.admin.clinicWrite))
 
-const COUNTRY_CODES = [
-  'AD', 'AE', 'AF', 'AG', 'AL', 'AM', 'AO', 'AR', 'AT', 'AU', 'AZ',
-  'BA', 'BB', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BN', 'BO', 'BR', 'BS', 'BT', 'BW', 'BY', 'BZ',
-  'CA', 'CD', 'CF', 'CG', 'CH', 'CI', 'CL', 'CM', 'CN', 'CO', 'CR', 'CU', 'CV', 'CY', 'CZ',
-  'DE', 'DJ', 'DK', 'DM', 'DO', 'DZ',
-  'EC', 'EE', 'EG', 'ER', 'ES', 'ET',
-  'FI', 'FJ', 'FM', 'FR',
-  'GA', 'GB', 'GD', 'GE', 'GH', 'GM', 'GN', 'GQ', 'GR', 'GT', 'GW', 'GY',
-  'HN', 'HR', 'HT', 'HU',
-  'ID', 'IE', 'IL', 'IN', 'IQ', 'IR', 'IS', 'IT',
-  'JM', 'JO', 'JP',
-  'KE', 'KG', 'KH', 'KI', 'KM', 'KN', 'KP', 'KR', 'KW', 'KZ',
-  'LA', 'LB', 'LC', 'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV', 'LY',
-  'MA', 'MC', 'MD', 'ME', 'MG', 'MH', 'MK', 'ML', 'MM', 'MN', 'MR', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ',
-  'NA', 'NE', 'NG', 'NI', 'NL', 'NO', 'NP', 'NR', 'NZ',
-  'OM',
-  'PA', 'PE', 'PG', 'PH', 'PK', 'PL', 'PT', 'PW', 'PY',
-  'QA',
-  'RO', 'RS', 'RU', 'RW',
-  'SA', 'SB', 'SC', 'SD', 'SE', 'SG', 'SI', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS', 'ST', 'SV', 'SY', 'SZ',
-  'TD', 'TG', 'TH', 'TJ', 'TL', 'TM', 'TN', 'TO', 'TR', 'TT', 'TV', 'TW', 'TZ',
-  'UA', 'UG', 'US', 'UY', 'UZ',
-  'VA', 'VC', 'VE', 'VN', 'VU',
-  'WS',
-  'XK',
-  'YE',
-  'ZA', 'ZM', 'ZW'
-]
-
 const { currentLocale } = useLocale()
 
-const countryOptions = computed(() => {
-  let displayNames: Intl.DisplayNames | null = null
-  try {
-    displayNames = new Intl.DisplayNames([currentLocale.value], { type: 'region' })
-  } catch {
-    displayNames = null
-  }
-  const collator = new Intl.Collator(currentLocale.value, { sensitivity: 'base' })
-  return COUNTRY_CODES.map(code => ({
-    value: code,
-    label: displayNames?.of(code) ?? code
-  })).sort((a, b) => collator.compare(a.label, b.label))
-})
-
-function translateCountry(value: string | undefined | null): string {
-  if (!value) return ''
-  if (value.length === 2 && /^[A-Za-z]{2}$/.test(value)) {
-    try {
-      return new Intl.DisplayNames([currentLocale.value], { type: 'region' })
-        .of(value.toUpperCase()) ?? value
-    } catch {
-      return value
-    }
-  }
-  return value
-}
-
-const currencyOptions = computed(() => {
-  let displayNames: Intl.DisplayNames | null = null
-  try {
-    displayNames = new Intl.DisplayNames([currentLocale.value], { type: 'currency' })
-  } catch {
-    displayNames = null
-  }
-  const collator = new Intl.Collator(currentLocale.value, { sensitivity: 'base' })
-  // Full ISO 4217 list from the runtime, same reasoning as timezones below —
-  // the previous curated list was EUR + Americas only (reported by a user in
-  // Vietnam, no VND). The backend accepts any `^[A-Z]{3}$`.
-  return Intl.supportedValuesOf('currency').map(code => ({
-    value: code,
-    label: displayNames?.of(code) ? `${code} — ${displayNames.of(code)}` : code
-  })).sort((a, b) => collator.compare(a.label, b.label))
-})
-
-// Full IANA list from the runtime — the previous curated list had no
-// Asia/Africa/Oceania zones (reported by a user in GMT+7).
-const timezoneOptions = Intl.supportedValuesOf('timeZone').map(tz => ({ label: tz, value: tz }))
+const countryOptions = computed(() => buildCountryOptions(currentLocale.value))
+const currencyOptions = computed(() => buildCurrencyOptions(currentLocale.value))
+const timezoneOptions = buildTimezoneOptions()
+const translateCountry = (value: string | undefined | null) => translateCountryName(currentLocale.value, value)
 
 const editing = ref(false)
 const isSaving = ref(false)
