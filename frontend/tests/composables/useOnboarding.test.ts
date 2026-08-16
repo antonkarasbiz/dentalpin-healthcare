@@ -50,6 +50,9 @@ describe('useOnboarding', () => {
     useState('clinic:current').value = clinic({ skipped: { b: '2026-01-01', c: '2026-01-01' } })
     await nextTick()
     expect(onboarding.progress.value).toEqual({ done: 3, total: 3 })
+    // completion is only trusted once rule data has been loaded
+    expect(onboarding.isComplete.value).toBe(false)
+    await onboarding.refresh(true)
     expect(onboarding.isComplete.value).toBe(true)
     expect(onboarding.isDismissed.value).toBe(false)
   })

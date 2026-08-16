@@ -20,6 +20,9 @@ export function useOnboarding() {
 
   const lastRefreshAt = useState<number>('onboarding:last-refresh', () => 0)
   const refreshing = useState<boolean>('onboarding:refreshing', () => false)
+  // Rules with `load` read as "resolved" until their data arrives — don't
+  // trust progress / completion before the first refresh finished.
+  const loaded = useState<boolean>('onboarding:loaded', () => false)
   const activeModalId = useState<string | null>('onboarding:modal', () => null)
 
   const isAdmin = computed(() => can('admin.clinic.write'))
@@ -34,7 +37,9 @@ export function useOnboarding() {
     done: required.value.filter(s => s.resolved || s.skipped).length,
     total: required.value.length
   }))
-  const isComplete = computed(() => required.value.length > 0 && pendingRequired.value.length === 0)
+  const isComplete = computed(() =>
+    loaded.value && required.value.length > 0 && pendingRequired.value.length === 0
+  )
 
   async function refresh(force = false): Promise<void> {
     if (refreshing.value) return
@@ -43,6 +48,7 @@ export function useOnboarding() {
     try {
       await registry.loadGettingStarted()
       lastRefreshAt.value = Date.now()
+      loaded.value = true
     } finally {
       refreshing.value = false
     }
@@ -112,6 +118,7 @@ export function useOnboarding() {
     pendingOptional,
     progress,
     isComplete,
+    loaded,
     refresh,
     refreshing,
     // guided mode

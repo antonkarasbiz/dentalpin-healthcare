@@ -1,59 +1,25 @@
 <script setup lang="ts">
-import type { Cabinet, CabinetCreate } from '~/types'
+import type { Cabinet } from '~/types'
 
 const { t } = useI18n()
 const clinic = useClinic()
 const { isAdmin } = usePermissions()
 
-const cabinetColors = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
-  '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'
-]
-
-const showCreate = ref(false)
-const isCreating = ref(false)
-const newCabinet = ref({ name: '', color: '#3B82F6' })
-
-const showEdit = ref(false)
-const isEditing = ref(false)
+const showForm = ref(false)
 const editing = ref<Cabinet | null>(null)
-const editData = ref({ name: '', color: '' })
 
 const showDelete = ref(false)
 const isDeleting = ref(false)
 const toDelete = ref<Cabinet | null>(null)
 
 function openCreate() {
-  newCabinet.value = { name: '', color: '#3B82F6' }
-  showCreate.value = true
-}
-
-async function handleCreate() {
-  isCreating.value = true
-  const data: CabinetCreate = { name: newCabinet.value.name, color: newCabinet.value.color }
-  const result = await clinic.createCabinet(data)
-  isCreating.value = false
-  if (result) showCreate.value = false
+  editing.value = null
+  showForm.value = true
 }
 
 function openEdit(cabinet: Cabinet) {
   editing.value = cabinet
-  editData.value = { name: cabinet.name, color: cabinet.color }
-  showEdit.value = true
-}
-
-async function handleUpdate() {
-  if (!editing.value) return
-  isEditing.value = true
-  const result = await clinic.updateCabinet(editing.value.id, {
-    name: editData.value.name,
-    color: editData.value.color
-  })
-  isEditing.value = false
-  if (result) {
-    showEdit.value = false
-    editing.value = null
-  }
+  showForm.value = true
 }
 
 function openDelete(cabinet: Cabinet) {
@@ -153,125 +119,11 @@ async function handleDelete() {
       </ul>
     </div>
 
-    <!-- Create modal -->
-    <UModal v-model:open="showCreate">
-      <template #content>
-        <UCard>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-square-plus"
-                class="w-5 h-5 text-primary-accent"
-              />
-              <h3 class="font-semibold text-default">
-                {{ t('settings.newCabinet') }}
-              </h3>
-            </div>
-          </template>
-
-          <form
-            class="space-y-4"
-            @submit.prevent="handleCreate"
-          >
-            <UFormField :label="t('common.name')">
-              <UInput
-                v-model="newCabinet.name"
-                required
-              />
-            </UFormField>
-
-            <UFormField :label="t('common.color')">
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="color in cabinetColors"
-                  :key="color"
-                  type="button"
-                  class="w-8 h-8 rounded-full border-2 transition-all"
-                  :class="newCabinet.color === color ? 'border-default ring-2 ring-[var(--color-primary)] scale-110' : 'border-transparent'"
-                  :style="{ backgroundColor: color }"
-                  @click="newCabinet.color = color"
-                />
-              </div>
-            </UFormField>
-
-            <div class="flex justify-end gap-2 pt-4">
-              <UButton
-                variant="ghost"
-                @click="showCreate = false"
-              >
-                {{ t('common.cancel') }}
-              </UButton>
-              <UButton
-                type="submit"
-                :loading="isCreating"
-              >
-                {{ t('settings.createCabinet') }}
-              </UButton>
-            </div>
-          </form>
-        </UCard>
-      </template>
-    </UModal>
-
-    <!-- Edit modal -->
-    <UModal v-model:open="showEdit">
-      <template #content>
-        <UCard>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-pencil"
-                class="w-5 h-5 text-primary-accent"
-              />
-              <h3 class="font-semibold text-default">
-                {{ t('settings.editCabinet') }}
-              </h3>
-            </div>
-          </template>
-
-          <form
-            class="space-y-4"
-            @submit.prevent="handleUpdate"
-          >
-            <UFormField :label="t('common.name')">
-              <UInput
-                v-model="editData.name"
-                required
-              />
-            </UFormField>
-
-            <UFormField :label="t('common.color')">
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="color in cabinetColors"
-                  :key="color"
-                  type="button"
-                  class="w-8 h-8 rounded-full border-2 transition-all"
-                  :class="editData.color === color ? 'border-default ring-2 ring-[var(--color-primary)] scale-110' : 'border-transparent'"
-                  :style="{ backgroundColor: color }"
-                  @click="editData.color = color"
-                />
-              </div>
-            </UFormField>
-
-            <div class="flex justify-end gap-2 pt-4">
-              <UButton
-                variant="ghost"
-                @click="showEdit = false"
-              >
-                {{ t('common.cancel') }}
-              </UButton>
-              <UButton
-                type="submit"
-                :loading="isEditing"
-              >
-                {{ t('settings.saveChanges') }}
-              </UButton>
-            </div>
-          </form>
-        </UCard>
-      </template>
-    </UModal>
+    <!-- Create / edit modal -->
+    <CabinetFormModal
+      v-model:open="showForm"
+      :cabinet="editing"
+    />
 
     <!-- Delete modal -->
     <UModal v-model:open="showDelete">

@@ -35,9 +35,8 @@ export default defineNuxtPlugin(() => {
     order: 90,
     optional: true,
     severity: 'info',
-    load: async () => {
+    load: async (api) => {
       const state = usePatientsOnboardingState()
-      const api = useApi()
       const res = await api.get<{ total: number }>('/api/v1/patients?page_size=1')
       state.value = { loaded: true, total: res.total }
     },

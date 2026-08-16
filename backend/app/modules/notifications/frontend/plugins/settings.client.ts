@@ -48,9 +48,8 @@ export default defineNuxtPlugin(() => {
     order: 80,
     optional: true,
     severity: 'info',
-    load: async () => {
+    load: async (api) => {
       const state = useSmtpOnboardingState()
-      const api = useApi()
       const res = await api.get<{ data: { provider: string, from_email: string | null, has_password: boolean } }>(
         '/api/v1/notifications/smtp-settings'
       )

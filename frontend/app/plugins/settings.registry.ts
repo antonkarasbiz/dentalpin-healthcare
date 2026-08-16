@@ -3,6 +3,7 @@
  * register their own pages via their own client plugins (same pattern
  * as the existing slot system).
  */
+import type { ActiveModule, ApiResponse } from '~/types'
 import {
   registerSettingsPage,
   registerGettingStartedRule
@@ -160,6 +161,7 @@ export default defineNuxtPlugin(() => {
     to: '/settings/workspace/cabinets',
     order: 20,
     severity: 'info',
+    modal: () => import('~/components/settings/cabinets/CabinetFormModal.vue'),
     when: () => {
       const c = useClinicState().currentClinic.value
       return !!c && (c.cabinets ?? []).length === 0
@@ -177,13 +179,14 @@ export default defineNuxtPlugin(() => {
     order: 40,
     severity: 'info',
     modal: () => import('~/components/settings/users/UserCreateModal.vue'),
-    load: async () => {
+    load: async (api) => {
       const state = useState<{ loaded: boolean, professionals: number, others: number }>(
         'onboarding:team', () => ({ loaded: false, professionals: 0, others: 0 })
       )
-      const users = useUsers()
-      await users.fetchUsers()
-      const list = users.users.value.filter(u => u.is_active)
+      const res = await api.get<{ data: Array<{ is_active: boolean, is_professional: boolean }> }>(
+        '/api/v1/auth/users'
+      )
+      const list = res.data.filter(u => u.is_active)
       state.value = {
         loaded: true,
         professionals: list.filter(u => u.is_professional).length,
@@ -210,7 +213,12 @@ export default defineNuxtPlugin(() => {
     order: 70,
     optional: true,
     severity: 'info',
-    load: async () => { await useModules().ensureLoaded() },
+    load: async (api) => {
+      const active = useActiveModulesState()
+      if (active.value) return
+      const res = await api.get<ApiResponse<ActiveModule[]>>('/api/v1/modules/-/active')
+      active.value = res.data
+    },
     when: () => {
       const c = useClinicState().currentClinic.value
       if (c?.settings?.country !== 'ES') return false

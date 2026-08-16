@@ -19,9 +19,8 @@ export default defineNuxtPlugin(() => {
     to: '/settings/invoice-series',
     order: 60,
     severity: 'warning',
-    load: async () => {
+    load: async (api) => {
       const state = useSeriesOnboardingState()
-      const api = useApi()
       const res = await api.get<{ data: unknown[] }>('/api/v1/billing/series')
       state.value = { loaded: true, count: res.data.length }
     },

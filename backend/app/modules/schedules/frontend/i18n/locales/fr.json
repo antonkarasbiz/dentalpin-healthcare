@@ -80,7 +80,9 @@
     },
     "onboarding": {
       "hoursLabel": "Horaires du cabinet",
-      "hoursDescription": "L'agenda est ouvert 24 h/24 pour l'instant. Définissez vos horaires réels."
+      "hoursDescription": "L'agenda est ouvert 24 h/24 pour l'instant. Définissez vos horaires réels.",
+      "presetSplit": "Lun–Ven 9–14 et 16–20",
+      "presetContinuous": "Lun–Ven 9–18"
     }
   }
 }

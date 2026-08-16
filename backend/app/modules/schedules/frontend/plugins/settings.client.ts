@@ -64,9 +64,9 @@ export default defineNuxtPlugin(() => {
     to: '/settings/workspace/clinic-hours',
     order: 30,
     severity: 'info',
-    load: async () => {
+    modal: () => import('../components/settings/ClinicHoursQuickModal.vue'),
+    load: async (api) => {
       const state = useHoursOnboardingState()
-      const api = useApi()
       const res = await api.get<{ data: ClinicHours }>('/api/v1/schedules/clinic-hours')
       state.value = { loaded: true, alwaysOpen: isAlwaysOpen(res.data) }
     },

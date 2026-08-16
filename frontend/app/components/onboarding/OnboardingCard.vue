@@ -23,6 +23,7 @@ const isVisible = computed(() =>
 )
 
 const percent = computed(() => {
+  if (!onboarding.loaded.value) return 0
   const { done, total } = onboarding.progress.value
   return total ? Math.round((done / total) * 100) : 0
 })
@@ -88,7 +89,7 @@ onMounted(() => {
             {{ t('onboarding.title') }}
           </h2>
           <p class="text-caption text-muted">
-            {{ t('onboarding.progress', onboarding.progress.value) }}
+            {{ onboarding.loaded.value ? t('onboarding.progress', onboarding.progress.value) : '…' }}
           </p>
         </div>
       </div>
@@ -111,7 +112,22 @@ onMounted(() => {
       </div>
     </header>
 
-    <ul class="divide-y divide-[var(--color-border-subtle)]">
+    <div
+      v-if="!onboarding.loaded.value"
+      class="space-y-2 py-1"
+      aria-busy="true"
+    >
+      <USkeleton
+        v-for="i in 3"
+        :key="i"
+        class="h-9 w-full"
+      />
+    </div>
+
+    <ul
+      v-else
+      class="divide-y divide-[var(--color-border-subtle)]"
+    >
       <li
         v-for="step in onboarding.required.value"
         :key="step.id"

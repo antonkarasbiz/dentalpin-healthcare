@@ -16,6 +16,8 @@
 import type { Component } from 'vue'
 import type { ApiResponse, OnboardingState } from '~/types'
 
+export type ApiClient = ReturnType<typeof useApi>
+
 export type SettingsCategoryId
   = | 'general'
     | 'workspace'
@@ -105,8 +107,12 @@ export interface GettingStartedRule {
   to: string
   /** True while the step is still pending. Must be sync and cheap. */
   when: () => boolean
-  /** Fetch whatever ``when`` needs. Called by the dashboard card on mount / refresh. */
-  load?: () => Promise<void>
+  /**
+   * Fetch whatever ``when`` needs. Called by the dashboard card on mount /
+   * refresh, possibly from an event handler — so it receives the host's
+   * ``useApi()`` client instead of creating one (setup-only composable).
+   */
+  load?: (api: ApiClient) => Promise<void>
   /** Guided-mode sequence. Lower first; ties resolve in registration order. */
   order?: number
   /** Optional steps are listed apart and don't count towards progress. */
@@ -410,7 +416,7 @@ export function useSettingsRegistry() {
   async function loadGettingStarted(): Promise<void> {
     // `version` is captured synchronously (Nuxt context) — after the await
     // `useState` would be unavailable and the bump silently lost.
-    await Promise.allSettled(_rules.map(r => r.load?.()))
+    await Promise.allSettled(_rules.map(r => nuxtApp.runWithContext(() => r.load?.(api))))
     version.value = version.value + 1
   }
 

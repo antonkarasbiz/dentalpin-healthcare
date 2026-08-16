@@ -19,9 +19,8 @@ export default defineNuxtPlugin(() => {
     to: '/settings/catalog',
     order: 50,
     severity: 'warning',
-    load: async () => {
+    load: async (api) => {
       const state = useCatalogOnboardingState()
-      const api = useApi()
       const res = await api.get<{ total: number }>('/api/v1/catalog/items?page_size=1')
       state.value = { loaded: true, total: res.total }
     },
