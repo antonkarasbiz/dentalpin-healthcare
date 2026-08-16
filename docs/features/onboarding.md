@@ -59,7 +59,7 @@ Rules (owner → data):
 
 ### 4. Guided mode
 
-*Modo guiado* opens the first pending step's page with `?onboarding=<ruleId>`. A sticky bar under the header shows "Paso N de M · <step>" with *Salir* and *Siguiente / Finalizar*; *Siguiente* re-checks the data and jumps to the next pending step, the last one returns to `/`. Query flag over composable state: survives reloads, deep-linkable, nothing to sync.
+*Modo guiado* opens the first pending step's page with `?onboarding=<ruleId>`. A sticky bar under the header shows "Paso N de M · `<step>`" with *Salir* and *Siguiente / Finalizar*; *Siguiente* re-checks the data and jumps to the next pending step, the last one returns to `/`. Query flag over composable state: survives reloads, deep-linkable, nothing to sync.
 
 ### 5. Team invite links
 
