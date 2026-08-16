@@ -9,22 +9,25 @@ import { resolve } from 'node:path'
  * `manifest.frontend.layer_path` is installed. When absent (fresh
  * checkout, no community modules yet), returns an empty array.
  */
-function loadModuleLayers(): string[] {
+function loadModuleLayers(): { layers: string[], names: string[] } {
   const path = resolve(__dirname, 'modules.json')
   try {
     const raw = readFileSync(path, 'utf-8')
-    const payload = JSON.parse(raw) as { layers?: string[] }
-    return Array.isArray(payload.layers) ? payload.layers : []
+    const payload = JSON.parse(raw) as { layers?: string[], modules?: { name: string }[] }
+    return {
+      layers: Array.isArray(payload.layers) ? payload.layers : [],
+      names: Array.isArray(payload.modules) ? payload.modules.map(m => m.name) : []
+    }
   } catch (err: unknown) {
     const code = (err as { code?: string }).code
     if (code !== 'ENOENT') {
       console.warn('[nuxt.config] modules.json is malformed, using empty layers:', err)
     }
-    return []
+    return { layers: [], names: [] }
   }
 }
 
-const moduleLayers = loadModuleLayers()
+const { layers: moduleLayers, names: moduleLayerNames } = loadModuleLayers()
 const modulesJsonPath = resolve(__dirname, 'modules.json')
 
 export default defineNuxtConfig({
@@ -75,7 +78,11 @@ export default defineNuxtConfig({
       demoMode: process.env.NUXT_PUBLIC_DEMO_MODE === 'true',
       // Documentation portal origin used by the in-app help drawer
       // (Fase 5 of issue #75). Empty disables the help button.
-      docsUrl: process.env.NUXT_PUBLIC_DOCS_URL || 'https://docs.dentalpin.com'
+      docsUrl: process.env.NUXT_PUBLIC_DOCS_URL || 'https://docs.dentalpin.com',
+      // Module layers baked into this build. `usePermissions().can()`
+      // hides their permissions while the backend reports the module as
+      // not installed (prod bakes every layer — see Dockerfile.prod).
+      moduleLayers: moduleLayerNames
     }
   },
   srcDir: 'app',
