@@ -80,7 +80,7 @@ First users: `payments` publishes `payment.allocated` and
   its second connection couldn't see), `notifications` never queued the
   welcome message for a patient created through the API, and
   `budget.superseded` had already been worked around by committing before
-  publishing. 24 handlers moved to the transactional contract; the rest are
+  publishing. 23 handlers moved to the transactional contract; the rest are
   payload-only or fire after the publisher commits, and say so in their
   docstring. Three workarounds (`SKIP LOCKED`, the commit-first publish, a
   lock-avoidance flag rationale) went away with them.
