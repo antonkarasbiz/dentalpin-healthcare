@@ -327,6 +327,7 @@ class BudgetWorkflowService:
                 "items": items_snapshot,
                 "occurred_at": datetime.now(UTC).isoformat(),
             },
+            db=db,
         )
 
         return budget
@@ -403,6 +404,7 @@ class BudgetWorkflowService:
                 "rejection_note": note,
                 "occurred_at": datetime.now(UTC).isoformat(),
             },
+            db=db,
         )
 
         return budget
@@ -421,8 +423,8 @@ class BudgetWorkflowService:
         reopen to ``draft`` (issue #162). ``publish_event=False`` is for
         callers that already own the plan transition — namely
         ``TreatmentPlanService.reopen()``, which cancels the budget from
-        inside its own transaction: an echo event there would make the
-        handler write the plan row the publisher holds locked → hang.
+        inside its own transaction: the echoed event would send the plan
+        back through a reopen it is already performing.
         """
         if not BudgetWorkflowService.can_transition(budget.status, "cancelled"):
             raise BudgetWorkflowError(f"Cannot cancel budget from status '{budget.status}'")
@@ -444,9 +446,6 @@ class BudgetWorkflowService:
         await db.flush()
 
         if publish_event:
-            # Safe pre-commit publish: our transaction only holds locks
-            # on budgets/budget_history; the handler writes only the
-            # (long-committed) treatment_plans row.
             plan_id = await BudgetWorkflowService._lookup_plan_id(db, budget.id)
             await event_bus.publish(
                 EventType.BUDGET_CANCELLED,
@@ -460,6 +459,7 @@ class BudgetWorkflowService:
                     "cancelled_by": str(cancelled_by),
                     "occurred_at": datetime.now(UTC).isoformat(),
                 },
+                db=db,
             )
 
         return budget
@@ -608,6 +608,7 @@ class BudgetWorkflowService:
                 "cancelled_at": datetime.now(UTC).isoformat(),
                 "cancelled_by": str(cancelled_by),
             },
+            db=db,
         )
         return budget
 

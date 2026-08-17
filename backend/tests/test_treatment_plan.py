@@ -1400,8 +1400,9 @@ async def test_odontogram_perform_first_cancels_pending_sessions(
         treatment_id = next(
             i["treatment_id"] for i in item_resp.json()["data"]["items"] if i["id"] == item_id
         )
-        # The handler opens its own DB connection — commit the shared test
-        # session so the planned item is visible to it.
+        # The plan handler runs on the publisher's session now (ADR 0019), so
+        # it sees uncommitted rows; the commit only keeps the identity map of
+        # the shared test session honest for the assertions below.
         await db_session.commit()
         r = await client.patch(
             f"/api/v1/odontogram/treatments/{treatment_id}/perform",

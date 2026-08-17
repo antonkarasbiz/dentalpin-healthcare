@@ -560,12 +560,6 @@ async def resend_budget(
     plan_ref = await BudgetWorkflowService._lookup_plan(db, budget.id)
     response = ApiResponse(data=BudgetResponse.model_validate(new_budget))
 
-    # Sole deviation from the publish-before-commit pattern: the
-    # treatment_plan handler must point an FK at the new budget row from
-    # its own session. Published pre-commit, that row is invisible → FK
-    # violation the bus would swallow → relink silently lost. Commit
-    # first (get_db's trailing commit becomes a no-op), then publish.
-    await db.commit()
     if plan_ref is not None:
         await event_bus.publish(
             EventType.BUDGET_SUPERSEDED,
@@ -579,6 +573,7 @@ async def resend_budget(
                 "resent_by": str(ctx.user_id),
                 "occurred_at": datetime.now(UTC).isoformat(),
             },
+            db=db,
         )
     return response
 
