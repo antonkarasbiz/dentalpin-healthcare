@@ -287,6 +287,13 @@ class InvoiceWorkflowService:
             },
         )
 
+        # Anticipos already collected on the quote land on this invoice
+        # now (issue #178). May flip it straight to ``paid``.
+        if invoice.credit_note_for_id is None:
+            from .payment_bridge import sweep_budget_into_invoice
+
+            await sweep_budget_into_invoice(db, invoice=invoice, actor_id=issued_by)
+
         return invoice
 
     @staticmethod

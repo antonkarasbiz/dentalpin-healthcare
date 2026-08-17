@@ -82,7 +82,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 | `patient.created` | `EventType.PATIENT_CREATED` | `patients` | `notifications` |
 | `patient.medical_updated` | `EventType.PATIENT_MEDICAL_UPDATED` | `patients_clinical` | `patient_timeline` |
 | `patient.updated` | `EventType.PATIENT_UPDATED` | `patients` | — |
-| `payment.allocated` | `EventType.PAYMENT_ALLOCATED` | `payments` | — |
+| `payment.allocated` | `EventType.PAYMENT_ALLOCATED` | `payments` | `billing` |
 | `payment.recorded` | `EventType.PAYMENT_RECORDED` | `payments` | — |
 | `payment.refunded` | `EventType.PAYMENT_REFUNDED` | `payments` | `billing` |
 | `payment.voided` | `EventType.PAYMENT_VOIDED` | — | — |
@@ -445,7 +445,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.INVOICE_PAID`
 - **Publishers:**
-  - `billing` — `backend/app/modules/billing/workflow.py:461`
+  - `billing` — `backend/app/modules/billing/workflow.py:468`
 - **Subscribers:**
   - `patient_timeline`
   - `verifactu`
@@ -669,21 +669,22 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.PAYMENT_ALLOCATED`
 - **Publishers:**
-  - `payments` — `backend/app/modules/payments/workflow.py:72`
-- **Subscribers:** —
+  - `payments` — `backend/app/modules/payments/workflow.py:79`
+- **Subscribers:**
+  - `billing`
 
 ### `payment.recorded`
 
 - **Constant:** `EventType.PAYMENT_RECORDED`
 - **Publishers:**
-  - `payments` — `backend/app/modules/payments/workflow.py:168`
+  - `payments` — `backend/app/modules/payments/workflow.py:184`
 - **Subscribers:** —
 
 ### `payment.refunded`
 
 - **Constant:** `EventType.PAYMENT_REFUNDED`
 - **Publishers:**
-  - `payments` — `backend/app/modules/payments/workflow.py:329`
+  - `payments` — `backend/app/modules/payments/workflow.py:362`
 - **Subscribers:**
   - `billing`
 

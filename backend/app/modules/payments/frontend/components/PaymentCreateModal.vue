@@ -103,6 +103,11 @@ function buildInitialForm() {
 
 const form = ref(buildInitialForm())
 const formError = ref<string | null>(null)
+// Where the money goes: 'on_account' | budget id. Drives allocations[0]
+// while the split hasn't been edited by hand (issue #178).
+const primaryTarget = ref<string>(props.defaultBudgetId || 'on_account')
+const patientBudgetCount = ref(0)
+const hasBudgetTargets = computed(() => patientBudgetCount.value > 0 || isBudgetContext.value)
 const isSubmitting = ref(false)
 const showAdvanced = ref(false)
 const showSecondaryMethods = ref(false)
@@ -113,6 +118,7 @@ const amountInputRef = ref<HTMLInputElement | null>(null)
 watch(() => props.open, async (isOpen) => {
   if (isOpen) {
     form.value = buildInitialForm()
+    primaryTarget.value = props.defaultBudgetId || 'on_account'
     formError.value = null
     showAdvanced.value = false
     showSecondaryMethods.value = false
@@ -126,10 +132,21 @@ watch(() => props.open, async (isOpen) => {
 // When the user changes the importe and hasn't manually edited the
 // allocation split, mirror the change into the single allocation so the
 // "Σ = X / Y" mismatch can't lock the submit button silently.
+function soleAllocation(): PaymentAllocationCreate | undefined {
+  if (splitManually.value || form.value.allocations.length !== 1) return undefined
+  return form.value.allocations[0]
+}
+
 watch(() => form.value.amount, (newAmount) => {
-  if (splitManually.value) return
-  if (form.value.allocations.length !== 1) return
-  form.value.allocations[0].amount = Number(newAmount) || 0
+  const sole = soleAllocation()
+  if (sole) sole.amount = Number(newAmount) || 0
+})
+
+watch(primaryTarget, (target) => {
+  const sole = soleAllocation()
+  if (!sole) return
+  sole.target_type = target === 'on_account' ? 'on_account' : 'budget'
+  sole.target_id = target === 'on_account' ? undefined : target
 })
 
 const allocationsSum = computed(() =>
@@ -311,6 +328,30 @@ function handleKeydown(e: KeyboardEvent) {
           </div>
         </div>
 
+        <!-- Destino — a cuenta o presupuesto. Visible siempre: un cobro
+             a cuenta no toca facturas ni presupuestos y el usuario debe
+             saberlo antes de guardar (issue #178). -->
+        <div v-if="!isBudgetContext">
+          <label class="block text-xs text-muted uppercase tracking-wide mb-1">
+            {{ t('payments.target.label') }}
+          </label>
+          <AllocationTargetSelect
+            v-model="primaryTarget"
+            :patient-id="form.patient_id"
+            :disabled="splitManually"
+            @loaded="patientBudgetCount = $event.length"
+          />
+          <p class="mt-1 text-xs text-muted">
+            {{ primaryTarget === 'on_account' ? t('payments.target.onAccountHint') : t('payments.target.budgetHint') }}
+          </p>
+        </div>
+        <div
+          v-else
+          class="text-xs text-muted"
+        >
+          {{ t('payments.target.lockedBudget', { budget: budgetLabel || '' }) }}
+        </div>
+
         <!-- Método — chips. One tap, no dropdown. -->
         <div>
           <label class="block text-xs text-muted uppercase tracking-wide mb-2">
@@ -440,17 +481,19 @@ function handleKeydown(e: KeyboardEvent) {
                   v-model="a.target_type"
                   :items="[
                     { label: t('payments.new.allocationOnAccount'), value: 'on_account' },
-                    { label: t('payments.new.allocationToBudget'), value: 'budget' }
+                    { label: t('payments.new.allocationToBudget'), value: 'budget', disabled: !hasBudgetTargets }
                   ]"
                   class="w-40"
                   :disabled="idx === 0 && isBudgetContext"
                 />
-                <UInput
+                <AllocationTargetSelect
                   v-if="a.target_type === 'budget'"
-                  v-model="a.target_id"
-                  :placeholder="budgetLabel || 'budget_id'"
+                  :model-value="a.target_id || ''"
+                  :patient-id="form.patient_id"
                   :disabled="idx === 0 && isBudgetContext"
+                  budgets-only
                   class="flex-1"
+                  @update:model-value="a.target_id = $event; splitManually = true"
                 />
                 <UInput
                   v-model.number="a.amount"

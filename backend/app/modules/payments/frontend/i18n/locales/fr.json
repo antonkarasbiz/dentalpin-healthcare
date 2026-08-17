@@ -215,7 +215,8 @@
         },
         "rowMenu": {
           "detail": "Voir le détail",
-          "refund": "Rembourser"
+          "refund": "Rembourser",
+          "reallocate": "Affecter à un devis…"
         }
       },
       "refundModal": {
@@ -282,6 +283,21 @@
         "viewPayments": "Voir les paiements de la période",
         "viewPatients": "Voir les patients endettés"
       }
+    },
+    "target": {
+      "label": "Affectation",
+      "placeholder": "Choisir la destination",
+      "onAccount": "Acompte patient",
+      "onAccountHint": "Reste en acompte au crédit du patient. Il n'est imputé à aucune facture ni devis tant que vous ne l'affectez pas.",
+      "budgetHint": "Sera imputé à ce devis et à ses factures émises.",
+      "lockedBudget": "Sera imputé au devis {budget} et à ses factures."
+    },
+    "reallocate": {
+      "title": "Affecter à un devis",
+      "hint": "Le paiement de {amount} sera intégralement affecté au devis choisi et à ses factures émises.",
+      "submit": "Affecter",
+      "success": "Paiement affecté au devis",
+      "error": "Impossible de réaffecter le paiement. Réessayez."
     }
   }
 }

@@ -14,7 +14,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/patients/router.py
   - backend/app/modules/patients/frontend/pages/patients/[id].vue
-last_verified_commit: 7ead18e
+last_verified_commit: 4752264
 ---
 
 # Patient detail
@@ -89,9 +89,14 @@ a **Pending to charge** card at the top.
   haven't covered yet (FIFO).
 - Total equals `clinic_receivable = earned − net_paid`.
 - The **Collect X €** button opens the payment modal with the amount
-  pre-filled; reception just picks the method and confirms.
+  pre-filled; reception picks the method and the **Apply to** target
+  (an open quote or *on account*) and confirms. On-account money
+  touches neither invoices nor quotes; the modal says so.
 - After the payment is recorded, the card disappears (or shrinks)
   depending on how much was collected.
+- Each payment in the timeline has a row menu: **View detail**,
+  **Assign to quote…** (moves an on-account deposit to the chosen
+  quote and, if it has issued invoices, applies it) and **Refund**.
 
 ## "Do not contact"
 

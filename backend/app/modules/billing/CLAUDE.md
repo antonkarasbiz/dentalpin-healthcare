@@ -8,7 +8,8 @@ Routes mounted at `/api/v1/billing/`.
 
 ## Dependencies
 
-`manifest.depends = ["patients", "catalog", "budget"]`.
+`manifest.depends = ["patients", "catalog", "budget", "payments"]`
+(billing → payments only; see ADR 0010).
 
 ## Permissions
 
@@ -37,10 +38,14 @@ by tests in `tests/test_module_tools.py`.
 
 ## Events consumed
 
-- _none today_. The legacy ``budget.completed`` subscription was
-  removed in 2026-04 — that event was never actually published, so
-  the handler was orphaned. Re-add a subscription here when invoices
-  need to react to budget lifecycle events again.
+| Event | Handler | Mode | Effect |
+|---|---|---|---|
+| `payment.allocated` | `events.py:on_payment_allocated` | transactional (ADR 0019) | `payment_bridge.reconcile_payment` — mirror the payment's budget allocations onto `invoice_payments` of that budget's open invoices (FIFO, preferred invoice first via `context.prefer_invoice_id`), unlink LIFO on reallocation, recompute status. Issue #178. |
+| `payment.refunded` | `events.py:on_payment_refunded` | transactional | Recompute status of invoices linked to the refunded payment. |
+| `clinic.created` | `events.py:on_clinic_created` | own session | Default `FAC` / `RECT` series. |
+
+The legacy ``budget.completed`` subscription was removed in 2026-04 —
+that event was never published.
 
 ## Lifecycle
 
@@ -67,11 +72,27 @@ by tests in `tests/test_module_tools.py`.
   `items[].global_discount_share` from the budget API.
 - **Credit notes** are issued via the same workflow as invoices,
   flagged via the document type. Don't introduce a parallel pipeline.
+- **Budget ↔ invoice bridge (`payment_bridge.py`, issue #178).** One
+  rule: money allocated to a budget is money for that budget's
+  invoices. Three entry points, all in-tx: the `payment.allocated`
+  subscriber, `issue_invoice` (sweeps anticipos already collected on
+  the quote into the fresh invoice — it may be born `paid`), and the
+  orchestrator `POST /invoices/{id}/payments` (allocates to
+  `invoice.budget_id` when set, `on_account` + explicit link for manual
+  invoices). `reconcile_payment` is idempotent (objective − current);
+  never write `invoice_payments` for a from-budget invoice anywhere
+  else. Lock order is **budget row → invoice rows** (`lock_budget`).
+- **`compute_paid_summary` is the only paid arithmetic.** Refunds are
+  subtracted proportionally there; any other surface (reports' patient
+  summary, lists) must reuse it / `compute_paid_summaries_for_invoices`
+  instead of summing `invoice_payments.amount` raw.
 
 ## Related ADRs
 
 - `docs/adr/0001-modular-plugin-architecture.md`
 - `docs/adr/0003-event-bus-over-direct-imports.md`
+- `docs/adr/0010-payments-as-primitive-module.md`
+- `docs/adr/0019-transactional-event-handlers.md`
 
 ## CHANGELOG
 

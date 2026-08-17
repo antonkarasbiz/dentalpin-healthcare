@@ -2,7 +2,7 @@ import { PERMISSIONS } from '~/config/permissions'
 
 export function usePermissions() {
   const auth = useAuth()
-  const permissions = computed<string[]>(() => auth.permissions.value ?? [])
+  const permissions = computed<readonly string[]>(() => auth.permissions.value ?? [])
 
   // Layers baked into this build vs modules the backend reports as
   // installed. `/me` grants permissions for every *registered* module

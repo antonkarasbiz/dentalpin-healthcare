@@ -14,6 +14,7 @@
  */
 
 import type { PatientExtended, PatientLedger, PatientLedgerEntry, PaymentMethod } from '~~/app/types'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { TotalLine } from '~~/app/components/shared/EntityTotalsCard.vue'
 import type { SemanticRole } from '~~/app/config/severity'
 import { PERMISSIONS } from '~~/app/config/permissions'
@@ -47,6 +48,8 @@ const loadError = ref(false)
 const showCobrar = ref(false)
 const showRefund = ref(false)
 const refundTarget = ref<{ id: string, amount: number, method: PaymentMethod } | null>(null)
+const showReallocate = ref(false)
+const reallocateTarget = ref<{ id: string, amount: number } | null>(null)
 const prefilledCobrarAmount = ref<number | null>(null)
 
 const canCollect = computed(() => can(PERMISSIONS.payments.recordWrite))
@@ -226,13 +229,23 @@ function openRefund(entry: PatientLedgerEntry) {
 
 function rowMenuItems(entry: PatientLedgerEntry) {
   if (entry.entry_type !== 'payment') return []
-  const items: Array<{ label: string, icon: string, to?: string, onSelect?: () => void, color?: string }> = [
+  const items: DropdownMenuItem[] = [
     {
       label: t('payments.patientPanel.timeline.rowMenu.detail'),
       icon: 'i-lucide-eye',
       to: `/payments/${entry.reference_id}`
     }
   ]
+  if (canCollect.value) {
+    items.push({
+      label: t('payments.patientPanel.timeline.rowMenu.reallocate'),
+      icon: 'i-lucide-file-check',
+      onSelect: () => {
+        reallocateTarget.value = { id: entry.reference_id, amount: Number(entry.amount) }
+        showReallocate.value = true
+      }
+    })
+  }
   if (canRefund.value) {
     items.push({
       label: t('payments.patientPanel.timeline.rowMenu.refund'),
@@ -496,6 +509,15 @@ function handleRefunded() {
       :default-amount="refundTarget.amount"
       :default-method="refundTarget.method"
       @refunded="handleRefunded"
+    />
+
+    <PaymentReallocateModal
+      v-if="reallocateTarget"
+      v-model:open="showReallocate"
+      :payment-id="reallocateTarget.id"
+      :patient-id="ctx.patientId"
+      :amount="reallocateTarget.amount"
+      @reallocated="refresh"
     />
   </div>
 </template>

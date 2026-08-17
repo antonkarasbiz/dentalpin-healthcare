@@ -36,7 +36,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/[id]/index.vue
   - backend/app/modules/billing/router.py
-last_verified_commit: b1b82f5
+last_verified_commit: 4752264
 ---
 
 # Detalle de factura
@@ -53,8 +53,14 @@ se emite un abono.
   dirección fiscal y serie + número (en `issued`). Si el pagador no
   es el paciente se ve un chip *Pagador distinto*.
 - **Cobros enlazados.** Listado de `invoice_payments` con importe y
-  método. La factura no tiene un *Cobrar* propio: para cobrar, usa
-  el módulo `payments` y enlaza el cobro a la factura.
+  método, y el botón **Cobrar** (facturas `issued`/`partial`). El
+  cobro se registra en el módulo `payments` y se enlaza aquí en la
+  misma operación. Si la factura nació de un presupuesto, el cobro
+  se asigna a ese presupuesto: la tarjeta *Cobrado* del presupuesto
+  y la ficha del paciente lo reflejan al instante. Al revés también:
+  cobrar desde el presupuesto imputa a sus facturas emitidas, y al
+  emitir una factura desde un presupuesto ya cobrado (anticipo) la
+  factura nace `paid`.
 - **PDF.** Dos formatos: borrador (vista previa con marca de agua)
   y definitivo (solo desde `issued`). El PDF se genera con
   WeasyPrint.
@@ -111,6 +117,7 @@ se emite un abono.
 - **VeriFactu en `rejected`.** Mira el panel lateral o el módulo
   `verifactu` para el motivo. Suele requerir editar datos del
   emisor o del receptor y reenviar manualmente.
-- **Falta el botón *Cobrar*.** No vive aquí. Crea el cobro desde
-  `/payments` (o desde la ficha del paciente) y asígnalo a esta
-  factura mediante `invoice_payments`.
+- **Cobré desde la ficha del paciente y la factura sigue sin cobrar.**
+  El cobro quedó *a cuenta* (sin presupuesto). En Administración →
+  Pagos usa **Asignar a presupuesto…** sobre ese cobro; si la factura
+  viene de ese presupuesto, se imputa sola.

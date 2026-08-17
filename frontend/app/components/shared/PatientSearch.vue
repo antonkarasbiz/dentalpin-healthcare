@@ -111,8 +111,9 @@ function handleKeydown(event: KeyboardEvent) {
       break
     case 'Enter':
       event.preventDefault()
-      if (highlightedIndex.value >= 0 && patients.value[highlightedIndex.value]) {
-        selectPatient(patients.value[highlightedIndex.value])
+      {
+        const highlighted = patients.value[highlightedIndex.value]
+        if (highlighted) selectPatient(highlighted)
       }
       break
     case 'Escape':

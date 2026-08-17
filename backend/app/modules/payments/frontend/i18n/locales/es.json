@@ -215,7 +215,8 @@
         },
         "rowMenu": {
           "detail": "Ver detalle",
-          "refund": "Reembolsar"
+          "refund": "Reembolsar",
+          "reallocate": "Asignar a presupuesto…"
         }
       },
       "refundModal": {
@@ -282,6 +283,21 @@
         "viewPayments": "Ver cobros del periodo",
         "viewPatients": "Ver pacientes con deuda"
       }
+    },
+    "target": {
+      "label": "Destino",
+      "placeholder": "Selecciona destino",
+      "onAccount": "A cuenta del paciente",
+      "onAccountHint": "Queda como saldo a cuenta del paciente. No se imputa a ninguna factura ni presupuesto hasta que lo asignes.",
+      "budgetHint": "Se imputará a este presupuesto y a sus facturas emitidas.",
+      "lockedBudget": "Se imputará al presupuesto {budget} y a sus facturas."
+    },
+    "reallocate": {
+      "title": "Asignar a presupuesto",
+      "hint": "El cobro de {amount} pasará íntegro al presupuesto elegido y a sus facturas emitidas.",
+      "submit": "Asignar",
+      "success": "Cobro asignado al presupuesto",
+      "error": "No se pudo reasignar el cobro. Intenta de nuevo."
     }
   }
 }

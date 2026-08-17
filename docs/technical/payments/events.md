@@ -13,10 +13,12 @@ Per-module slice of [`docs/events-catalog.md`](../../events-catalog.md)
 | Event | When | Consumers |
 |-------|------|-----------|
 | `payment.recorded` | A payment is registered | — |
-| `payment.allocated` | An allocation is created or moved (create / reallocate) | — |
-| `payment.refunded` | A refund is registered against a payment | billing (invoice status recompute) |
+| `payment.allocated` | An allocation is created or moved (create / reallocate). **Published transactionally** (`db=db`, ADR 0019). | billing (`payment_bridge.reconcile_payment` — mirrors budget allocations onto the budget's invoices) |
+| `payment.refunded` | A refund is registered against a payment. **Published transactionally**. | billing (invoice status recompute, in-tx) |
 
-Payload shapes are documented in the module `CLAUDE.md`.
+Payload shapes are documented in the module `CLAUDE.md`. `payment.allocated`
+carries an opaque `context` dict echoed from `record_payment(context=...)`;
+payments never reads it (billing uses `context.prefer_invoice_id`).
 
 ## Subscribed
 
@@ -45,7 +47,8 @@ rows (plain unique constraints treat NULLs as distinct — `pay_0004`).
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method (after `flush`; pass `db=db` if a
+   subscriber must react inside your transaction — ADR 0019).
 3. Add the row to the table(s) above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.

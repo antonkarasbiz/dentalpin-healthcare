@@ -68,8 +68,8 @@ returning. Enforced by tests in `tests/test_module_tools.py`.
 ## Events emitted
 
 - `payment.recorded` — payload `{clinic_id, payment_id, patient_id, amount, currency, method, payment_date, occurred_at}`.
-- `payment.allocated` — payload `{clinic_id, payment_id, allocation_id, target_type, target_id, amount, previous_target_type, previous_target_id, occurred_at}`. Fired on create and on reallocate.
-- `payment.refunded` — payload `{clinic_id, payment_id, refund_id, amount, reason_code, occurred_at}`.
+- `payment.allocated` — payload `{clinic_id, payment_id, patient_id, actor_id, allocation_id, target_type, target_id, amount, previous_target_type, previous_target_id, context, occurred_at}`. Fired once per allocation row on create and on reallocate. **Published transactionally** (`db=db`, ADR 0019): billing's `payment_bridge` runs inside the same session and mirrors budget allocations onto the budget's invoices — a failure there rolls the payment back. `context` is an opaque dict echoed from `record_payment(context=...)`; this module never reads it.
+- `payment.refunded` — payload `{clinic_id, payment_id, refund_id, amount, reason_code, refunded_by, occurred_at}`. **Published transactionally** (billing recomputes invoice status in-tx).
 
 ## Events consumed
 
@@ -96,7 +96,7 @@ partial index `uq_earned_treatment_null_session` (NULL rows, `pay_0004`
 |---|---|---|
 | `budget.detail.sidebar` | `BudgetPaymentsCard` (cobrado / pendiente / allocations + "Cobrar" CTA) | `payments.record.read` |
 | `reports.categories` | `PaymentsReportEntry` (card on `/reports` linking to `/reports/payments`) | `payments.reports.read` |
-| `patient.detail.administracion.payments` | `PatientPaymentsPanel` (patient ledger inside the Administración tab — KPIs + timeline + refund row menu + "Pendiente de cobrar" card) | `payments.record.read` |
+| `patient.detail.administracion.payments` | `PatientPaymentsPanel` (patient ledger inside the Administración tab — KPIs + timeline + row menu with refund / "Asignar a presupuesto…" (`PaymentReallocateModal` → `/reallocate`) + "Pendiente de cobrar" card) | `payments.record.read` |
 
 Registered in `frontend/plugins/slots.client.ts`. Cards receive `ctx`
 from the host page (`{ budget }`, `{ patient, patientId }`) and never
@@ -124,7 +124,15 @@ the public endpoints.
 - **Allocations sum invariant** is enforced in the service, not the DB.
   Schemas validate at the boundary so 4xx never reach the workflow.
 - **Cross-clinic budgets** are rejected by the workflow. UI must filter
-  budget pickers to current clinic.
+  budget pickers to current clinic — `AllocationTargetSelect` lists the
+  patient's accepted/completed budgets from `/api/v1/budgets` (issue
+  #178: never ask reception for a UUID).
+- **`on_account` is unlinked by design.** An anticipo touches neither
+  invoices nor budgets until reassigned; the create modal says so
+  under "Destino" and the ledger offers "Asignar a presupuesto…". Money
+  allocated to a **budget** *is* mirrored onto that budget's invoices by
+  billing (transactional `payment.allocated` subscriber) — that is
+  billing's concern, this module only publishes.
 - **`Clinic.currency` snapshot.** Payments capture the clinic currency
   at write time. If a clinic ever switches currency, historical
   payments stay in the old one (correct behaviour).
@@ -134,6 +142,7 @@ the public endpoints.
 - `docs/adr/0001-modular-plugin-architecture.md`
 - `docs/adr/0003-event-bus-over-direct-imports.md`
 - `docs/adr/0010-payments-as-primitive-module.md`
+- `docs/adr/0019-transactional-event-handlers.md`
 
 ## CHANGELOG
 

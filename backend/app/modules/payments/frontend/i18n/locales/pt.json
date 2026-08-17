@@ -215,7 +215,8 @@
         },
         "rowMenu": {
           "detail": "Ver detalhe",
-          "refund": "Reembolsar"
+          "refund": "Reembolsar",
+          "reallocate": "Atribuir a orçamento…"
         }
       },
       "refundModal": {
@@ -282,6 +283,21 @@
         "viewPayments": "Ver pagamentos do período",
         "viewPatients": "Ver pacientes com dívida"
       }
+    },
+    "target": {
+      "label": "Destino",
+      "placeholder": "Selecionar destino",
+      "onAccount": "Por conta do paciente",
+      "onAccountHint": "Fica como saldo por conta do paciente. Não é imputado a nenhuma fatura nem orçamento até o atribuir.",
+      "budgetHint": "Será imputado a este orçamento e às suas faturas emitidas.",
+      "lockedBudget": "Será imputado ao orçamento {budget} e às suas faturas."
+    },
+    "reallocate": {
+      "title": "Atribuir a orçamento",
+      "hint": "O pagamento de {amount} passará integralmente para o orçamento escolhido e as suas faturas emitidas.",
+      "submit": "Atribuir",
+      "success": "Pagamento atribuído ao orçamento",
+      "error": "Não foi possível reatribuir o pagamento. Tente novamente."
     }
   }
 }
