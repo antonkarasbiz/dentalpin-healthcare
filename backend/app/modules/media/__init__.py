@@ -5,10 +5,10 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType
 from app.core.plugins import BaseModule
-from app.database import async_session_maker
 
 from .models import Document, MediaAttachment
 from .router import router
@@ -67,13 +67,14 @@ class MediaModule(BaseModule):
             EventType.PATIENT_ARCHIVED: self._on_patient_archived,
         }
 
-    async def _on_patient_archived(self, data: dict) -> None:
+    async def _on_patient_archived(self, data: dict, *, db: AsyncSession) -> None:
         """Cascade soft-archive of a patient's documents when they are
         archived.
 
-        The event bus calls handlers as ``handler(data)`` and publishes
-        before the request commits, so this opens its own session and
-        commits independently (same pattern as the recalls handler).
+        Transactional (ADR 0019): the cascade is part of archiving the
+        patient. On its own session it committed independently, so a request
+        that failed after the publish left the documents archived under a
+        patient that never was (issue #183).
         """
         patient_id = data.get("patient_id")
         clinic_id = data.get("clinic_id")
@@ -84,12 +85,6 @@ class MediaModule(BaseModule):
             )
             return
 
-        async with async_session_maker() as db:
-            try:
-                await DocumentService.archive_patient_documents(
-                    db, UUID(str(clinic_id)), UUID(str(patient_id))
-                )
-                await db.commit()
-            except Exception as exc:
-                logger.error("media._on_patient_archived failed: %s", exc, exc_info=True)
-                await db.rollback()
+        await DocumentService.archive_patient_documents(
+            db, UUID(str(clinic_id)), UUID(str(patient_id))
+        )

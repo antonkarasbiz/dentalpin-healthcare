@@ -366,14 +366,19 @@ async def test_event_bus_dispatch_reaches_handler(
 ):
     """Regression: the bus calls ``handler(data)`` — one arg. Handlers must
     match this signature. This test would have caught the old
-    ``(self, db, data)`` bug."""
+    ``(self, db, data)`` bug.
+
+    ``db=`` is required because other modules subscribe to this event
+    transactionally (ADR 0019); timeline's own handlers stay own-session and
+    ignore it.
+    """
     payload = {
         **_base_payload(test_clinic, test_patient),
         "appointment_id": str(uuid4()),
         "treatment_type": "Revisión",
         "end_time": datetime.now(UTC).isoformat(),
     }
-    await event_bus.publish(EventType.APPOINTMENT_COMPLETED, payload)
+    await event_bus.publish(EventType.APPOINTMENT_COMPLETED, payload, db=db_session)
 
     # ``publish`` awaits every subscriber inline, so the timeline row
     # is already written by the time we get here.

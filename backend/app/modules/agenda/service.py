@@ -508,6 +508,7 @@ class AppointmentService:
                 "treatment_type": appointment.treatment_type,
                 "cabinet": appointment.cabinet,
             },
+            db=db,
         )
 
         await db.refresh(appointment, ["patient", "professional", "treatments"])
@@ -735,7 +736,7 @@ class AppointmentService:
             "no_show": EventType.APPOINTMENT_NO_SHOW,
         }.get(to_status)
         if specific is not None:
-            await event_bus.publish(specific, payload)
+            await event_bus.publish(specific, payload, db=db)
 
         return appointment
 

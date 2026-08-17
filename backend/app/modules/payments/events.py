@@ -19,6 +19,12 @@ calls ``perform(publish_price=False)`` so the performed event carries
 ``unit_price: None`` (skipped below); when the odontogram performs
 first, treatment_plan cancels the item's pending sessions so session
 events can never fire on top of the NULL row.
+
+Both handlers are **transactional** (ADR 0019): revenue is booked in the
+same transaction as the treatment that earned it. On their own session they
+committed independently, so a request that failed after the publish left an
+earned entry for a treatment that never existed — and ``treatment_id``
+carries no FK to stop it (issue #183).
 """
 
 from __future__ import annotations
@@ -30,8 +36,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-from app.database import async_session_maker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import PatientEarnedEntry
 
@@ -73,6 +78,7 @@ async def _upsert_earned_entry(
     data: dict[str, Any],
     source_event: str,
     *,
+    db: AsyncSession,
     source_session_id: UUID | None = None,
     amount_override: Any = None,
     description: str | None = None,
@@ -109,39 +115,33 @@ async def _upsert_earned_entry(
     catalog_item_id = _parse_uuid(data.get("catalog_item_id"))
     professional_id = _parse_uuid(data.get("performed_by") or data.get("professional_id"))
 
-    async with async_session_maker() as db:
-        try:
-            stmt = (
-                pg_insert(PatientEarnedEntry)
-                .values(
-                    clinic_id=clinic_id,
-                    patient_id=patient_id,
-                    treatment_id=treatment_id,
-                    catalog_item_id=catalog_item_id,
-                    source_session_id=source_session_id,
-                    description=description,
-                    amount=amount,
-                    performed_at=performed_at,
-                    professional_id=professional_id,
-                    source_event=source_event,
-                )
-                # Bare form: swallows conflicts on the composite constraint
-                # AND the partial NULL-session index alike.
-                .on_conflict_do_nothing()
-            )
-            await db.execute(stmt)
-            await db.commit()
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.error("Failed to upsert PatientEarnedEntry: %s", exc, exc_info=True)
-            await db.rollback()
+    stmt = (
+        pg_insert(PatientEarnedEntry)
+        .values(
+            clinic_id=clinic_id,
+            patient_id=patient_id,
+            treatment_id=treatment_id,
+            catalog_item_id=catalog_item_id,
+            source_session_id=source_session_id,
+            description=description,
+            amount=amount,
+            performed_at=performed_at,
+            professional_id=professional_id,
+            source_event=source_event,
+        )
+        # Bare form: swallows conflicts on the composite constraint
+        # AND the partial NULL-session index alike.
+        .on_conflict_do_nothing()
+    )
+    await db.execute(stmt)
 
 
-async def on_treatment_performed(data: dict[str, Any]) -> None:
+async def on_treatment_performed(data: dict[str, Any], *, db: AsyncSession) -> None:
     """Handler for ``odontogram.treatment.performed`` (single-session row)."""
-    await _upsert_earned_entry(data, source_event="odontogram.treatment.performed")
+    await _upsert_earned_entry(data, source_event="odontogram.treatment.performed", db=db)
 
 
-async def on_session_completed(data: dict[str, Any]) -> None:
+async def on_session_completed(data: dict[str, Any], *, db: AsyncSession) -> None:
     """Handler for ``treatment_plan.item_session_completed``.
 
     Books a per-session earned row keyed on ``(treatment_id,
@@ -154,6 +154,7 @@ async def on_session_completed(data: dict[str, Any]) -> None:
     await _upsert_earned_entry(
         data,
         source_event="treatment_plan.item_session_completed",
+        db=db,
         source_session_id=session_id,
         amount_override=data.get("amount"),
         description=description if isinstance(description, str) else None,

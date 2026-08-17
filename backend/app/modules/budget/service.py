@@ -809,21 +809,6 @@ class BudgetService:
         budget.total_tax = total_tax
         budget.total = items_total - global_discount
 
-    @staticmethod
-    async def on_treatment_performed(data: dict) -> None:
-        """Event handler for when a treatment is performed in odontogram.
-
-        Updates the linked budget item status if applicable.
-        """
-        # This will be called by the event bus when odontogram.treatment.performed is published
-        budget_item_id = data.get("budget_item_id")
-        if not budget_item_id:
-            return
-
-        # Get DB session from context (this would need to be passed differently in real impl)
-        # For now, this is a placeholder for the event handler
-        pass
-
 
 class BudgetHistoryService:
     """Service for budget history/audit operations."""

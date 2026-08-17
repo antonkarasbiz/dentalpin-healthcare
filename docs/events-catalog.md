@@ -76,7 +76,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 | `odontogram.tooth.updated` | `EventType.ODONTOGRAM_TOOTH_UPDATED` | `odontogram` | — |
 | `odontogram.treatment.added` | `EventType.ODONTOGRAM_TREATMENT_ADDED` | `odontogram` | — |
 | `odontogram.treatment.deleted` | `EventType.ODONTOGRAM_TREATMENT_DELETED` | `odontogram` | — |
-| `odontogram.treatment.performed` | `EventType.ODONTOGRAM_TREATMENT_PERFORMED` | `odontogram` | `budget`, `patient_timeline`, `payments`, `periodontogram`, `treatment_plan` |
+| `odontogram.treatment.performed` | `EventType.ODONTOGRAM_TREATMENT_PERFORMED` | `odontogram` | `patient_timeline`, `payments`, `periodontogram`, `treatment_plan` |
 | `odontogram.treatment.status_changed` | `EventType.ODONTOGRAM_TREATMENT_STATUS_CHANGED` | `odontogram` | — |
 | `patient.archived` | `EventType.PATIENT_ARCHIVED` | `patients` | `media`, `periodontogram`, `recalls` |
 | `patient.created` | `EventType.PATIENT_CREATED` | `patients` | `notifications` |
@@ -114,7 +114,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.AGENDA_VISIT_NOTE_UPDATED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:859`
+  - `agenda` — `backend/app/modules/agenda/service.py:860`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -122,14 +122,14 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_CABINET_CHANGED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:796`
+  - `agenda` — `backend/app/modules/agenda/service.py:797`
 - **Subscribers:** —
 
 ### `appointment.cancelled`
 
 - **Constant:** `EventType.APPOINTMENT_CANCELLED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:734`
+  - `agenda` — `backend/app/modules/agenda/service.py:735`
 - **Subscribers:**
   - `copilot`
   - `notifications`
@@ -141,7 +141,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_CHECKED_IN`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:731`
+  - `agenda` — `backend/app/modules/agenda/service.py:732`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -149,7 +149,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_COMPLETED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:733`
+  - `agenda` — `backend/app/modules/agenda/service.py:734`
 - **Subscribers:**
   - `patient_timeline`
   - `recalls`
@@ -159,7 +159,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_CONFIRMED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:730`
+  - `agenda` — `backend/app/modules/agenda/service.py:731`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -167,7 +167,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_IN_TREATMENT`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:732`
+  - `agenda` — `backend/app/modules/agenda/service.py:733`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -175,7 +175,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_NO_SHOW`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:735`
+  - `agenda` — `backend/app/modules/agenda/service.py:736`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -194,14 +194,14 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.APPOINTMENT_STATUS_CHANGED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:725`
+  - `agenda` — `backend/app/modules/agenda/service.py:726`
 - **Subscribers:** —
 
 ### `appointment.updated`
 
 - **Constant:** `EventType.APPOINTMENT_UPDATED`
 - **Publishers:**
-  - `agenda` — `backend/app/modules/agenda/service.py:626`
+  - `agenda` — `backend/app/modules/agenda/service.py:627`
 - **Subscribers:**
   - `schedules`
 
@@ -610,7 +610,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.ODONTOGRAM_TREATMENT_DELETED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:887`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:888`
 - **Subscribers:** —
 
 ### `odontogram.treatment.performed`
@@ -619,7 +619,6 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 - **Publishers:**
   - `odontogram` — `backend/app/modules/odontogram/service.py:828`
 - **Subscribers:**
-  - `budget`
   - `patient_timeline`
   - `payments`
   - `periodontogram`
@@ -751,7 +750,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_BUDGET_SYNC_REQUESTED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1291`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1292`
 - **Subscribers:**
   - `budget`
 
@@ -759,7 +758,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_CLOSED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1773`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1774`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -767,7 +766,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_CONFIRMED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1633`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1634`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -783,7 +782,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_ITEM_COMPLETED_WITHOUT_NOTE`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1001`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1002`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -806,7 +805,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.TREATMENT_PLAN_REACTIVATED`
 - **Publishers:**
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1819`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:1820`
 - **Subscribers:**
   - `patient_timeline`
 
@@ -830,7 +829,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 - **Constant:** `EventType.TREATMENT_PLAN_TREATMENT_COMPLETED`
 - **Publishers:**
   - `treatment_plan` — `backend/app/modules/treatment_plan/events.py:88`
-  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:986`
+  - `treatment_plan` — `backend/app/modules/treatment_plan/service.py:987`
 - **Subscribers:**
   - `patient_timeline`
   - `recalls`
