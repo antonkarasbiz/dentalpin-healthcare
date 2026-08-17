@@ -29,5 +29,7 @@ in v1. (Every tool call is already recorded in `agent_audit_logs`.)
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from the router/service after the DB commit succeeds.
+2. Publish from a service method after `flush()` — the bus runs handlers
+   inline, *before* the request commits. Pass `db=db` so transactional
+   subscribers can join the transaction (ADR 0019, issue #183).
 3. Add a row above and re-run `python backend/scripts/generate_catalogs.py`.

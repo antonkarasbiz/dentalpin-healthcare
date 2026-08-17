@@ -28,17 +28,24 @@ treatment_plan models (ADR 0003). It is `null` for standalone budgets.
 
 ## Subscribed
 
+All three run **transactionally** (ADR 0019): they declare `db` and mirror
+the plan inside the publisher's transaction, so a failed mirror fails the
+request instead of quietly dropping a line (issue #183).
+
 | Event | Handler | Effect |
 |-------|---------|--------|
-| `odontogram.treatment.performed` | `__init__.py` → `BudgetService.on_treatment_performed` | Mark matching line items done. |
 | `treatment_plan.budget_sync_requested` | `__init__.py::_on_sync_requested` | Rebuild draft-budget lines from the snapshot payload. |
 | `treatment_plan.treatment_added` | `__init__.py::_on_treatment_added_to_plan` | Add matching line to the linked draft budget (no-op on non-draft). |
 | `treatment_plan.treatment_removed` | `__init__.py::_on_treatment_removed_from_plan` | Remove matching line from the linked draft budget. |
 
+`odontogram.treatment.performed` used to appear here; the handler was a
+`pass` placeholder and was removed in #183.
+
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method, after `flush` — and pass `db=db` so
+   transactional subscribers can join the transaction (ADR 0019).
 3. Add the row to the table(s) above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.

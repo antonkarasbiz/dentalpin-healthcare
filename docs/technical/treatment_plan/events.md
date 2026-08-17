@@ -31,12 +31,16 @@ resulting `odontogram.treatment.performed` carries `unit_price: null`
 
 ## Subscribed
 
+Every handler is **transactional** (ADR 0019): it declares `db` and runs in
+the publisher's session, so plan and budget move together or not at all
+(issue #183).
+
 | Event | Handler | Effect |
 |-------|---------|--------|
 | `appointment.completed` | `events.py::on_appointment_completed` | Mark planned items as performed if linked. |
 | `budget.accepted` | `events.py::on_budget_accepted` | pending → active; also closed(`rejected_by_patient`) → active when the patient accepts a resent version (issue #162). On either transition the item's **pending** sessions are rescaled to the payload's `items[].net_amount` (matched by `treatment_id`) so the earned ledger books the discounted price the patient signed (issue #167). Idempotent (already-active plans are left untouched). |
 | `budget.rejected` | `events.py::on_budget_rejected` | pending → closed (`closure_reason=rejected_by_patient`). |
-| `budget.renegotiated` | `events.py::on_budget_renegotiated` | pending → draft via `reopen_from_budget` (never writes the budget row — the publisher's open transaction holds it locked). |
+| `budget.renegotiated` | `events.py::on_budget_renegotiated` | pending → draft via `reopen_from_budget` (never writes the budget row — the publisher is already cancelling it, and an echoed `budget.cancelled` would loop back here). |
 | `budget.cancelled` | `events.py::on_budget_cancelled` | pending → draft via `reopen_from_budget` (issue #162). No-op without `plan_id` (standalone budget). |
 | `budget.superseded` | `events.py::on_budget_superseded` | Repoint `plan.budget_id` to the resent version — only while the plan still points at the superseded budget (idempotent). Status untouched. |
 | `odontogram.treatment.performed` | `events.py::on_treatment_performed` | Mark the matching pending item completed **and cancel its pending sessions** (no session events) — the performed event already carried the full price to payments; a later session completion would book the same money twice. |
@@ -44,7 +48,9 @@ resulting `odontogram.treatment.performed` carries `unit_price: null`
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method after `flush()` — the bus runs handlers
+   inline, *before* the request commits. Pass `db=db` so transactional
+   subscribers can join the transaction (ADR 0019, issue #183).
 3. Add the row to the table(s) above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.

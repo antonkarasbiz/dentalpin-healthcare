@@ -25,6 +25,10 @@ Published by the gateway (`gateway.py`) across the outbox lifecycle:
 
 ## Subscribed
 
+All six are **transactional** (ADR 0019): they queue a `CommunicationMessage`
+on the publisher's session inside a savepoint, and the outbox tick does the
+sending. A rolled-back request queues nothing (issue #183).
+
 | Event | Handler | Effect |
 |-------|---------|--------|
 | `appointment.scheduled` | `handlers.on_appointment_scheduled` | Enqueue `appointment_confirmation`. |
@@ -37,7 +41,9 @@ Published by the gateway (`gateway.py`) across the outbox lifecycle:
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method after `flush()` — the bus runs handlers
+   inline, *before* the request commits. Pass `db=db` so transactional
+   subscribers can join the transaction (ADR 0019, issue #183).
 3. Add the row to the table(s) above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.

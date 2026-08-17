@@ -38,7 +38,9 @@ react to in-progress drafts.
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`)
    if a new event type is required.
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method after `flush()` — the bus runs handlers
+   inline, *before* the request commits. Pass `db=db` so transactional
+   subscribers can join the transaction (ADR 0019, issue #183).
 3. Add a row to the table above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.
