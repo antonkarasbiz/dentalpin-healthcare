@@ -734,6 +734,42 @@ bus raises `RuntimeError` at publish time. Reference implementation:
 `payments` publishes `payment.allocated` / `payment.refunded` with `db`,
 `billing/events.py` consumes them transactionally.
 
+**Which one does your handler need?** (audit of every handler: issue #183)
+
+Ask: *does it read or write state that depends on what the publisher just
+wrote in this request?*
+
+- **Yes, and it must be atomic** — money, counters, cross-module links, a
+  status derived from the publisher's rows, or **any FK pointing at a row
+  the publisher just created**. Transactional. An own-session handler
+  cannot even insert that FK: the referenced row is invisible from a second
+  connection and Postgres rejects the write.
+- **Yes, but eventual is fine** — timeline entries, cache warmers. Either
+  read *only what the payload carries* (snapshot pattern — see
+  `patient_timeline/events.py`) or go transactional. Say which in the
+  docstring.
+- **No** — payload-only, sends an email, schedules a job. Own-session, with
+  a one-line docstring note saying so.
+
+Three more rules that fall out of the audit:
+
+- **A transactional handler that publishes forwards its session**:
+  `await event_bus.publish(type, payload, db=db)`. Otherwise the chain
+  silently drops back to own-session halfway through.
+- **Best-effort work goes in a savepoint.** A transactional handler's
+  exception rolls back the publisher's request — right for money, wrong for
+  a notification. Wrap the body in `async with db.begin_nested():` and log
+  the failure: the work still rolls back with the request, but a failure
+  can't take the request down. See `notifications/handlers.py`.
+- **Don't commit in a service another module's handler may call.** Flush and
+  let the session's owner commit (`get_db` in a request, the scheduler job
+  in a cron). A commit inside a transactional handler commits the
+  publisher's half-finished transaction.
+
+`backend/tests/test_event_bus_transactional.py` walks every registered
+handler and every `event_bus.publish` in `app/`, and fails CI when a
+publisher of a transactionally-consumed event forgets `db=`.
+
 ### FK cross-module
 
 Allowed **only** when the target module is in `depends`. A CI

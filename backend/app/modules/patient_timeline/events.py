@@ -4,8 +4,10 @@ Every handler follows the same contract:
 
 - Signature ``async def on_*(data: dict) -> None`` — matches the event bus
   calling convention (``handler(data)``).
-- Opens its own DB session via :func:`async_session_maker`.
-- Commits on success, rolls back on failure.
+- Opens its own DB session via :func:`async_session_maker`, commits on
+  success and rolls back on failure — deliberately own-session (ADR 0019,
+  audited in issue #183): the timeline is a log and must never be able to
+  fail the event it is logging.
 - Never imports models from other modules. Everything it needs must come in
   the ``data`` dict. Keeps the timeline module removable in isolation — the
   whole point of the patient_timeline split in Fase B.3.
@@ -70,6 +72,11 @@ async def _record(
 
     Centralizes session management + error handling so each specific handler
     stays declarative.
+
+    own-session (issue #183): every handler in this module is payload-only —
+    the timeline records what the payload says happened and never re-reads
+    the publisher's rows, and ``source_id`` is polymorphic with no FK. The
+    timeline is a log: it must not be able to fail the thing it is logging.
     """
     ids = _required_ids(data, "clinic_id", "patient_id", source_id_key)
     if ids is None:

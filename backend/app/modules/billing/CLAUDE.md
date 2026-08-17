@@ -42,7 +42,7 @@ by tests in `tests/test_module_tools.py`.
 |---|---|---|---|
 | `payment.allocated` | `events.py:on_payment_allocated` | transactional (ADR 0019) | `payment_bridge.reconcile_payment` — mirror the payment's budget allocations onto `invoice_payments` of that budget's open invoices (FIFO, preferred invoice first via `context.prefer_invoice_id`), unlink LIFO on reallocation, recompute status. Issue #178. |
 | `payment.refunded` | `events.py:on_payment_refunded` | transactional | Recompute status of invoices linked to the refunded payment. |
-| `clinic.created` | `events.py:on_clinic_created` | own session | Default `FAC` / `RECT` series. |
+| `clinic.created` | `events.py:on_clinic_created` | own session (published after setup commits) | Default `FAC` / `RECT` series. |
 
 The legacy ``budget.completed`` subscription was removed in 2026-04 —
 that event was never published.

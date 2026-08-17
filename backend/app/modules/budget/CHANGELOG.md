@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- fix(#183): the three plan-sync handlers are transactional (ADR 0019); a failed mirror now fails the request instead of leaving the quote out of sync with the plan.
+- fix(#183): `budget.superseded` is published before commit like every other event — the treatment_plan handler shares the session, so the FK to the new budget row resolves. Removes the documented "sole deviation from the publish-before-commit pattern".
+- chore: drop `BudgetService.on_treatment_performed`, a no-op placeholder subscribed to `odontogram.treatment.performed`.
 - feat(events): `budget.accepted` payload now carries `items[]` with a
   per-line ex-tax `net_amount` (line discount + prorated global
   discount) so `treatment_plan` can reprice sessions from the snapshot

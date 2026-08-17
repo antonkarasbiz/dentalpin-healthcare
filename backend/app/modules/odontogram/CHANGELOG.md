@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(#183): `TreatmentService.perform` publishes with `db=` so the payments earned ledger and the plan-item completion run in its transaction (ADR 0019).
 - feat(events): `TreatmentService.perform` accepts `publish_price=False`
   to emit `odontogram.treatment.performed` with `unit_price: null` —
   the caller declares the revenue already attributed elsewhere

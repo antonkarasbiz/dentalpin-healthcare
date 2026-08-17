@@ -16,7 +16,8 @@ class EventType:
     # country, currency, timezone, language, vat_preset, created_by,
     # source). Modules react by seeding their defaults (catalog, billing
     # series, cabinet, hours) — handlers must be idempotent and open their
-    # own DB session.
+    # own DB session (this is the one event published *after* the
+    # publisher commits, so there is nothing uncommitted to miss).
     CLINIC_CREATED = "clinic.created"
 
     # Patient events
@@ -70,16 +71,15 @@ class EventType:
     # cancelled_by, occurred_at). NOT published when the cancellation is
     # initiated by ``treatment_plan.reopen()`` — the plan module already
     # owns that transition (``publish_event=False``); an echo here would
-    # deadlock against the publisher's open transaction.
+    # send the plan through a reopen it is already performing.
     BUDGET_CANCELLED = "budget.cancelled"
     # A terminal budget (rejected/expired/cancelled) was cloned to a new
     # draft version ("Resend"). The plan's ``budget_id`` link must follow
-    # the new version; plan status is untouched. Published AFTER the
-    # request transaction commits (sole deviation from the pre-commit
-    # pattern) so the treatment_plan handler can repoint an FK at the new
-    # row from its own session. Payload carries (clinic_id, budget_id
-    # [old], new_budget_id, patient_id, plan_id, version [new],
-    # resent_by, occurred_at).
+    # the new version; plan status is untouched. Published before commit
+    # like everything else: the treatment_plan handler is transactional
+    # (ADR 0019) so the new row is visible to it. Payload carries
+    # (clinic_id, budget_id [old], new_budget_id, patient_id, plan_id,
+    # version [new], resent_by, occurred_at).
     BUDGET_SUPERSEDED = "budget.superseded"
     # Patient opened the public link (first time). Payload carries
     # (budget_id, plan_id, patient_id, viewed_at, ip_hash). Idempotent.

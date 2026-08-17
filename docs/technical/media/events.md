@@ -16,14 +16,16 @@ _This module does not publish any events._
 
 ## Subscribed
 
-| Event | Handler | Effect |
-|-------|---------|--------|
-| `patient.archived` | _Handler module path._ | _What it does in response._ |
+| Event | Handler | Mode | Effect |
+|-------|---------|------|--------|
+| `patient.archived` | `__init__.py::MediaModule._on_patient_archived` | transactional (ADR 0019) | Soft-archive the patient's documents, atomically with the archive itself. |
 
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method after `flush()` — the bus runs handlers
+   inline, *before* the request commits. Pass `db=db` so transactional
+   subscribers can join the transaction (ADR 0019, issue #183).
 3. Add the row to the table(s) above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.

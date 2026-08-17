@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(#183): both event handlers documented as own-session/payload-only, with a note that PR-3's real cleanup should be transactional (ADR 0019).
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.
 
 - style(lint): first ESLint pass over this module's frontend layer —

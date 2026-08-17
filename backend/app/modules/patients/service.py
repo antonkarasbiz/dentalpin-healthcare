@@ -256,6 +256,7 @@ class PatientService:
         await event_bus.publish(
             EventType.PATIENT_CREATED,
             {"patient_id": str(patient.id), "clinic_id": str(clinic_id)},
+            db=db,
         )
         return patient
 

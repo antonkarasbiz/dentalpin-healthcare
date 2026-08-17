@@ -186,8 +186,12 @@ class NotificationGateway:
             next_attempt_at=datetime.now(UTC),
         )
         db.add(msg)
-        await db.commit()
-        await db.refresh(msg)
+        # Flush, don't commit: whoever owns the session decides when the
+        # message becomes real. In a request that is ``get_db``; for a
+        # transactional event handler it is the publisher, so a rolled-back
+        # request queues nothing (ADR 0019). The scheduler jobs that own
+        # their session commit explicitly.
+        await db.flush()
         await NotificationGateway._publish(msg, EventType.NOTIFICATION_QUEUED)
         return msg
 
@@ -532,8 +536,7 @@ class NotificationGateway:
             triggered_by_user_id=triggered_by_user_id,
         )
         db.add(msg)
-        await db.commit()
-        await db.refresh(msg)
+        await db.flush()
         return msg
 
     @staticmethod

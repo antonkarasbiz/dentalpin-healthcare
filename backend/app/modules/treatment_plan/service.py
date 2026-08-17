@@ -641,6 +641,7 @@ class TreatmentPlanService:
                     str(item.assigned_professional_id) if item.assigned_professional_id else None
                 ),
             },
+            db=db,
         )
 
         return item
@@ -825,6 +826,7 @@ class TreatmentPlanService:
                 "clinic_id": str(clinic_id),
                 "budget_id": str(plan.budget_id) if plan.budget_id else None,
             },
+            db=db,
         )
 
         return True
@@ -1297,6 +1299,7 @@ class TreatmentPlanService:
                 "clinic_id": str(clinic_id),
                 "items": items_payload,
             },
+            db=db,
         )
 
         return True

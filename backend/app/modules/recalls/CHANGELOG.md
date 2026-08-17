@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(#183): the four event handlers are transactional (ADR 0019). `on_appointment_scheduled` writes `linked_appointment_id`, an FK to the appointment the publisher has only flushed — from its own session that write was rejected and swallowed, so **auto-link never worked** through the API.
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.
 
 - style(lint): first ESLint pass over this module's frontend layer —

@@ -16,6 +16,11 @@ _This module does not publish any events._
 
 ## Subscribed
 
+Every handler goes through `events.py::_record` and is deliberately
+**own-session and payload-only** (ADR 0019, issue #183): the timeline
+records what the payload carries, never re-reads the publisher's rows, and
+must never be able to fail the event it is logging.
+
 | Event | Handler | Effect |
 |-------|---------|--------|
 | `agenda.visit_note_updated` | _Handler module path._ | _What it does in response._ |
@@ -56,7 +61,9 @@ _This module does not publish any events._
 ## Adding a new event
 
 1. Add the constant to `backend/app/core/events/types.py` (`EventType`).
-2. Publish from a service method, after the DB commit succeeds.
+2. Publish from a service method after `flush()` — the bus runs handlers
+   inline, *before* the request commits. Pass `db=db` so transactional
+   subscribers can join the transaction (ADR 0019, issue #183).
 3. Add the row to the table(s) above.
 4. Run `python backend/scripts/generate_catalogs.py` to refresh the
    global catalog.

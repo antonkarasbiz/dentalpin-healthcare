@@ -704,6 +704,7 @@ async def send_invoice_email(
             "recipient_email": patient.email if patient and data.send_email else None,
             "custom_message": data.custom_message,
         },
+        db=db,
     )
 
     # Add history entry

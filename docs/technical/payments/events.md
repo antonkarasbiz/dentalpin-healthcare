@@ -22,6 +22,10 @@ payments never reads it (billing uses `context.prefer_invoice_id`).
 
 ## Subscribed
 
+Both are **transactional** (ADR 0019): revenue is booked in the same
+transaction as the treatment that earned it, so a failed request cannot
+leave an orphan entry behind (issue #183).
+
 | Event | Handler | Effect |
 |-------|---------|--------|
 | `odontogram.treatment.performed` | `payments/events.py::on_treatment_performed` | Upserts one `PatientEarnedEntry` with `source_session_id = NULL` for the event's `unit_price`. Skips when `unit_price` is `null` — that means the revenue was already attributed per-session (see below). |

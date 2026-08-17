@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(#183): handlers documented as own-session/payload-only — the timeline records what the payload carries and must never be able to fail the event it logs.
 - i18n: add `pt` fallback to treatment name resolution in the demo
   timeline seed.
 

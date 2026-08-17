@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 async def on_clinic_created(data: dict[str, Any]) -> None:
+    """own-session (issue #183): ``clinic.created`` is published after
+    ``POST /auth/setup`` commits, so there are no uncommitted rows to miss —
+    and seeding a fresh clinic must not stretch the signup transaction.
+    """
     clinic_id_raw = data.get("clinic_id")
     if not clinic_id_raw:
         return

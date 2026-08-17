@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(#183): `on_invoice_paid` documented as own-session/payload-only (ADR 0019).
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.
 
 - style(lint): first ESLint pass over this module's frontend layer —

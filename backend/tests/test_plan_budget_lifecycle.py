@@ -1,11 +1,11 @@
 """Cross-module round-trips for the plan ↔ budget lifecycle (issue #162).
 
-Harness note: the ``client`` fixture's ``get_db`` override never commits,
-while event handlers open their OWN sessions via ``async_session_maker``.
-Any HTTP call that triggers a handler therefore needs the relevant rows
-committed FIRST (``_sync`` before the call) so the handler can see them,
-and committed + expired AFTER (``_sync`` again) so the test session sees
-the handler's writes instead of stale identity-map state.
+Harness note: the plan ↔ budget handlers are transactional (ADR 0019) — they
+run on the publisher's session, so they see the request's own writes and the
+test sees theirs. ``_sync`` remains for the events still handled
+own-session (patient_timeline and friends): it commits so those handlers can
+see the rows, and expires so the test session picks up their writes instead
+of stale identity-map state.
 """
 
 from uuid import UUID, uuid4
@@ -358,7 +358,8 @@ async def test_on_budget_superseded_idempotent(
             "plan_id": plan_id,
             "budget_id": str(uuid4()),  # not the budget the plan points at
             "new_budget_id": str(uuid4()),
-        }
+        },
+        db=db_session,
     )
     db_session.expire_all()
     plan = await _get_plan(client, auth_headers, plan_id)
@@ -460,3 +461,49 @@ async def test_reopen_with_expired_budget_does_not_500(
 
     result = await db_session.execute(select(Budget.status).where(Budget.id == UUID(budget_id)))
     assert result.scalar_one() == "expired", "terminal budget must be left alone"
+
+
+# ---------------------------------------------------------------------------
+# Atomicity — plan and budget agree or neither moves (issue #183)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_budget_acceptance_rolls_back_when_the_plan_cannot_activate(
+    db_session: AsyncSession,
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The plan activation used to run on its own session with the error
+    logged and swallowed: the budget ended up accepted next to a plan that
+    never activated, and nothing surfaced it."""
+    from app.modules.treatment_plan.service import TreatmentPlanService
+
+    plan_id, _ = await _create_plan_with_items(client, auth_headers, setup, [16])
+    budget_id = await _confirm_plan(client, auth_headers, plan_id)
+    await _sync(db_session)
+    await _send_budget(client, auth_headers, budget_id)
+    await _sync(db_session)
+
+    async def _boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("plan activation failed")
+
+    monkeypatch.setattr(TreatmentPlanService, "accept_from_budget", _boom)
+
+    with pytest.raises(RuntimeError, match="plan activation failed"):
+        await client.post(
+            f"/api/v1/budget/budgets/{budget_id}/accept",
+            headers=auth_headers,
+            json={
+                "signature": {
+                    "signed_by_name": "Rosa Vega",
+                    "relationship_to_patient": "patient",
+                }
+            },
+        )
+
+    await db_session.rollback()
+    status = await db_session.scalar(select(Budget.status).where(Budget.id == UUID(budget_id)))
+    assert status == "sent", "a failed plan activation must not leave the budget accepted"
