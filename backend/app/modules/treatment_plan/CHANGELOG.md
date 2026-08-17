@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(#183): the seven event handlers are transactional (ADR 0019). `on_appointment_completed` was reading `completed_in_appointment` flags the publisher had only flushed, so it closed nothing. The `SKIP LOCKED` in `on_treatment_performed` is gone — it only existed to dodge a deadlock between the handler's own session and the publisher awaiting it.
 - fix(sessions): accepting a quote now reprices the plan's pending
   sessions to the accepted line amounts (line + global discount, ex-tax),
   so `item_session_completed` — and the payments earned ledger — book the

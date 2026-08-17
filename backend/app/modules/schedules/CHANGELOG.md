@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(#183): `on_clinic_created` documented as own-session (published after setup commits); the appointment handlers are payload-only logging.
 - feat(onboarding): `ClinicHoursQuickModal` — inline weekly-hours editor with two presets, used as the getting-started mini-modal.
 
 - feat(onboarding): getting-started rule `clinic-hours` — flags clinics still on the 24/7 default template.

@@ -97,6 +97,10 @@ async def on_clinic_created(data: dict[str, Any]) -> None:
     """Seed ``FAC`` (invoice) + ``RECT`` (credit note) default series.
 
     Idempotent: skipped when the clinic already has any series.
+
+    own-session (issue #183): ``clinic.created`` is published after
+    ``POST /auth/setup`` commits, so there is nothing uncommitted to miss —
+    and seeding must not stretch the signup transaction.
     """
     clinic_id_raw = data.get("clinic_id")
     if not clinic_id_raw:

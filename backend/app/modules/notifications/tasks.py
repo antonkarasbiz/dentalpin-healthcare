@@ -154,6 +154,11 @@ async def process_appointment_reminders() -> None:
                             f"Queued reminder for appointment {appointment.id} to {patient.email}"
                         )
 
+            # This job owns its session, so it commits what ``enqueue``
+            # flushed. Once for the whole sweep: the ``dedup_key`` makes a
+            # re-run after a failure a no-op.
+            await db.commit()
+
         if reminders_sent > 0 or reminders_skipped > 0:
             logger.info(
                 f"Reminder job complete: {reminders_sent} sent, {reminders_skipped} skipped"
@@ -241,6 +246,7 @@ async def send_single_reminder(appointment_id: UUID, clinic_id: UUID) -> bool:
                 force_send=True,
                 dedup_key=f"appointment_reminder:{appointment.id}",
             )
+            await db.commit()  # own session → own commit (``enqueue`` only flushes)
 
             return msg is not None and msg.status != "skipped"
 

@@ -35,7 +35,13 @@ async def _end_of_local_day(db, clinic_id: UUID, now_utc: datetime) -> datetime:
 
 
 async def on_appointment_cancelled(data: dict) -> None:
-    """A cancellation frees a slot — nudge staff to fill it from recalls."""
+    """A cancellation frees a slot — nudge staff to fill it from recalls.
+
+    own-session (issue #183): payload-only, and deliberately not
+    transactional — a nudge is advisory, it must never be able to fail the
+    cancellation. Worst case a rolled-back cancellation leaves a nudge that
+    expires at midnight anyway.
+    """
     appointment_id = data.get("appointment_id")
     clinic_id = data.get("clinic_id")
     if not appointment_id or not clinic_id:

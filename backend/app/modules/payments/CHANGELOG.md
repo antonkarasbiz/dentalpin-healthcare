@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(#183): the earned-ledger handlers are transactional (ADR 0019). Revenue is booked in the same transaction as the treatment; a failed request no longer leaves an orphan `PatientEarnedEntry` (there is no FK to `treatments` to catch one).
 - fix(#178): `payment.allocated` and `payment.refunded` are published
   transactionally (`db=db`, ADR 0019) so billing mirrors budget
   allocations onto invoices and recomputes status inside the same

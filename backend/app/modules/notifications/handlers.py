@@ -1,17 +1,27 @@
 """Event handlers for the notifications module.
 
-These handlers listen to events from other modules and trigger
-notification emails when appropriate.
+These handlers listen to events from other modules and queue notifications
+when appropriate.
+
+All of them are **transactional** (ADR 0019): they read the publisher's own
+rows and queue a ``CommunicationMessage`` on its session. Nothing is sent
+here — ``NotificationGateway.dispatch_outbox`` (scheduler) owns the network
+I/O, so there is no external side effect inside the transaction.
+
+Each body runs inside a **savepoint**: queueing a message is best-effort and
+must never fail the appointment, patient or invoice it announces, but an
+error still has to unwind cleanly or the publisher's transaction would be
+left unusable. The outer transaction rolling back discards the queued
+message too, which is the point — no confirmation email for an appointment
+that was never booked (issue #183).
 """
 
-import asyncio
 import logging
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-
-from app.database import async_session_maker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +30,16 @@ class NotificationHandlers:
     """Event handlers for notification triggers."""
 
     @staticmethod
-    def on_appointment_scheduled(data: dict[str, Any]) -> None:
+    async def on_appointment_scheduled(data: dict[str, Any], *, db: AsyncSession) -> None:
         """Handle appointment.scheduled event.
 
-        Sends appointment confirmation email to patient.
-        """
-        asyncio.create_task(NotificationHandlers._handle_appointment_scheduled(data))
+        Queues the appointment confirmation for the patient.
 
-    @staticmethod
-    async def _handle_appointment_scheduled(data: dict[str, Any]) -> None:
-        """Async handler for appointment scheduled."""
+        Transactional (ADR 0019): queues the message on the publisher's
+        session. Nothing is sent here — the outbox tick owns the network
+        I/O — so a rolled-back request queues nothing, and the rows this
+        reads are the publisher's own (issue #183).
+        """
         from app.modules.agenda.models import Appointment
         from app.modules.notifications.gateway import NotificationGateway
         from app.modules.patients.models import Patient
@@ -38,7 +48,7 @@ class NotificationHandlers:
             clinic_id = UUID(data["clinic_id"])
             appointment_id = UUID(data["appointment_id"])
 
-            async with async_session_maker() as db:
+            async with db.begin_nested():
                 # Get appointment with patient
                 result = await db.execute(
                     select(Appointment).where(Appointment.id == appointment_id)
@@ -88,7 +98,7 @@ class NotificationHandlers:
                     "clinic_address": clinic.address if clinic else None,
                 }
 
-                # Send notification
+                # Queue it — the outbox tick does the sending.
                 await NotificationGateway.enqueue(
                     db=db,
                     clinic_id=clinic_id,
@@ -103,16 +113,16 @@ class NotificationHandlers:
             logger.error(f"Error handling appointment.scheduled: {e}", exc_info=True)
 
     @staticmethod
-    def on_appointment_cancelled(data: dict[str, Any]) -> None:
+    async def on_appointment_cancelled(data: dict[str, Any], *, db: AsyncSession) -> None:
         """Handle appointment.cancelled event.
 
-        Sends appointment cancellation email to patient.
-        """
-        asyncio.create_task(NotificationHandlers._handle_appointment_cancelled(data))
+        Queues the cancellation notice for the patient.
 
-    @staticmethod
-    async def _handle_appointment_cancelled(data: dict[str, Any]) -> None:
-        """Async handler for appointment cancelled."""
+        Transactional (ADR 0019): queues the message on the publisher's
+        session. Nothing is sent here — the outbox tick owns the network
+        I/O — so a rolled-back request queues nothing, and the rows this
+        reads are the publisher's own (issue #183).
+        """
         from app.modules.agenda.models import Appointment
         from app.modules.notifications.gateway import NotificationGateway
         from app.modules.patients.models import Patient
@@ -122,7 +132,7 @@ class NotificationHandlers:
             appointment_id = UUID(data["appointment_id"])
             cancellation_reason = data.get("reason")
 
-            async with async_session_maker() as db:
+            async with db.begin_nested():
                 # Get appointment
                 result = await db.execute(
                     select(Appointment).where(Appointment.id == appointment_id)
@@ -182,16 +192,16 @@ class NotificationHandlers:
             logger.error(f"Error handling appointment.cancelled: {e}", exc_info=True)
 
     @staticmethod
-    def on_patient_created(data: dict[str, Any]) -> None:
+    async def on_patient_created(data: dict[str, Any], *, db: AsyncSession) -> None:
         """Handle patient.created event.
 
-        Sends welcome email to new patient (if auto_send is enabled).
-        """
-        asyncio.create_task(NotificationHandlers._handle_patient_created(data))
+        Queues the welcome message for the new patient (if auto_send is enabled).
 
-    @staticmethod
-    async def _handle_patient_created(data: dict[str, Any]) -> None:
-        """Async handler for patient created."""
+        Transactional (ADR 0019): queues the message on the publisher's
+        session. Nothing is sent here — the outbox tick owns the network
+        I/O — so a rolled-back request queues nothing, and the rows this
+        reads are the publisher's own (issue #183).
+        """
         from app.modules.notifications.gateway import NotificationGateway
         from app.modules.patients.models import Patient
 
@@ -199,7 +209,7 @@ class NotificationHandlers:
             clinic_id = UUID(data["clinic_id"])
             patient_id = UUID(data["patient_id"])
 
-            async with async_session_maker() as db:
+            async with db.begin_nested():
                 # Get patient
                 result = await db.execute(select(Patient).where(Patient.id == patient_id))
                 patient = result.scalar_one_or_none()
@@ -234,15 +244,16 @@ class NotificationHandlers:
             logger.error(f"Error handling patient.created: {e}", exc_info=True)
 
     @staticmethod
-    def on_budget_sent(data: dict[str, Any]) -> None:
+    async def on_budget_sent(data: dict[str, Any], *, db: AsyncSession) -> None:
         """Handle budget.sent event.
 
-        Sends budget email to patient.
-        """
-        asyncio.create_task(NotificationHandlers._handle_budget_sent(data))
+        Queues the budget email for the patient.
 
-    @staticmethod
-    async def _handle_budget_sent(data: dict[str, Any]) -> None:
+        Transactional (ADR 0019): queues the message on the publisher's
+        session. Nothing is sent here — the outbox tick owns the network
+        I/O — so a rolled-back request queues nothing, and the rows this
+        reads are the publisher's own (issue #183).
+        """
         """Async handler for budget sent.
 
         Only sends email if send_method is "email".
@@ -264,7 +275,7 @@ class NotificationHandlers:
             clinic_id = UUID(data["clinic_id"])
             budget_id = UUID(data["budget_id"])
 
-            async with async_session_maker() as db:
+            async with db.begin_nested():
                 # Get budget with items
                 result = await db.execute(select(Budget).where(Budget.id == budget_id))
                 budget = result.scalar_one_or_none()
@@ -343,15 +354,16 @@ class NotificationHandlers:
             logger.error(f"Error handling budget.sent: {e}", exc_info=True)
 
     @staticmethod
-    def on_invoice_sent(data: dict[str, Any]) -> None:
+    async def on_invoice_sent(data: dict[str, Any], *, db: AsyncSession) -> None:
         """Handle invoice.sent event.
 
-        Sends invoice email to patient.
-        """
-        asyncio.create_task(NotificationHandlers._handle_invoice_sent(data))
+        Queues the invoice email for the patient.
 
-    @staticmethod
-    async def _handle_invoice_sent(data: dict[str, Any]) -> None:
+        Transactional (ADR 0019): queues the message on the publisher's
+        session. Nothing is sent here — the outbox tick owns the network
+        I/O — so a rolled-back request queues nothing, and the rows this
+        reads are the publisher's own (issue #183).
+        """
         """Async handler for invoice sent.
 
         Only sends email if send_method is "email".
@@ -373,7 +385,7 @@ class NotificationHandlers:
             clinic_id = UUID(data["clinic_id"])
             invoice_id = UUID(data["invoice_id"])
 
-            async with async_session_maker() as db:
+            async with db.begin_nested():
                 # Get invoice with items
                 result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
                 invoice = result.scalar_one_or_none()
@@ -447,16 +459,16 @@ class NotificationHandlers:
             logger.error(f"Error handling invoice.sent: {e}", exc_info=True)
 
     @staticmethod
-    def on_budget_accepted(data: dict[str, Any]) -> None:
+    async def on_budget_accepted(data: dict[str, Any], *, db: AsyncSession) -> None:
         """Handle budget.accepted event.
 
-        Sends budget acceptance confirmation to patient.
-        """
-        asyncio.create_task(NotificationHandlers._handle_budget_accepted(data))
+        Queues the budget acceptance confirmation for the patient.
 
-    @staticmethod
-    async def _handle_budget_accepted(data: dict[str, Any]) -> None:
-        """Async handler for budget accepted."""
+        Transactional (ADR 0019): queues the message on the publisher's
+        session. Nothing is sent here — the outbox tick owns the network
+        I/O — so a rolled-back request queues nothing, and the rows this
+        reads are the publisher's own (issue #183).
+        """
         from app.modules.budget.models import Budget
         from app.modules.notifications.gateway import NotificationGateway
         from app.modules.patients.models import Patient
@@ -465,7 +477,7 @@ class NotificationHandlers:
             clinic_id = UUID(data["clinic_id"])
             budget_id = UUID(data["budget_id"])
 
-            async with async_session_maker() as db:
+            async with db.begin_nested():
                 # Get budget
                 result = await db.execute(select(Budget).where(Budget.id == budget_id))
                 budget = result.scalar_one_or_none()

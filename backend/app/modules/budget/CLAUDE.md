@@ -100,24 +100,26 @@ contract.
 - **Snapshot-only event handlers.** `_on_treatment_added_to_plan` and
   friends consume the data carried in the payload (catalog_item_id,
   tooth, surfaces, unit_price, budget_id) — no fetches against the
-  publisher's tables.
+  publisher's tables. They are transactional (ADR 0019, issue #183): the
+  quote mirrors the plan inside the publisher's transaction, so a failed
+  mirror fails the request instead of silently dropping a line.
 - **Plan reverse-lookup uses raw SQL** (`_lookup_plan` /
   `_lookup_plan_id`) instead of importing the `TreatmentPlan` model, so
   event payloads can carry `plan_id` without violating ADR 0003. It
   deliberately does NOT walk the `parent_budget_id` chain — a stale old
   version must resolve to no plan once the link moved on.
-- **`budget.superseded` publishes AFTER commit** (in the `/resend`
-  router) — the sole deviation from the publish-before-commit pattern.
-  The treatment_plan handler points `treatment_plans.budget_id` (an FK)
-  at the new budget row from its own session; pre-commit that row is
-  invisible → FK violation the bus swallows → relink silently lost. Do
-  not "normalize" this back.
+- **`budget.superseded` publishes before commit**, like every other
+  event. It used to be the sole deviation: the treatment_plan handler
+  points `treatment_plans.budget_id` (an FK) at the new budget row, which
+  from its own session was invisible → FK violation the bus swallowed →
+  relink silently lost. The handler is transactional now (ADR 0019,
+  issue #183), so the row is visible and the workaround is gone.
 - **`cancel_budget(publish_event=False)` is for plan-initiated
-  cancels.** `treatment_plan.reopen()` cancels the budget inside its
-  own transaction; an echoed `budget.cancelled` there would make the
-  handler write the plan row the publisher holds locked (the bus awaits
-  handlers inline) → hang. Direct staff cancels keep the default and
-  publish.
+  cancels.** `treatment_plan.reopen()` cancels the budget inside its own
+  transaction; an echoed `budget.cancelled` would send the plan through a
+  reopen it is already performing. Direct staff cancels keep the default
+  and publish. (Pre-#183 this was also a deadlock guard — the handler ran
+  on its own session; it shares the publisher's now.)
 - **`pricing.allocate_global_discount` is the only proration formula.**
   The global discount is applied to the VAT-inclusive items total in
   `_recalculate_totals`; every per-line consumer (the `budget.accepted`

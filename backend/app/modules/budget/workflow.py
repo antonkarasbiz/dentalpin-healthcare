@@ -170,6 +170,7 @@ class BudgetWorkflowService:
                 "recipient_email": recipient_email,
                 "custom_message": custom_message,
             },
+            db=db,
         )
 
         return budget

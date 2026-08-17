@@ -74,8 +74,16 @@ First users: `payments` publishes `payment.allocated` and
   introspection; a typo (`session`) silently downgrades the handler to
   own-session. Reviewers check the signature when a handler is meant
   to be transactional.
-- Existing own-session handlers may carry the same latent bug (reading
-  before commit). Audited separately — see issue #183.
+- Existing own-session handlers carried the same latent bug. The audit
+  (issue #183) found three instances of it, two of them live and silent:
+  `recalls` could never link a recall to a new appointment (FK to a row
+  its second connection couldn't see), `notifications` never queued the
+  welcome message for a patient created through the API, and
+  `budget.superseded` had already been worked around by committing before
+  publishing. 24 handlers moved to the transactional contract; the rest are
+  payload-only or fire after the publisher commits, and say so in their
+  docstring. Three workarounds (`SKIP LOCKED`, the commit-first publish, a
+  lock-avoidance flag rationale) went away with them.
 
 ## Alternatives considered
 
@@ -98,6 +106,9 @@ First users: `payments` publishes `payment.allocated` and
 - `grep -rn "async_session_maker" backend/app/modules/*/events.py`
   lists own-session handlers; any of them that reads publisher-written
   rows is a candidate for `db`.
+- `test_every_publisher_of_a_transactional_event_passes_db` (same file)
+  walks the registry and every publish site in `app/`, so a publisher
+  that forgets `db=` fails CI instead of raising in production.
 
 ## References
 

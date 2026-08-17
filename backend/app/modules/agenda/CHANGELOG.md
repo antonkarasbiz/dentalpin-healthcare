@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(#183): appointment events are published with `db=` so recalls, treatment_plan and notifications react inside the request's transaction (ADR 0019).
 - feat(onboarding): subscribe to `clinic.created` — create one default cabinet for a new clinic.
 
 - fix(timezones): the mobile day view (free-slot engine, timeline,

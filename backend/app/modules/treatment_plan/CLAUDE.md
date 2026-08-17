@@ -118,11 +118,16 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
   not freeze the plan. Mirrored in `PlanDetailView.vue` and
   keep the two predicates in sync. (`TreatmentPlanDetail.vue` was
   dead code and was removed in #167.)
+- **Every handler in `events.py` is transactional** (ADR 0019, issue
+  #183): it declares `db` and runs inside the publisher's session, so
+  plan and budget move together or not at all. A handler that publishes
+  forwards `db=db`.
 - **Budget-side reopens go through `reopen_from_budget`,** which never
-  writes the budget row: the publisher's open transaction holds it
-  locked and the bus awaits handlers inline — calling `reopen()` from a
-  handler would hang. `reopen()` itself cancels the linked budget with
-  `publish_event=False` for the symmetric reason.
+  writes the budget row — the publisher is already cancelling it, and
+  `reopen()` would cancel it again and echo `budget.cancelled` straight
+  back into this module. `reopen()` itself cancels the linked budget with
+  `publish_event=False` for the symmetric reason. (Both used to be about
+  lock avoidance; sharing the publisher's session removed that half.)
 - **Plan ↔ budget item sync goes through events**, not direct calls.
   Adding a treatment to a plan publishes
   `treatment_plan.treatment_added` with a denormalized snapshot

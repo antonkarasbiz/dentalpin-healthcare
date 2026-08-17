@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(#183): `on_clinic_created` documented as own-session — published after setup commits, and seeding series must not stretch the signup transaction.
 - fix(#178): budget ↔ invoice bridge (`payment_bridge.py`). Payments
   allocated to a budget are imputed to that budget's open invoices
   (FIFO, preferring the invoice being collected on) and unlinked on

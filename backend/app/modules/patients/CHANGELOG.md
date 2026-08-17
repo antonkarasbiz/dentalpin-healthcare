@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix(#183): `patient.created` / `patient.archived` are published with `db=` so the notifications, recalls and media handlers see the row and roll back with it (ADR 0019).
 - feat(onboarding): optional getting-started rule `first-patient` — suggests creating the first patient.
 
 - fix(timezones): visit summary card renders appointment date/hour as

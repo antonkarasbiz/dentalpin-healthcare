@@ -227,3 +227,71 @@ async def test_cannot_delete_system_template(
     )
 
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Event handlers queue on the publisher's session (issue #183)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_creating_a_patient_queues_the_welcome_message(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, test_clinic
+):
+    """The handler used to re-read the patient from its own session, in a
+    task racing the request's commit. The row was invisible there, so it
+    returned early and the welcome message was never queued."""
+    from sqlalchemy import select
+
+    from app.modules.notifications.models import CommunicationMessage
+
+    res = await client.post(
+        "/api/v1/patients",
+        headers=auth_headers,
+        json={
+            "first_name": "Nuevo",
+            "last_name": "Paciente",
+            "email": "nuevo@paciente.example.com",
+        },
+    )
+    assert res.status_code == 201, res.text
+
+    queued = (
+        (
+            await db_session.execute(
+                select(CommunicationMessage).where(
+                    CommunicationMessage.to_address == "nuevo@paciente.example.com"
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(queued) == 1
+    assert queued[0].template_key == "welcome"
+    assert queued[0].status in ("queued", "skipped")
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_queued_when_the_request_rolls_back(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, test_clinic
+):
+    """No welcome message for a patient that was never created."""
+    from sqlalchemy import select
+
+    from app.modules.notifications.models import CommunicationMessage
+    from app.modules.patients.service import PatientService
+
+    await PatientService.create_patient(
+        db_session,
+        test_clinic.id,
+        {"first_name": "Fantasma", "last_name": "Nunca", "email": "fantasma@paciente.example.com"},
+    )
+    await db_session.rollback()
+
+    queued = await db_session.scalar(
+        select(CommunicationMessage.id).where(
+            CommunicationMessage.to_address == "fantasma@paciente.example.com"
+        )
+    )
+    assert queued is None

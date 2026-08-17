@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- docs(#183): `on_clinic_created` documented as own-session — `clinic.created` is published after setup commits, and seeding must not stretch the signup transaction.
 - feat(onboarding): getting-started rule `catalog-empty` (frontend plugin) — flags a clinic with no catalog items on the dashboard card.
 
 - feat(onboarding): subscribe to `clinic.created` — seed VAT types by country preset (`VAT_PRESETS`: `es` | `generic`), categories and the default catalog for every new clinic; `seed_catalog(..., vat_preset, with_prices)` (non-EUR → prices 0).
