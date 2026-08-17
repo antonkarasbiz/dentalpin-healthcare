@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- fix(#178): budget ↔ invoice bridge (`payment_bridge.py`). Payments
+  allocated to a budget are imputed to that budget's open invoices
+  (FIFO, preferring the invoice being collected on) and unlinked on
+  reallocation, via a transactional `payment.allocated` subscriber;
+  `issue_invoice` sweeps anticipos already collected on the quote into
+  the new invoice; the orchestrator `POST /invoices/{id}/payments`
+  allocates to `invoice.budget_id` when set (quote card now shows
+  invoice collections). `payment.refunded` handler is transactional —
+  invoice status actually moves on refund (it silently didn't before).
+  Patient billing summary `total_paid` is refund-aware. Lock order:
+  budget row → invoice rows.
+
 - feat(onboarding): getting-started rule `invoice-series` (frontend plugin) — flags a clinic without invoice series.
 
 - feat(onboarding): subscribe to `clinic.created` — auto-create default `FAC`/`RECT` series so the first invoice can be issued without visiting settings.

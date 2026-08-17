@@ -29,7 +29,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/payments/frontend/pages/payments/index.vue
   - backend/app/modules/payments/router.py
-last_verified_commit: b1b82f5
+last_verified_commit: 4752264
 ---
 
 # Payment list
@@ -64,13 +64,18 @@ reallocate it, or issue a refund from the same screen.
    card on the patient record).
 2. Pick the patient. Choose the method (cash, card, bank transfer,
    direct debit, insurance, or *other*) and the payment date.
-3. Split the amount across the patient's open budgets, or leave it
-   *on account* for later assignment. The sum of allocations must
-   equal the gross amount — the form validates this invariant before
-   submitting.
+3. Pick the **Apply to** target: one of the patient's open quotes
+   (listed by number and amount) or *Patient credit (on account)*.
+   On-account money stays as the patient's credit and **is not applied
+   to any invoice or quote** until you assign it — the form says so
+   under the selector. To split across several targets open
+   *Advanced options*; the sum of allocations must equal the gross
+   amount.
 4. **Save**. `payment.recorded` and one `payment.allocated` per
-   allocation are published. The budget's *Paid / Outstanding*
-   sidebar card refreshes immediately.
+   allocation are published. The quote's *Paid / Outstanding* sidebar
+   card refreshes immediately and, if the quote has issued invoices,
+   the payment is applied to them (FIFO) in the same operation: the
+   invoice moves to `partial`/`paid` with no extra step.
 
 ## Reallocate a payment
 
@@ -80,7 +85,11 @@ reallocate it, or issue a refund from the same screen.
    record.
 2. Use **Reallocate** to move amounts between budgets or between a
    budget and *on-account*. Each change publishes
-   `payment.allocated` with the previous and new targets.
+   `payment.allocated`; invoices of the source quote are unlinked and
+   those of the target quote are applied, all in one transaction.
+   From the patient record (Administration → Payments) the row menu
+   offers **Assign to quote…** for the common case: a deposit left on
+   account that should now be applied.
 
 ## Refund
 

@@ -37,7 +37,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/[id].vue
   - backend/app/modules/budget/router.py
-last_verified_commit: 2a05d7a
+last_verified_commit: 4752264
 ---
 
 # Budget detail
@@ -53,7 +53,9 @@ signed, invoiced, or renegotiated.
 - **Two-column layout.** Left: budget line items with catalog item,
   tooth, surfaces, quantity, discount, and VAT. Right (top to
   bottom): **payments** card (slot `budget.detail.sidebar`, filled
-  by `payments`), **totals** (subtotal, discount, VAT, total),
+  by `payments`; it also lists payments collected from this quote's
+  issued invoices, and what is collected here is applied to those
+  invoices), **totals** (subtotal, discount, VAT, total),
   **info** (number, version, validity, creator, linked plan).
 - **Status chip** in the header. Available actions depend on it.
 - **Versioning.** Each renegotiation creates a new version linked

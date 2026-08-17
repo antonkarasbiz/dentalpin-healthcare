@@ -4,11 +4,14 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-Handler = Callable[[dict[str, Any]], None]
+Handler = Callable[..., Any]
 
 
 class EventBus:
@@ -20,6 +23,19 @@ class EventBus:
     subscriber has finished before the call returns. Handler
     exceptions are caught and logged so one broken subscriber cannot
     fail another, but the publisher sees a clean return.
+
+    Transactional handlers (ADR 0019)
+    ---------------------------------
+    A publisher may offer its own ``AsyncSession`` with
+    ``publish(..., db=db)``. A handler opts in by declaring a keyword
+    parameter named ``db`` — it then runs *inside the publisher's
+    transaction*: same session, no commit of its own, no external I/O,
+    and its exception **propagates** to the publisher (rolling the whole
+    request back). Handlers without ``db`` keep the fire-and-log
+    contract above and must open their own session — beware that they
+    run before the publisher commits, so they cannot see rows the
+    publisher only flushed. Subscribing a ``db`` handler to an event
+    that is published without ``db`` raises at publish time.
     """
 
     def __init__(self) -> None:
@@ -40,7 +56,13 @@ class EventBus:
             except ValueError:
                 pass
 
-    async def publish(self, event_type: str, data: dict[str, Any]) -> None:
+    async def publish(
+        self,
+        event_type: str,
+        data: dict[str, Any],
+        *,
+        db: "AsyncSession | None" = None,
+    ) -> None:
         """Publish an event and await every subscriber to completion.
 
         Sync handlers run inline; async handlers are awaited in order.
@@ -49,6 +71,10 @@ class EventBus:
         clean return. The contract is: "after ``await``, every handler
         has finished (or failed)."
 
+        Pass ``db`` to offer the publisher's session to transactional
+        handlers (those declaring a ``db`` parameter). Their failures
+        are re-raised — they are part of the publisher's transaction.
+
         Handlers that need fire-and-forget (e.g. an SMTP call that
         should not block the request) are responsible for scheduling
         their own background task internally.
@@ -56,11 +82,19 @@ class EventBus:
         logger.info(f"Event published: {event_type}", extra={"event_data": data})
 
         for handler in self._handlers.get(event_type, []):
+            transactional = _wants_db(handler)
+            if transactional and db is None:
+                raise RuntimeError(
+                    f"Handler {getattr(handler, '__qualname__', handler)} for "
+                    f"{event_type} requires a transactional publish (db=...)"
+                )
             try:
-                result = handler(data)
+                result = handler(data, db=db) if transactional else handler(data)
                 if inspect.iscoroutine(result):
                     await result
             except Exception:
+                if transactional:
+                    raise
                 logger.exception(
                     "Event handler %s failed for %s",
                     getattr(handler, "__qualname__", handler.__name__),
@@ -92,6 +126,14 @@ class EventBus:
     def clear(self) -> None:
         """Remove all handlers. Useful for testing."""
         self._handlers.clear()
+
+
+def _wants_db(handler: Handler) -> bool:
+    """True when the handler declares a ``db`` parameter (transactional)."""
+    try:
+        return "db" in inspect.signature(handler).parameters
+    except (TypeError, ValueError):  # builtins / C callables
+        return False
 
 
 # Global singleton instance

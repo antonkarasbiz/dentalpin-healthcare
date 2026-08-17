@@ -104,30 +104,25 @@ class BillingReportService:
         # Invoice aggregation (only issued, partial, paid). ``total_paid``
         # comes from ``invoice_payments`` since the legacy cached column
         # was removed when payments became its own module.
-        invoice_result = await db.execute(
-            select(
-                func.coalesce(func.sum(Invoice.total), Decimal("0")).label("total_invoiced"),
-            ).where(
-                Invoice.clinic_id == clinic_id,
-                Invoice.patient_id == patient_id,
-                Invoice.status.in_(["issued", "partial", "paid"]),
-                Invoice.deleted_at.is_(None),
-            )
-        )
-        invoice_totals = invoice_result.one()
+        # Same refund-aware arithmetic as the invoice detail/list views
+        # (``compute_paid_summaries_for_invoices``) so this tab never
+        # disagrees with the invoice page (issue #178).
+        from app.modules.billing.service import compute_paid_summaries_for_invoices
 
-        paid_result = await db.execute(
-            select(func.coalesce(func.sum(InvoicePayment.amount), Decimal("0")))
-            .join(Invoice, Invoice.id == InvoicePayment.invoice_id)
-            .where(
+        invoice_rows = await db.execute(
+            select(Invoice.id, Invoice.total).where(
                 Invoice.clinic_id == clinic_id,
                 Invoice.patient_id == patient_id,
                 Invoice.status.in_(["issued", "partial", "paid"]),
                 Invoice.deleted_at.is_(None),
             )
         )
-        total_invoiced = invoice_totals.total_invoiced
-        total_paid: Decimal = paid_result.scalar_one()
+        invoices = invoice_rows.all()
+        total_invoiced = sum((row.total for row in invoices), Decimal("0"))
+        paid_by_invoice = await compute_paid_summaries_for_invoices(
+            db, clinic_id, [row.id for row in invoices]
+        )
+        total_paid = sum((paid for paid, _ in paid_by_invoice.values()), Decimal("0"))
         balance_pending = total_invoiced - total_paid
 
         return {

@@ -215,7 +215,8 @@
         },
         "rowMenu": {
           "detail": "View detail",
-          "refund": "Refund"
+          "refund": "Refund",
+          "reallocate": "Assign to quote…"
         }
       },
       "refundModal": {
@@ -282,6 +283,21 @@
         "viewPayments": "View payments in the period",
         "viewPatients": "View patients with debt"
       }
+    },
+    "target": {
+      "label": "Apply to",
+      "placeholder": "Select destination",
+      "onAccount": "Patient credit (on account)",
+      "onAccountHint": "Stays as the patient's on-account credit. It is not applied to any invoice or quote until you assign it.",
+      "budgetHint": "Will be applied to this quote and its issued invoices.",
+      "lockedBudget": "Will be applied to quote {budget} and its invoices."
+    },
+    "reallocate": {
+      "title": "Assign to quote",
+      "hint": "The full {amount} payment will move to the selected quote and its issued invoices.",
+      "submit": "Assign",
+      "success": "Payment assigned to quote",
+      "error": "Could not reassign the payment. Please try again."
     }
   }
 }

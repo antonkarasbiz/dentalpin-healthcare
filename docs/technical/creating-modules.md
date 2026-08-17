@@ -377,9 +377,11 @@ async def list_items(
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def on_appointment_completed(db: AsyncSession, data: dict) -> None:
+async def on_appointment_completed(data: dict) -> None:
     """Consume stock based on the appointment's treatments."""
-    # Reach into your service layer here.
+    # Own-session handler: open ``async_session_maker()`` here. Declare
+    # ``*, db: AsyncSession`` instead to run inside the publisher's
+    # transaction (ADR 0019 — see §6 "Own-session vs transactional").
 ```
 
 ### `lifecycle.py`
@@ -713,6 +715,24 @@ event_bus.publish("inventory.restocked", {
 ```
 
 Naming convention: `<module>.<action>` (lower-snake).
+
+#### Own-session vs transactional handlers (ADR 0019)
+
+The bus runs handlers inline, **before the publisher commits**. Two
+contracts, chosen by the handler's signature:
+
+| Handler signature | Session | Sees publisher's flushed rows? | On exception |
+|---|---|---|---|
+| `async def on_x(data)` | opens its own (`async_session_maker()`) | **No** (READ COMMITTED) | logged and swallowed |
+| `async def on_x(data, *, db: AsyncSession)` | the publisher's | Yes | **propagates** → publisher's request rolls back |
+
+Use the transactional form when your reaction must be atomic with the
+publisher's write (money, counters, links between modules). Keep it
+short, DB-only, idempotent, no external I/O. The publisher must offer
+its session — `await event_bus.publish(type, payload, db=db)` — or the
+bus raises `RuntimeError` at publish time. Reference implementation:
+`payments` publishes `payment.allocated` / `payment.refunded` with `db`,
+`billing/events.py` consumes them transactionally.
 
 ### FK cross-module
 

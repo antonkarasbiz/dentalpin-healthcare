@@ -37,7 +37,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/[id].vue
   - backend/app/modules/budget/router.py
-last_verified_commit: 2a05d7a
+last_verified_commit: 4752264
 ---
 
 # Detalle del presupuesto
@@ -53,7 +53,9 @@ Desde aquí se mueve el presupuesto por todo su flujo
 - **Layout en dos columnas.** Izquierda: líneas del presupuesto con
   ítem del catálogo, diente, superficies, cantidad, descuento e IVA.
   Derecha (de arriba abajo): tarjeta de **cobros** (slot
-  `budget.detail.sidebar` rellenado por `payments`), **totales**
+  `budget.detail.sidebar` rellenado por `payments`; incluye también
+  los cobros hechos desde las facturas emitidas de este presupuesto,
+  y lo que se cobra aquí se imputa a esas facturas), **totales**
   (subtotal, descuento, IVA, total), **info** (número, versión,
   validez, creador, plan asociado).
 - **Estado del presupuesto** — chip de color en la cabecera. Las

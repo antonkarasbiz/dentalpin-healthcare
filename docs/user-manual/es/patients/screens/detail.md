@@ -14,7 +14,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/patients/router.py
   - backend/app/modules/patients/frontend/pages/patients/[id].vue
-last_verified_commit: 7ead18e
+last_verified_commit: 4752264
 ---
 
 # Ficha del paciente
@@ -89,9 +89,14 @@ tarjeta de **Pendiente de cobrar** al principio.
 - El total del paciente se calcula como `clinic_receivable =
   earned − net_paid`.
 - El botón **Cobrar X €** abre el modal de cobro con el importe ya
-  rellenado; recepción solo elige el método y confirma.
+  rellenado; recepción elige método y **Destino** (presupuesto
+  abierto o *a cuenta*) y confirma. Un cobro *a cuenta* no toca
+  facturas ni presupuestos; el modal lo indica.
 - Tras el cobro, la tarjeta desaparece o reduce su importe según
   cuánto se cobró.
+- En el menú de cada cobro del historial: **Ver detalle**, **Asignar
+  a presupuesto…** (mueve un anticipo a cuenta al presupuesto elegido
+  y, si tiene facturas emitidas, las imputa) y **Reembolsar**.
 
 ## "No contactar"
 

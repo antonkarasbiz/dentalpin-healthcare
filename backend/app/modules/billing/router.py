@@ -860,6 +860,7 @@ async def apply_payment_to_invoice(
     from app.modules.payments.workflow import PaymentWorkflowError, record_payment
 
     from .models import Invoice, InvoicePayment
+    from .payment_bridge import lock_budget
 
     invoice = await InvoiceService.get_invoice(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
@@ -874,7 +875,10 @@ async def apply_payment_to_invoice(
 
     # Serialize concurrent payments against this invoice (audit S3/C2, #97):
     # lock the invoice row so two requests can't both read the full balance
-    # and each record a payment, over-collecting past the total.
+    # and each record a payment, over-collecting past the total. Lock
+    # order is budget → invoice (see ``payment_bridge.lock_budget``).
+    if invoice.budget_id is not None:
+        await lock_budget(db, ctx.clinic_id, invoice.budget_id)
     await db.execute(
         select(Invoice.id)
         .where(Invoice.id == invoice_id, Invoice.clinic_id == ctx.clinic_id)
@@ -888,6 +892,19 @@ async def apply_payment_to_invoice(
             detail=f"Payment amount ({payload.amount}) exceeds balance due ({balance_due})",
         )
 
+    # Invoices born from a quote collect *against the quote*: the
+    # allocation targets ``invoice.budget_id`` and the transactional
+    # ``payment.allocated`` handler (``payment_bridge``) creates the
+    # ``invoice_payments`` link, preferring this invoice. Manual invoices
+    # keep an ``on_account`` allocation + explicit link (issue #178).
+    from_budget = invoice.budget_id is not None
+    if from_budget:
+        allocations = [
+            {"target_type": "budget", "target_id": invoice.budget_id, "amount": payload.amount}
+        ]
+    else:
+        allocations = [{"target_type": "on_account", "amount": payload.amount}]
+
     try:
         payment = await record_payment(
             db,
@@ -898,28 +915,34 @@ async def apply_payment_to_invoice(
             method=payload.method,
             payment_date=payload.payment_date,
             recorded_by=ctx.user_id,
-            # Imputation against an invoice is tracked here in billing's
-            # ``invoice_payments``. The payment itself records an
-            # ``on_account`` allocation so the invariant holds without
-            # leaking invoice references into payments.
-            allocations=[{"target_type": "on_account", "amount": payload.amount}],
+            allocations=allocations,
             reference=payload.reference,
             notes=payload.notes,
+            context={"prefer_invoice_id": str(invoice_id)},
         )
     except PaymentWorkflowError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    link = InvoicePayment(
-        clinic_id=ctx.clinic_id,
-        invoice_id=invoice_id,
-        payment_id=payment.id,
-        amount=payload.amount,
-        created_by=ctx.user_id,
-    )
-    db.add(link)
-    await db.flush()
+    if from_budget:
+        link_row = await db.execute(
+            select(InvoicePayment).where(
+                InvoicePayment.invoice_id == invoice_id,
+                InvoicePayment.payment_id == payment.id,
+            )
+        )
+        link = link_row.scalar_one()
+    else:
+        link = InvoicePayment(
+            clinic_id=ctx.clinic_id,
+            invoice_id=invoice_id,
+            payment_id=payment.id,
+            amount=payload.amount,
+            created_by=ctx.user_id,
+        )
+        db.add(link)
+        await db.flush()
+        await InvoiceWorkflowService.recalc_invoice_status(db, invoice, actor_id=ctx.user_id)
 
-    await InvoiceWorkflowService.recalc_invoice_status(db, invoice, actor_id=ctx.user_id)
     await db.commit()
 
     return ApiResponse(data=InvoicePaymentResponse.model_validate(link))

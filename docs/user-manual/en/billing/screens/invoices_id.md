@@ -30,7 +30,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/billing/frontend/pages/invoices/[id]/index.vue
   - backend/app/modules/billing/router.py
-last_verified_commit: b1b82f5
+last_verified_commit: 4752264
 ---
 
 # Invoice detail
@@ -47,8 +47,14 @@ or issue a credit note.
   fiscal address, series + number (on `issued`). If the payer is
   not the patient, a *Different payer* chip is shown.
 - **Linked payments.** A list of `invoice_payments` with amount and
-  method. The invoice has no *Charge* button of its own: to collect,
-  use the `payments` module and link the payment to the invoice.
+  method, plus the **Collect** button (`issued`/`partial` invoices).
+  The payment is recorded in the `payments` module and linked here in
+  the same operation. If the invoice was created from a quote, the
+  payment is allocated to that quote: the quote's *Paid* card and the
+  patient record reflect it immediately. The reverse holds too:
+  collecting on the quote applies to its issued invoices, and issuing
+  an invoice from a quote that was already collected (deposit) makes
+  the invoice born `paid`.
 - **PDF.** Two formats: draft (watermarked preview) and final (only
   for `issued`). PDF generation uses WeasyPrint.
 - **History.** Status changes and key events in chronological order.
@@ -103,6 +109,7 @@ or issue a credit note.
 - **VeriFactu is `rejected`.** Check the sidebar or the
   `verifactu` module for the reason. Usually requires editing
   issuer or receiver data and re-submitting manually.
-- **No *Charge* button.** It does not live here. Create the
-  payment under `/payments` (or from the patient record) and link
-  it to this invoice via `invoice_payments`.
+- **I collected from the patient record and the invoice is still
+  unpaid.** The payment was left *on account* (no quote). Under
+  Administration → Payments use **Assign to quote…** on that payment;
+  if the invoice comes from that quote it is applied automatically.

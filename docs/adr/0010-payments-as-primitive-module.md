@@ -100,7 +100,13 @@ the reverse direction is forbidden.** Concretely:
   money: refunds proportionally affect already-imputed payments and
   require a transactional recalc that fits the synchronous
   `recalc_invoice_status` path triggered by the `payment.refunded`
-  handler.
+  handler. *Amendment 2026-08-17 (ADR 0019, issue #178):* the bus
+  handler was synchronous but ran in its own session, so it was in
+  fact eventual (and stale). Both `payment.refunded` and
+  `payment.allocated` are now consumed as **transactional handlers**
+  (`db` passed by the publisher); billing's `payment_bridge` mirrors
+  budget allocations onto the budget's invoices in the same
+  transaction, so the ADR's intent finally holds in code.
 
 ## How to verify the rule still holds
 
@@ -123,3 +129,4 @@ the reverse direction is forbidden.** Concretely:
 - `backend/app/modules/billing/migrations/versions/bil_0004_invoice_payments.py`
 - ADR 0001 (modular plugin architecture)
 - ADR 0003 (event bus over direct imports)
+- ADR 0019 (transactional event handlers)

@@ -29,7 +29,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/payments/frontend/pages/payments/index.vue
   - backend/app/modules/payments/router.py
-last_verified_commit: b1b82f5
+last_verified_commit: 4752264
 ---
 
 # Listado de cobros
@@ -65,13 +65,19 @@ registra un cobro nuevo, se reasigna o se emite un reembolso.
    presupuesto en la ficha del paciente).
 2. Elige el paciente. Selecciona método (efectivo, tarjeta,
    transferencia, débito, seguro u *otro*) y la fecha del cobro.
-3. Reparte el importe entre los presupuestos abiertos del paciente,
-   o déjalo *a cuenta* para asignarlo más tarde. La suma de
-   asignaciones debe igualar el importe — el formulario valida el
-   invariante antes de enviar.
+3. Elige el **Destino**: un presupuesto abierto del paciente (lista
+   con número e importe) o *A cuenta del paciente*. Un cobro *a
+   cuenta* queda como saldo del paciente y **no se imputa a ninguna
+   factura ni presupuesto** hasta que lo asignes — el formulario lo
+   avisa bajo el selector. Para repartir entre varios destinos, abre
+   *Opciones avanzadas*; la suma de asignaciones debe igualar el
+   importe.
 4. **Guardar**. Se publican `payment.recorded` y un
    `payment.allocated` por cada asignación. La tarjeta lateral
-   *Cobrado/Pendiente* del presupuesto se actualiza al instante.
+   *Cobrado/Pendiente* del presupuesto se actualiza al instante y,
+   si el presupuesto tiene facturas emitidas, el cobro se imputa a
+   ellas (FIFO) en la misma operación: la factura pasa a
+   `partial`/`paid` sin ningún paso extra.
 
 ## Reasignar un cobro
 
@@ -80,7 +86,11 @@ registra un cobro nuevo, se reasigna o se emite un reembolso.
 1. Abre el cobro pulsando sobre su fila o desde la ficha del paciente.
 2. Usa **Reasignar** para mover importe entre presupuestos o entre
    presupuesto y *a cuenta*. Cada cambio publica
-   `payment.allocated` con el destino anterior y el nuevo.
+   `payment.allocated`; las facturas del presupuesto de origen se
+   desvinculan y las del destino se imputan, todo en la misma
+   transacción. Desde la ficha del paciente (Administración → Pagos)
+   el menú de la fila ofrece **Asignar a presupuesto…** para el caso
+   habitual: un anticipo dejado a cuenta que ahora toca aplicar.
 
 ## Reembolsar
 

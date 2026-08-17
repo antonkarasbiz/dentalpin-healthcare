@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- fix(#178): `payment.allocated` and `payment.refunded` are published
+  transactionally (`db=db`, ADR 0019) so billing mirrors budget
+  allocations onto invoices and recomputes status inside the same
+  transaction. `record_payment(context=...)` echoes an opaque dict into
+  the allocated payload; payload also carries `patient_id`/`actor_id`
+  (`refunded_by` on refund). Frontend: "Destino" select
+  (`AllocationTargetSelect`) replaces the raw budget UUID field in
+  `PaymentCreateModal` and explains that on-account money is unlinked;
+  ledger row menu gains "Asignar a presupuesto…" (`PaymentReallocateModal`
+  over `/reallocate`). `reallocate_payment` no longer double-deletes
+  allocation rows (delete-orphan warning).
+
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.
 
 - fix(earned): repair + guard against double-booked treatments

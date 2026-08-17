@@ -62,26 +62,38 @@ def _allocations_sum(allocations: list[dict]) -> Decimal:
 
 
 async def _publish_allocated(
+    db: AsyncSession,
     *,
     clinic_id: UUID,
     payment_id: UUID,
+    patient_id: UUID,
+    actor_id: UUID,
     allocation: PaymentAllocation,
+    context: dict | None = None,
     previous_target_type: str | None = None,
     previous_target_id: UUID | None = None,
 ) -> None:
+    # Published *transactionally* (ADR 0019): subscribers that declare a
+    # ``db`` parameter (billing's budget↔invoice bridge) run inside this
+    # session and their failure rolls the payment back.
     await event_bus.publish(
         EventType.PAYMENT_ALLOCATED,
         {
             "clinic_id": str(clinic_id),
             "payment_id": str(payment_id),
+            "patient_id": str(patient_id),
+            "actor_id": str(actor_id),
             "allocation_id": str(allocation.id),
             "target_type": allocation.target_type,
             "target_id": str(allocation.budget_id) if allocation.budget_id else None,
             "amount": str(allocation.amount),
             "previous_target_type": previous_target_type,
             "previous_target_id": str(previous_target_id) if previous_target_id else None,
+            # Opaque caller context echoed verbatim; payments never reads it.
+            "context": context or {},
             "occurred_at": _now().isoformat(),
         },
+        db=db,
     )
 
 
@@ -98,10 +110,14 @@ async def record_payment(
     allocations: list[dict],
     reference: str | None = None,
     notes: str | None = None,
+    context: dict | None = None,
 ) -> Payment:
     """Create a Payment with its allocations transactionally.
 
     Each item of ``allocations`` is ``{target_type, target_id?, amount}``.
+    ``context`` is an opaque dict echoed into every ``payment.allocated``
+    payload for transactional subscribers (e.g. billing passes the
+    invoice the user is collecting on); payments never interprets it.
     """
     if not allocations:
         raise PaymentWorkflowError("At least one allocation required")
@@ -179,7 +195,15 @@ async def record_payment(
         },
     )
     for alloc in created_allocations:
-        await _publish_allocated(clinic_id=clinic_id, payment_id=payment.id, allocation=alloc)
+        await _publish_allocated(
+            db,
+            clinic_id=clinic_id,
+            payment_id=payment.id,
+            patient_id=patient_id,
+            actor_id=recorded_by,
+            allocation=alloc,
+            context=context,
+        )
 
     return payment
 
@@ -216,9 +240,9 @@ async def reallocate_payment(
         for a in payment.allocations
     ]
 
-    # Cascade delete via ORM (also removes references in-memory).
-    for old in list(payment.allocations):
-        await db.delete(old)
+    # ``delete-orphan`` on ``Payment.allocations`` issues the DELETEs;
+    # keeping the collection authoritative avoids a double delete.
+    payment.allocations.clear()
     await db.flush()
 
     created_allocations: list[PaymentAllocation] = []
@@ -231,7 +255,7 @@ async def reallocate_payment(
             amount=Decimal(str(spec["amount"])),
             created_by=changed_by,
         )
-        db.add(alloc)
+        payment.allocations.append(alloc)
         created_allocations.append(alloc)
 
     db.add(
@@ -258,7 +282,14 @@ async def reallocate_payment(
     await db.flush()
 
     for alloc in created_allocations:
-        await _publish_allocated(clinic_id=clinic_id, payment_id=payment.id, allocation=alloc)
+        await _publish_allocated(
+            db,
+            clinic_id=clinic_id,
+            payment_id=payment.id,
+            patient_id=payment.patient_id,
+            actor_id=changed_by,
+            allocation=alloc,
+        )
 
     return payment
 
@@ -326,6 +357,8 @@ async def refund_payment(
 
     await db.flush()
 
+    # Transactional publish (ADR 0019): billing recomputes the status of
+    # invoices this payment was imputed to, inside this same session.
     await event_bus.publish(
         EventType.PAYMENT_REFUNDED,
         {
@@ -334,8 +367,10 @@ async def refund_payment(
             "refund_id": str(refund.id),
             "amount": str(amount),
             "reason_code": reason_code,
+            "refunded_by": str(refunded_by),
             "occurred_at": now.isoformat(),
         },
+        db=db,
     )
 
     return refund
