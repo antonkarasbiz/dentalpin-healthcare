@@ -907,6 +907,7 @@ class TreatmentPlanService:
                 "completed_by": str(user_id),
                 "occurred_at": session.completed_at.isoformat(),
             },
+            db=db,
         )
 
         # Item finalizes when every session is in a terminal state and at

@@ -1,7 +1,7 @@
 """Tests for the unified /treatments API (header + children model)."""
 
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -582,3 +582,69 @@ async def test_no_scope_no_teeth_raises(
         },
     )
     assert r.status_code == 422
+
+
+# ----------------------------------------------------------------------------
+# Earned ledger (payments subscribes transactionally — ADR 0019, issue #183)
+# ----------------------------------------------------------------------------
+
+
+async def _earned_rows(db_session: AsyncSession, treatment_id) -> list:
+    from sqlalchemy import select
+
+    from app.modules.payments.models import PatientEarnedEntry
+
+    result = await db_session.execute(
+        select(PatientEarnedEntry).where(PatientEarnedEntry.treatment_id == treatment_id)
+    )
+    return list(result.scalars().all())
+
+
+@pytest.mark.asyncio
+async def test_perform_books_the_earned_entry(
+    client: AsyncClient, auth_headers: dict, setup: dict, db_session: AsyncSession
+) -> None:
+    create = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"catalog_item_id": setup["crown_id"], "tooth_numbers": [26], "status": "planned"},
+    )
+    tid = create.json()["data"]["id"]
+
+    r = await client.patch(
+        f"/api/v1/odontogram/treatments/{tid}/perform", headers=auth_headers, json={}
+    )
+    assert r.status_code == 200
+
+    rows = await _earned_rows(db_session, UUID(tid))
+    assert len(rows) == 1
+    assert rows[0].amount == Decimal("500.00")
+
+
+@pytest.mark.asyncio
+async def test_earned_entry_rolls_back_with_the_treatment(
+    client: AsyncClient, auth_headers: dict, setup: dict, db_session: AsyncSession
+) -> None:
+    """Revenue is booked in the publisher's transaction.
+
+    The handler used to open its own session and commit there, so a request
+    that failed after ``perform`` left an earned entry for a treatment that
+    never happened — ``treatment_id`` carries no FK to catch it (issue #183).
+    """
+    from app.modules.odontogram.service import TreatmentService
+
+    create = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"catalog_item_id": setup["crown_id"], "tooth_numbers": [27], "status": "planned"},
+    )
+    tid = UUID(create.json()["data"]["id"])
+    me = await client.get("/api/v1/auth/me", headers=auth_headers)
+    user_id = UUID(me.json()["data"]["user"]["id"])
+
+    await TreatmentService.perform(db_session, UUID(setup["clinic_id"]), tid, user_id)
+    assert await _earned_rows(db_session, tid), "earned entry should exist inside the tx"
+
+    await db_session.rollback()
+
+    assert await _earned_rows(db_session, tid) == []

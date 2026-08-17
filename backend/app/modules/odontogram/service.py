@@ -862,6 +862,7 @@ class TreatmentService:
                 if publish_price and treatment.price_snapshot is not None
                 else None,
             },
+            db=db,
         )
         return treatment
 
