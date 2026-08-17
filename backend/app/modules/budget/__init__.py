@@ -126,10 +126,7 @@ class BudgetModule(BaseModule):
         ]
 
     def get_event_handlers(self) -> dict[str, Any]:
-        from .service import BudgetService
-
         return {
-            EventType.ODONTOGRAM_TREATMENT_PERFORMED: BudgetService.on_treatment_performed,
             EventType.TREATMENT_PLAN_TREATMENT_ADDED: self._on_treatment_added_to_plan,
             EventType.TREATMENT_PLAN_TREATMENT_REMOVED: self._on_treatment_removed_from_plan,
             EventType.TREATMENT_PLAN_BUDGET_SYNC_REQUESTED: self._on_sync_requested,
