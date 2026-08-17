@@ -13,7 +13,7 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 | `accounting_export` | 0.1.0 | official | billing, payments | manual | yes | 2 | 0 | 0 | yes |
 | `agenda` | 0.4.0 | official | patients, catalog, odontogram | auto | no | 4 | 11 | 1 | yes |
 | `billing` | 0.1.0 | official | patients, catalog, budget, payments | auto | no | 3 | 3 | 3 | yes |
-| `budget` | 0.1.0 | official | patients, catalog, odontogram | auto | no | 5 | 9 | 4 | yes |
+| `budget` | 0.1.0 | official | patients, catalog, odontogram | auto | no | 5 | 9 | 3 | yes |
 | `catalog` | 0.1.0 | official | — | auto | no | 3 | 0 | 1 | yes |
 | `clinical_notes` | 0.2.0 | official | patients, odontogram, treatment_plan, media, agenda | auto | no | 2 | 6 | 0 | yes |
 | `copilot` | 0.1.0 | official | — | auto | yes | 5 | 3 | 1 | yes |
@@ -134,7 +134,6 @@ Dental treatment quotes, versioning, signatures.
   - `budget.superseded`
   - `budget.viewed`
 - **Events consumed:**
-  - `odontogram.treatment.performed`
   - `treatment_plan.budget_sync_requested`
   - `treatment_plan.treatment_added`
   - `treatment_plan.treatment_removed`
